@@ -43,9 +43,16 @@ final class FeedStore {
     }
 
     /// 约定接口 GET /api/feed/units；后端暂无 → 任何失败都静默留空（诚实空态）
+    /// 2026-10-07：把资讯 prompt 传给后端（?prompt=…&limit=6），后端按提示词生成 units；
+    /// 无 prompt 时后端走默认，不会坏。
     func load() async {
         let auth = AuthStore()
-        guard let url = URL(string: auth.serverURL + "/api/feed/units") else { return }
+        var comps = URLComponents(string: auth.serverURL + "/api/feed/units")
+        comps?.queryItems = [
+            URLQueryItem(name: "prompt", value: prompt),
+            URLQueryItem(name: "limit", value: "6"),
+        ]
+        guard let url = comps?.url else { return }
         var req = URLRequest(url: url)
         req.timeoutInterval = 8
         if !auth.token.isEmpty {
