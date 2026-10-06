@@ -42,6 +42,7 @@ struct MuseRowDivider: View {
 struct GraySettingsRow: View {
     var icon: String? = nil
     var colorful: Bool = false   // K 线：连接应用页用多彩图标（SF Symbol multicolor）
+    var iconView: AnyView? = nil // 2026-10-07：连接应用·本机页用 Apple 风格手绘图标（见 SystemAppIcons）
     let title: String
     var subtitle: String? = nil
     var value: String? = nil
@@ -54,7 +55,10 @@ struct GraySettingsRow: View {
             action()
         } label: {
             HStack(spacing: 12) {
-                if let icon {
+                if let iconView {
+                    iconView
+                        .frame(width: 44, height: 44)
+                } else if let icon {
                     Group {
                         if colorful {
                             Image(systemName: icon)

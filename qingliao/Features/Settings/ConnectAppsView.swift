@@ -137,21 +137,28 @@ struct ConnectAppsView: View {
     @ViewBuilder
     private func deviceRow(_ cap: AppCapability) -> some View {
         let st = states[cap] ?? .notDetermined
-        GraySettingsRow(icon: cap.sfSymbol, colorful: true, title: cap.displayName,
+        // 2026-10-07 真机反馈：本机页用 Apple 风格真机图标（对标 Muse），不用 SF 符号
+        let appleIcon: AnyView? = cap.appleStyleKind.map { AnyView(AppleStyleIcon(kind: $0, size: 44)) }
+        GraySettingsRow(icon: appleIcon == nil ? cap.sfSymbol : nil,
+                        colorful: appleIcon == nil,
+                        iconView: appleIcon,
+                        title: cap.displayName,
                         subtitle: cap.blurb, value: st.label, chevron: false) {
             Task { await tapCapability(cap, state: st) }
         }
     }
 
     private var musicRow: some View {
-        GraySettingsRow(icon: "music.note", colorful: true, title: "音乐",
+        GraySettingsRow(iconView: AnyView(AppleStyleIcon(kind: .music, size: 44)),
+                        title: "音乐",
                         subtitle: "读取媒体库，为你播放音乐", value: musicState.label, chevron: false) {
             Task { await tapMusic() }
         }
     }
 
     private var micRow: some View {
-        GraySettingsRow(icon: "mic", colorful: true, title: "麦克风",
+        GraySettingsRow(iconView: AnyView(AppleStyleIcon(kind: .mic, size: 44)),
+                        title: "麦克风",
                         subtitle: "语音输入与语音对话", value: micState.label, chevron: false) {
             Task { await tapMic() }
         }
