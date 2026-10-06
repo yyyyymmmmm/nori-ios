@@ -1620,53 +1620,45 @@ struct HermesModelPickerSheet: View {
                         .font(.system(size: 15, weight: .medium))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if groups.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "cpu")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.tertiary)
+                        Text("暂无可用模型")
+                            .font(.system(size: 17, weight: .medium))
+                        Text("Hermes 服务未返回模型列表")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
                         ForEach(groups) { g in
-                            Section {
-                                if let err = g.error {
-                                    Text(err)
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(.orange)
-                                }
-                                ForEach(g.models) { m in
-                                    Button {
-                                        Haptics.tap()
-                                        Task { await select(provider: g.id, m) }
-                                    } label: {
-                                        HStack {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(m.name)
-                                                    .font(.system(size: 17))
-                                                    .foregroundStyle(.primary)
-                                                if m.name != m.id {
-                                                    Text(m.id)
-                                                        .font(.system(size: 12))
-                                                        .foregroundStyle(.tertiary)
-                                                }
-                                            }
-                                            Spacer()
-                                            if busyID == "\(g.id)|\(m.id)" {
-                                                ProgressView().controlSize(.small)
-                                            } else if m.selected {
-                                                Image(systemName: "checkmark")
-                                                    .font(.system(size: 16, weight: .semibold))
-                                                    .foregroundStyle(.primary)
-                                            }
-                                        }
-                                        .contentShape(Rectangle())
+                            NavigationLink {
+                                HermesModelListView(
+                                    provider: g,
+                                    busyID: $busyID,
+                                    onSelect: { m in Task { await select(provider: g.id, m) } },
+                                    onHide: { m in hideConfirm = (g.id, m) }
+                                )
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(g.name)
+                                            .font(.system(size: 17))
+                                            .foregroundStyle(.primary)
+                                        Text("\(g.models.count) 个模型")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(.tertiary)
                                     }
-                                    .buttonStyle(.plain)
-                                    .contextMenu {
-                                        Button(role: .destructive) {
-                                            hideConfirm = (g.id, m)
-                                        } label: {
-                                            Label("隐藏此模型", systemImage: "eye.slash")
-                                        }
+                                    Spacer()
+                                    if g.models.contains(where: { $0.selected }) {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(.primary)
                                     }
                                 }
-                            } header: {
-                                Text(g.name)
                             }
                         }
                     }
@@ -1758,6 +1750,64 @@ struct HermesModelPickerSheet: View {
         _ = try? await auth.json("/api/agent/hermes/models/hide", method: "POST",
                                  body: ["provider": pid, "model_ids": arr])
         await load()
+    }
+}
+
+// MARK: - 服务商的模型列表（两级选择第二级）
+
+struct HermesModelListView: View {
+    let provider: HermesProviderGroup
+    @Binding var busyID: String?
+    let onSelect: (HermesModelOption) -> Void
+    let onHide: (HermesModelOption) -> Void
+
+    var body: some View {
+        List {
+            if let err = provider.error {
+                Text(err)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.orange)
+            }
+            ForEach(provider.models) { m in
+                Button {
+                    Haptics.tap()
+                    onSelect(m)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(m.name)
+                                .font(.system(size: 17))
+                                .foregroundStyle(.primary)
+                            if m.name != m.id {
+                                Text(m.id)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        Spacer()
+                        if busyID == "\(provider.id)|\(m.id)" {
+                            ProgressView().controlSize(.small)
+                        } else if m.selected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button(role: .destructive) {
+                        onHide(m)
+                    } label: {
+                        Label("隐藏此模型", systemImage: "eye.slash")
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(provider.name)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

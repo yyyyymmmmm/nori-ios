@@ -52,7 +52,7 @@ struct HealthHeroCard: View {
                 .frame(maxWidth: .infinity)
             }
             .padding(18)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 28))
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 28))
             .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 4)
         }
         .buttonStyle(.plain)
@@ -139,7 +139,7 @@ struct TodaySuggestionCard: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 28))
+        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 28))
         .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 4)
         .task {
             guard !loaded else { return }

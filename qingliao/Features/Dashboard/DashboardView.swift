@@ -142,13 +142,13 @@ struct DashboardView: View {
                         .foregroundStyle(.primary)
                         .padding(.top, Spacing.lg)
 
-                    // 2026-10 简化：只留三块——健康 Hero + 记忆 Hero + Nori 今日建议
+                    // 2026-10 简化：只留三块——Nori 今日建议置顶 + 健康 Hero + 记忆 Hero
                     // 其他（快捷入口/服务状态/动态信息流）全砍
+                    TodaySuggestionCard()
+
                     HealthHeroCard()
 
                     MemoryHeroCard()
-
-                    TodaySuggestionCard()
                 }
                 .padding(.horizontal, Spacing.xxl)
                 .padding(.bottom, 100)
