@@ -35,8 +35,7 @@ CI 只在 **`v*` tag 推送**时触发（分支 push 不触发；版本线现为
 #      它就是 CI 同款口径的本地自查，1 秒出结果，别用一次 15 分钟的 CI 去试错（v4.0.11 教训）
 #    新增 target（widget/extension）必须写它自己的 Info.plist 版本号，否则 XcodeGen 默认落 1.0/1（v3.8.0 教训）
 # 2) 自查（见下）+ ./check_swift.sh + commit
-git push origin feature/handoff-301
-git tag v3.9.x && git push origin v3.9.x     # 触发 CI（约 15-20 分钟）
+git push origin main
 ```
 
 - **⚠️ 同 tag force push 不触发 CI**（GitHub 只认新建 tag）——失败重试必须**删远端 tag 重建**（`git push origin :refs/tags/vX`）或升新版本号
@@ -571,9 +570,9 @@ QingliaoWidget/          挂件 Extension target（.appex）：灵动岛/锁屏�
 
 ## 🔀 分支与版本
 
-- `feature/handoff-301`：**当前默认分支**，3.9.x 的开发与发版线
-- `native-3.0`：3.0 早期主线，已停更（不再是默认分支，勿再作为发版基线）
-- `native-2.0`：2.0 历史冻结（终版 tag `v2.0.140`）；旧 `master` 本地残留可忽略（勿 push）
+- `main`：**当前默认分支**，Nori 的开发线（2026-10 起）
+- `native-3.0`：3.0 早期主线，已停更（勿再作为发版基线）
+- `native-2.0`：2.0 历史冻结（终版 tag `v2.0.140`）
 - 版本演进记录在提交信息（v2.0.87bn 起每提交带版本后缀）；发版 tag = `v3.9.x` 递增，`project.yml` 的 build 号（`CFBundleVersion`/`CURRENT_PROJECT_VERSION`）同步 +1
 - 仓库为 public：**任何提交不得包含真实服务器域名/公网 IP/内网 IP/密码/token**（此前已做全历史脱敏，v2.0.52-54；新引入敏感信息即泄露）
 
