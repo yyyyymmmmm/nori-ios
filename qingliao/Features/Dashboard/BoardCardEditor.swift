@@ -110,4 +110,4 @@ struct BoardCardEditorSheet: View {
 
 // MARK: - 服务控制 sheet（HomeKit 卡片式：信息卡 + 重试卡 + 停止卡）
 
-/// v3.0.36：服务类型（轻聊后端 / Hermes 网关）
+/// v3.0.36：服务类型（Nori后端 / Hermes 网关）

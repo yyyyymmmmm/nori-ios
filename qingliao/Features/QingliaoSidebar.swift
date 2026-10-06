@@ -95,7 +95,7 @@ struct QingliaoSidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             // 顶部：App 名 + 设置齿轮（设置页唯一入口）
             HStack {
-                Text("轻聊")
+                Text("Nori")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(.primary)
                 Spacer()

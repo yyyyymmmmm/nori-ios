@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - 启动动画（轻聊风格：聊天气泡 + 环境光晕，自然简洁一次淡入，无复杂粒子）
+// MARK: - 启动动画（Nori风格：聊天气泡 + 环境光晕，自然简洁一次淡入，无复杂粒子）
 
 struct SplashView: View {
     @State private var appeared = false
@@ -40,7 +40,7 @@ struct SplashView: View {
 
                 // 标题
                 VStack(spacing: 6) {
-                    Text("轻聊")
+                    Text("Nori")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.primary)
                     Text("QINGLIAO · AI Agent")

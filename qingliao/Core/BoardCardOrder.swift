@@ -1,6 +1,6 @@
 //
 //  BoardCardOrder.swift
-//  轻聊
+//  Nori
 //
 //  v4.0.20：看板（Dashboard）栏目卡片「长按拖动排序」的**纯逻辑**
 //  （无 SwiftUI / UIKit 依赖）—— 顺序串归一化、垂直拖拽落位几何、写回保位。

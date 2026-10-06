@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - F线 2026-10-06：AI 形象胶囊（Muse 式，五页顶栏统一）
 //
-// 顶部居中：PetAvatar（56pt，动画跟任务状态走）+ 下方压着"轻聊"名字胶囊 + 状态小字。
+// 顶部居中：PetAvatar（56pt，动画跟任务状态走）+ 下方压着"Nori"名字胶囊 + 状态小字。
 // 状态：连接异常 / 正在执行任务 / 正在思考… / 在线（D路 aiStatusStrip 的文案口径）。
 // 点击 → 发 .qingliaoOpenTaskCenter 通知（ChatView 既有链路弹任务中心，不新造状态）。
 //

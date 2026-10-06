@@ -1,6 +1,6 @@
 //
 //  HomeCards.swift
-//  轻聊
+//  Nori
 //
 //  v4.0.8：聊天首页「方块卡片」组件（2 列等宽网格 + 长按拖拽排序 + 自定义开关）。
 //  版式 = 用户 2026-09-29 拍板的 B3 稿；纯逻辑全在 Core/HomeCardOrder.swift（那里有真值表）。
@@ -774,7 +774,7 @@ struct HomeCardFace: View {
     private var subtitle: String {
         switch kind {
         case .mail:
-            guard let n = data.mailUnread else { return "点一下让轻聊去查" }
+            guard let n = data.mailUnread else { return "点一下让Nori去查" }
             if n == 0 { return "没有未读 · 点一下复查" }
             return data.mailLatest.isEmpty ? "\(n) 封未读" : "\(n) 封未读 · 最新 \(data.mailLatest)"
         case .resume:

@@ -80,13 +80,13 @@ enum MinutesKit {
     static let memoSavedHint = "已存备忘 · 生活页「备忘」里可看全文"
     /// 原文备忘存好后的提示
     static let rawMemoSavedHint = "转写原文已存备忘（来源：会议纪要）"
-    static let micDeniedHint = "没拿到麦克风权限：设置 → 轻聊 → 麦克风打开后，点「重试」。"
+    static let micDeniedHint = "没拿到麦克风权限：设置 → Nori → 麦克风打开后，点「重试」。"
     static let startFailedHint = "录音没能启动。点「重试」再试一次；仍不行请确认麦克风没被别的 App 占着。"
     /// 机型/系统不支持设备端识别（转写器给的诊断原话是 SpeechTranscriber.isAvailable=false）
     static let unsupportedHint = "这台设备不支持设备端语音识别（需要 iOS 26 且机型支持）。纪要就没法在这儿做了。"
     static let tooLongHint = "录音太长了（上限 6 万字）。先用「存原文备忘」把原文留下，再分段整理。"
     static let emptySummaryHint = "这次没整理出内容。点「重试」再来一次，或用「存原文备忘」把原文留下。"
-    static let loginHint = "轻聊还没登录：先打开 App 登录一次，再回来整理。"
+    static let loginHint = "Nori还没登录：先打开 App 登录一次，再回来整理。"
 
     /// 分段整理有失败时（网络/超时），不许整单失败：说明哪几条没整理
     static func partialHint(_ failed: Int) -> String {

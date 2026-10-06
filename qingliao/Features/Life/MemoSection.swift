@@ -270,7 +270,7 @@ struct MemoSection: View {
     }
 
     /// v3.9.14：把备忘内容作为一条用户消息发给 AI，并切回聊天页。
-    /// 备忘存下来只能复制粘贴没意义——能直接接着办才是轻聊备忘录区别于系统备忘录的地方。
+    /// 备忘存下来只能复制粘贴没意义——能直接接着办才是Nori备忘录区别于系统备忘录的地方。
     private func sendToAI(_ m: MemoItem) {
         NotificationCenter.default.post(name: .qingliaoMemoSend, object: m.content)
         Haptics.success()

@@ -919,7 +919,7 @@ struct HistoryItem: Identifiable {
 
 //
 //  HomeShortcutSheet.swift
-//  轻聊
+//  Nori
 //
 //  v3.9.82：桌面图标长按快捷方式的选择弹窗（候选清单里挑 4 项显示，v4.0.x 候选 8 项）
 //  上限来自 iOS 本身（桌面长按菜单最多 4 项），不是我们的产品决定 —— 文案里对用户说清楚。
@@ -942,7 +942,7 @@ struct HomeShortcutSheet: View {
                 } footer: {
                     Text(selected.isEmpty
                          ? "一个都没选 —— 长按桌面图标不会出现快捷方式。"
-                         : "顺序就是下面的排列顺序。长按桌面上的「轻聊」图标即可看到这几项，最多 \(HomeShortcut.maxCount) 个（iOS 系统上限）。")
+                         : "顺序就是下面的排列顺序。长按桌面上的「Nori」图标即可看到这几项，最多 \(HomeShortcut.maxCount) 个（iOS 系统上限）。")
                 }
                 // 常显：全关掉之后也得有路回来。
                 // 判据用集合比较（不是 count）：选了 4 个但和默认不一样时，也得给「恢复默认」。

@@ -2,7 +2,7 @@ import Foundation
 //
 //  v3.9.74 P1.5 连接器面板（Muse 借鉴）：AI 能连上的"数字生活"收拢成一页
 //
-//  Muse 的核心卖点之一是接入六大类数字生活；轻聊的对应底座早已存在，只是入口散在三处：
+//  Muse 的核心卖点之一是接入六大类数字生活；Nori的对应底座早已存在，只是入口散在三处：
 //    · MCP 工具服务（App 配 key → Hermes 原生 MCP 工具）→ 设置页弹窗 MCPSettingsSheet
 //    · 智能家居（HomeKit 风格设备卡 / 场景 / 自动化 / 规则）→ 看板页若干栏目
 //    · 生活卡片（股票 / 资讯 / 快递）→ 生活页 + 设置页 LifeCardsSettingsView

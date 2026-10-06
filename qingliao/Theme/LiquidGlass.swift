@@ -537,7 +537,7 @@ struct IslandGlowOverlay: View {
 // 想"统一毛玻璃"，真机反馈**观感回退** —— 因为 iOS 26 系统给弹窗的默认底本身就是玻璃材质，
 // 用 `ultraThinMaterial` 盖上去等于拿旧材质覆盖系统那层，反而显得又旧又灰。
 //
-// 结论（用户所说的"设置里关于轻聊那种" = 系统默认）：
+// 结论（用户所说的"设置里关于Nori那种" = 系统默认）：
 //   · **弹窗背景一律不覆盖**，让系统默认生效，这就是"统一"；
 //   · 真正让弹窗看起来不统一的是**内容视图自带的不透明底**
 //     （`.background(Color(uiColor: .systemBackground))` / `.systemGroupedBackground`）→ 已清理 11 处；

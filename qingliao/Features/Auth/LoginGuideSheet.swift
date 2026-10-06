@@ -39,21 +39,21 @@ struct LoginGuideSheet: View {
         GuideStep(
             id: 1, icon: "server.rack", iconColor: .blue,
             title: "部署后端",
-            brief: "在一台装有 Docker 的机器（NAS / 服务器 / 电脑）上拉起轻聊后端服务。推荐方式：把官方部署 skill 交给你的 AI 助手，说一句「帮我部署轻聊」即可自动完成。",
+            brief: "在一台装有 Docker 的机器（NAS / 服务器 / 电脑）上拉起Nori后端服务。推荐方式：把官方部署 skill 交给你的 AI 助手，说一句「帮我部署Nori」即可自动完成。",
             bullets: [
-                "自动部署（推荐）：下载部署 skill → 丢给 Hermes → 说「帮我部署轻聊」",
+                "自动部署（推荐）：下载部署 skill → 丢给 Hermes → 说「帮我部署Nori」",
                 "手动部署：克隆仓库 → 跑 bash install.sh（它会引导设置密码与上游 AI 端点）",
                 "⚠️ 别跳过 install.sh：它自动生成 QL_INBOX_TOKEN / QL_PUSH_TOKEN；在 compose 里手填却漏了这两个，收件箱与推送会静默失效（没有任何报错）",
                 "AI 记忆 / 文件管理等模块随服务开启；智能家居需另配 Home Assistant（QL_HA_URL / Token）",
             ],
             code: "# 手动部署（在装了 Docker 的机器上执行）\ngit clone https://github.com/lxm20060513-svg/qingliao-backend.git\ncd qingliao-backend\nbash install.sh          # 交互式：设密码 + 上游 AI 端点，并自动生成接口 token\ndocker compose logs -f   # 看启动日志（统一入口默认 9127）",
-            skillCode: "# 第一步：下载部署 skill（GitHub），放进 Hermes 的 skills 目录\n# 第二步：对 Hermes 说一句「帮我部署轻聊」，\n# Hermes 会自动完成克隆、改配置、启动。",
+            skillCode: "# 第一步：下载部署 skill（GitHub），放进 Hermes 的 skills 目录\n# 第二步：对 Hermes 说一句「帮我部署Nori」，\n# Hermes 会自动完成克隆、改配置、启动。",
             skillURL: "https://github.com/lxm20060513-svg/qingliao-backend/tree/main/skills/deployment/qingliao-deploy"
         ),
         GuideStep(
             id: 2, icon: "puzzlepiece.extension", iconColor: .indigo,
             title: "部署插件（接入 AI）",
-            brief: "Hermes 平台插件把轻聊接入 AI 智能体，让 AI 能真正干活：查状态、控设备、执行任务。部署 skill 的第 4 步会自动完成本步。",
+            brief: "Hermes 平台插件把Nori接入 AI 智能体，让 AI 能真正干活：查状态、控设备、执行任务。部署 skill 的第 4 步会自动完成本步。",
             bullets: [
                 "一键安装脚本把插件放进 AI 网关的 plugins/ 目录",
                 "在网关 config.yaml 启用 qingliao 平台并重启网关",
@@ -105,7 +105,7 @@ struct LoginGuideSheet: View {
                 "./update.sh —— 命令行更新到最新 + 自动重启。数据、会话、密码全部保留",
                 "./update.sh --check 只看有没有新版；./update.sh --version v4.0.xx 更新到指定版本（要配套某个 App 版本时用）",
                 "更新前会自动把数据备份到 backups/，万一新版有问题可回滚",
-                "App「设置 → 关于轻聊」能看到当前后端版本，方便确认配套的是哪一版",
+                "App「设置 → 关于Nori」能看到当前后端版本，方便确认配套的是哪一版",
             ],
             code: "# 在后端目录里执行（把路径换成你自己的部署目录）\ncd 你的部署目录\n./update.sh",
             skillCode: nil,

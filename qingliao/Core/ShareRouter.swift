@@ -5,7 +5,7 @@ import CoreLocation
 
 // MARK: - v3.4.14 系统分享接入口
 //
-// 从其他 App（照片/文件/Safari/备忘录…）通过系统分享把内容交给轻聊。
+// 从其他 App（照片/文件/Safari/备忘录…）通过系统分享把内容交给Nori。
 // 原理：Info.plist 声明 CFBundleDocumentTypes（能打开的文件类型/UTI）后，
 // 侧载 App 也能出现在系统分享/打开方式列表（LiveContainer 接 IPA 即此原理）。
 // 数据流：DockTabView.onOpenURL 捕获分享的 URL → 解析成 SharedPayload →

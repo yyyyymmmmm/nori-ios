@@ -443,7 +443,7 @@ struct OrbIdentifyOverlay: View {
                                                                   imageDataURL: dataURL,
                                                                   timeout: PhotoAskKit.timeout)
                 // 空正文在这里不可达：`QingliaoIntentClient.oneShot` 已经先 `throw`
-                //（「轻聊没有返回内容」）→ 走下面的 catch 显示真因；别再加一个「空回答」分支当摆设。
+                //（「Nori没有返回内容」）→ 走下面的 catch 显示真因；别再加一个「空回答」分支当摆设。
                 let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
                 phase = .photoAnswer(text)
                 Haptics.success()

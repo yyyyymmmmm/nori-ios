@@ -52,7 +52,7 @@ enum NotificationHelper {
             !$0.trimmingCharacters(in: .whitespaces).isEmpty
         }
         let preview = (firstLine ?? "").trimmingCharacters(in: .whitespaces)
-        notify(title: "轻聊", body: preview.isEmpty ? "AI 回复完成，点击查看" : "💬 " + String(preview.prefix(50)),
+        notify(title: "Nori", body: preview.isEmpty ? "AI 回复完成，点击查看" : "💬 " + String(preview.prefix(50)),
                sessionId: sessionId)
     }
 

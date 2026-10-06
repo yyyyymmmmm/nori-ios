@@ -276,7 +276,7 @@ enum DiagnosticsPayload {
                            backend: String, pendingCount: Int,
                            uploadStats: DiagnosticsStore.UploadStats) -> String {
         var out = [
-            "轻聊诊断报告",
+            "Nori诊断报告",
             "生成时间: \(timeText(Date().timeIntervalSince1970))",
             "App 版本: \(env.version) (\(env.build))",
             "设备: \(env.device)",

@@ -88,7 +88,7 @@ let df = DateFormatter()
 df.locale = Locale(identifier: "zh_CN")
 df.dateFormat = "M月d日 EEEE"
 let prompt = """
-你是轻聊的生活助手。今天是\(df.string(from: Date()))。请为用户生成 4-6 条个性化推荐（点子）：每条都是你现在就能帮用户做的具体事项，要实用、具体，贴合一天中的这个时间点。
+你是Nori的生活助手。今天是\(df.string(from: Date()))。请为用户生成 4-6 条个性化推荐（点子）：每条都是你现在就能帮用户做的具体事项，要实用、具体，贴合一天中的这个时间点。
 每条推荐包含：icon（SF Symbol 名）、title（简短有力的标题）、desc（2-3 句话，详细说明你会怎么做、需要什么信息、产出什么）、prompt（用户点开后填入对话框的完整提示词，要详细全面、可直接使用）、group（分组名，从"今日效率""规划复盘""生活助手"中选一个）。
 只返回 JSON 数组，不要任何其他文字。格式示例：
 [{"icon":"calendar","title":"今日会议准备","desc":"……","prompt":"……","group":"今日效率"}]

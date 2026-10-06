@@ -39,7 +39,7 @@ struct AgentAction: Equatable, Sendable {
         case reminderCreate = "reminder.create"
         case reminderList   = "reminder.list"      // 看待办（只读）
         case reminderDelete = "reminder.delete"
-        // v4.0.57 轻聊 App 自己的待办清单（TodoStore/todos.json，生活页 → 待办），
+        // v4.0.57 Nori App 自己的待办清单（TodoStore/todos.json，生活页 → 待办），
         // 与系统「提醒事项」App（reminder.create）是两回事 —— 用户「加入待办」指这里
         case todoAdd = "todo.add"                  // 加入待办（写）
         // v4.0.60 iOS 健康数据（HealthKit **只读**）：用户问睡眠/步数/心率 → 回只读卡自动执行。
@@ -56,7 +56,7 @@ struct AgentAction: Equatable, Sendable {
         // 剪贴板
         case clipboardRead  = "clipboard.read"     // 读剪贴板（只读）
         case clipboardWrite = "clipboard.write"    // 写剪贴板（写）
-        // 文件（轻聊自己的沙盒目录，不是任意路径）
+        // 文件（Nori自己的沙盒目录，不是任意路径）
         case fileList  = "file.list"               // 列目录（只读）
         case fileRead  = "file.read"               // 读文件（只读）
         case fileWrite = "file.write"              // 写文件（写）

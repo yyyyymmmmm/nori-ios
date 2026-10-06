@@ -22,7 +22,7 @@ struct QingliaoActivityAttributes: ActivityAttributes {
 
     /// 动态数据：可随 `Activity.update` 变化
     struct ContentState: Codable, Hashable {
-        /// 会话标题（空则挂件显示「轻聊」）
+        /// 会话标题（空则挂件显示「Nori」）
         var sessionTitle: String
         /// 当前模型名（展示用）
         var modelName: String
@@ -100,7 +100,7 @@ struct QingliaoActivityAttributes: ActivityAttributes {
         /// 这里逐个 `decodeIfPresent` 兜底，缺字段按「思考中」渲染。
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            sessionTitle = try c.decodeIfPresent(String.self, forKey: .sessionTitle) ?? "轻聊"
+            sessionTitle = try c.decodeIfPresent(String.self, forKey: .sessionTitle) ?? "Nori"
             modelName = try c.decodeIfPresent(String.self, forKey: .modelName) ?? "AI"
             startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt) ?? Date()
             isAnswering = try c.decodeIfPresent(Bool.self, forKey: .isAnswering) ?? true

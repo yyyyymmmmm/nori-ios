@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - v4.0.1 系统分享接收扩展 ↔ 主 App 的唯一协议
 //
-// 目的：从别的 App（照片 / Safari / 备忘录…）把**文本、链接、图片**分享进轻聊**当前会话**。
+// 目的：从别的 App（照片 / Safari / 备忘录…）把**文本、链接、图片**分享进Nori**当前会话**。
 // （口径 1a：分享入口只留这三类，`project.yml` 的 activation rule 已删 File —— 本协议本身仍只认
 //  文本/链接/图片三形态，`Payload.sourceName` 只做「空正文时的来源兜底」。）
 //
@@ -16,7 +16,7 @@ import Foundation
 //        主 App 在回前台 / 冷启动时读。跨 App 读剪贴板系统会弹一次「允许粘贴」，这是既定行为。
 // 3. ⚠️ **iOS 18 起系统明令禁止 App 扩展拉起宿主 App**（`extensionContext.open` 抛
 //    `LSApplicationWorkspaceErrorDomain 115`）。所以「唤起」只能当**尽力而为**，不能当唯一路径：
-//    兜底流程是「内容已放进剪贴板 + 用户自己打开轻聊 → 主 App 自动接住」。扩展的可见 UI 必须
+//    兜底流程是「内容已放进剪贴板 + 用户自己打开Nori → 主 App 自动接住」。扩展的可见 UI 必须
 //    如实说清这一点（用户拍板：可见入口必须可用，不接受占位）。
 //
 // ## 去重

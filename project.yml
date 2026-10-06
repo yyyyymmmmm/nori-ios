@@ -1,4 +1,4 @@
-name: 轻聊
+name: Nori
 options:
   bundleIdPrefix: com.qingliao
   deploymentTarget:
@@ -72,20 +72,20 @@ targets:
         # v3.9.95：AI 操控本地数据（权限与 AI 操控页 / ```ql-action 动作卡）
         # ⚠️ 缺权限串的后果分两种：EventKit/Photos 多数是"拒绝授权"，
         #    但历史上 FaceID/PhotoLibraryAdd 缺串直接 SIGABRT —— 声明先补上，别等真机崩。
-        NSCalendarsFullAccessUsageDescription: 让轻聊在你确认后读取和修改你的日历
-        NSPhotoLibraryUsageDescription: 让轻聊在你确认后读取相册图片供 AI 识别，或存入你选中的图片
+        NSCalendarsFullAccessUsageDescription: 让Nori在你确认后读取和修改你的日历
+        NSPhotoLibraryUsageDescription: 让Nori在你确认后读取相册图片供 AI 识别，或存入你选中的图片
         # v4.0.x：AI 本地动作扩容（提醒事项 / 通讯录 / 定位）。
         # ⚠️ 与上面 FaceID / PhotoLibraryAdd 同一条教训：缺权限串在真机上不是"弹窗被拒"而是
         #    **SIGABRT 闪退**，且只在用户真点一次该功能时复现 —— -parse 和 CI archive 都查不出。
         #    这三条一律"用到才触发"，漏补就是"用户第一次用就崩"，先声明再说。
-        NSRemindersFullAccessUsageDescription: 让轻聊在你确认后读取你的待办提醒、新建提醒事项
+        NSRemindersFullAccessUsageDescription: 让Nori在你确认后读取你的待办提醒、新建提醒事项
         # v4.0.60 健康（HealthKit 只读）：同一条教训 —— 缺权限串在真机上是 SIGABRT 闪退，
         # 且只在用户真点一次「健康」时复现，-parse 与 CI archive 都查不出。
-        NSHealthShareUsageDescription: 让轻聊在你确认后读取你的健康数据（步数/睡眠/心率等），用于回答你的健康问题
-        NSContactsUsageDescription: 让轻聊在你确认后查询联系人、新建联系人
-        NSLocationWhenInUseUsageDescription: 让轻聊在你确认后读取一次当前位置，用于回答「我在哪 / 附近有什么」
+        NSHealthShareUsageDescription: 让Nori在你确认后读取你的健康数据（步数/睡眠/心率等），用于回答你的健康问题
+        NSContactsUsageDescription: 让Nori在你确认后查询联系人、新建联系人
+        NSLocationWhenInUseUsageDescription: 让Nori在你确认后读取一次当前位置，用于回答「我在哪 / 附近有什么」
         # 文件读写走 App 自己的 Documents 沙盒（SandboxFiles）。打开文件 App 共享后，
-        # 用户能在「文件」→ 我的 iPhone → 轻聊 里看到 AI 写的文件、也能自己放文件进去给 AI 读。
+        # 用户能在「文件」→ 我的 iPhone → Nori 里看到 AI 写的文件、也能自己放文件进去给 AI 读。
         UIFileSharingEnabled: true
         # SR8：后台刷新的 delegate 方法 application(_:performFetchWithCompletionHandler:)
         # （ChatView.swift 里那份「唤醒后查流式任务是否完成 → 本地通知」）**必须**声明
@@ -103,7 +103,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # v3.4.14 系统分享接入口：声明能打开的文件类型/UTI，侧载 App 也能作为系统分享目标
         LSSupportsOpeningDocumentsInPlace: true
-        # v3.4.25：注册 qingliao:// URL Scheme——地图/Safari 分享面板更稳定出现轻聊入口
+        # v3.4.25：注册 qingliao:// URL Scheme——地图/Safari 分享面板更稳定出现Nori入口
         CFBundleURLTypes:
           - CFBundleURLName: com.qingliao.app2
             CFBundleURLSchemes:
@@ -191,7 +191,7 @@ targets:
         SKIP_INSTALL: YES
 
   # v4.0.1：**系统分享接收扩展** —— 从别的 App（照片 / Safari / 备忘录…）把文本、链接、图片
-  # 分享进轻聊**当前会话**（口径 1a：入口只留这三类，不声明 File/视频/音频）。
+  # 分享进Nori**当前会话**（口径 1a：入口只留这三类，不声明 File/视频/音频）。
   #
   # ⚠️ 侧载（免费签名）**没有 App Groups**（与挂件同一约束）→ 扩展与主 App 没有共享容器：
   #    共享文件、共享 UserDefaults 全都不可用。所以内容只走两条**系统级**通道：
@@ -199,7 +199,7 @@ targets:
   #      ② 系统剪贴板（自定义类型，图片 / 超长文本）——扩展写、主 App 进前台时读。
   #    协议、去重令牌、档位都写在 qingliao/Core/ShareLinkCodec.swift 的文件头注释里；
   #    ⚠️ 另一条硬限制：**iOS 18 起扩展无法拉起宿主 App**（extensionContext.open 会被系统拒），
-  #    所以「唤起轻聊」只算尽力而为，兜底是「内容已在剪贴板 + 用户手动打开轻聊」。
+  #    所以「唤起Nori」只算尽力而为，兜底是「内容已在剪贴板 + 用户手动打开Nori」。
   qingliaoShare:
     type: app-extension
     platform: iOS
@@ -222,7 +222,7 @@ targets:
           # 不用 storyboard：直接挂 VC 类（本仓没有 MainInterface.storyboard，少一份要同步的资源）
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
           # 出现条件（口径 1a：用户拍板「分享入口只留文本 / 链接 / 图片」，故只声明我们**真的能收**的三类；
-          # 视频 / 音频 / 文件都不声明 —— 轻聊现有的分享落点只能接文本与单图
+          # 视频 / 音频 / 文件都不声明 —— Nori现有的分享落点只能接文本与单图
           # （ShareRouter 一条 = 一图一文本），声明 File 会出现一个「点进去只发文件名、内容读不出」的入口）：
           #   · 文本、网页链接、图片 各一条
           #   · 网页归档（webarchive，二进制）不处理，故不声明 WebPage

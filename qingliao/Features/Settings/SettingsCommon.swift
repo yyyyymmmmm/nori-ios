@@ -145,7 +145,7 @@ struct PinPathSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                TextField("默认: /volume1/.../轻聊app", text: $path)
+                TextField("默认: /volume1/.../Noriapp", text: $path)
                     .font(.system(size: Typography.body))
                     .padding(Spacing.xl)
                     .background(Color(uiColor: .secondarySystemGroupedBackground))
@@ -383,7 +383,7 @@ struct SessionLocSheet: View {
                 Text("设置 NAS 上存储会话记录的目录（需为服务器可写路径）")
                 .font(.system(size: Typography.subhead))
                 .foregroundStyle(.secondary)
-            TextField("如 /volume1/docker/轻聊数据/sessions", text: $path)
+            TextField("如 /volume1/docker/Nori数据/sessions", text: $path)
                 .font(.system(size: Typography.body, design: .monospaced))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()

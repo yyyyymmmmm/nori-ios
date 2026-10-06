@@ -58,7 +58,7 @@ enum AgentActionExecutor {
         // v4.0.7 长期目标：AI 判定「我在筹备XX」→ 用户点确认 → 建目标 + 拆步骤进待办
         case .goalCreate:     return await createGoal(action, auth: auth)
         case .goalStepDone:   return await markGoalStep(action, auth: auth)
-        // v4.0.57 轻聊待办清单：写 TodoStore（App 内数据），不经二级分派文件
+        // v4.0.57 Nori待办清单：写 TodoStore（App 内数据），不经二级分派文件
         case .todoAdd:        return await addTodo(action)
         // v4.0.60 健康数据（HealthKit 只读）：本地执行，经二级分派文件（同第二批能力口径）
         case .healthQuery:    return await runLocal(action)
@@ -75,9 +75,9 @@ enum AgentActionExecutor {
         }
     }
 
-    // MARK: - 轻聊待办清单（v4.0.57）
+    // MARK: - Nori待办清单（v4.0.57）
 
-    /// todo.add：写进轻聊生活页自己的待办清单（TodoStore → todos.json，NAS 双写）。
+    /// todo.add：写进Nori生活页自己的待办清单（TodoStore → todos.json，NAS 双写）。
     /// 与 reminder.create（系统「提醒事项」App）是两个落点 —— 用户说「加入待办」指这里。
     private static func addTodo(_ action: AgentAction) async -> Outcome {
         if let reason = await AppPermissionKit.mutationGuard(.todoList) {
@@ -92,9 +92,9 @@ enum AgentActionExecutor {
         // TodoStore.add 对「同内容 5 分钟内已存在」会返回 true 但**不插入**（去重）—— 照实说，
         // 别报「已加入」再让用户去生活页找不到（2026-10-05 审查抓到的「看着成功其实没成」）。
         guard TodoStore.shared.todos.count > before else {
-            return .doneNoUndo(message: "这条已经在轻聊待办里了：「\(title)」")
+            return .doneNoUndo(message: "这条已经在Nori待办里了：「\(title)」")
         }
-        return .doneNoUndo(message: "已加入轻聊待办：「\(title)」（生活页 → 待办 里能看到）")
+        return .doneNoUndo(message: "已加入Nori待办：「\(title)」（生活页 → 待办 里能看到）")
     }
 
     // MARK: - 日历
@@ -111,7 +111,7 @@ enum AgentActionExecutor {
         }
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: [cal])
         // 读操作也要兜后台：后台时系统可能已经收回 store 的读权限
-        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到轻聊再查") }
+        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到Nori再查") }
 
         var busy: [String] = []
         for e in store.events(matching: predicate).sorted(by: { $0.startDate < $1.startDate }) {
@@ -129,7 +129,7 @@ enum AgentActionExecutor {
 
     /// 今天的日程
     private static func todayEvents(_ action: AgentAction) async -> Outcome {
-        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到轻聊再看") }
+        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到Nori再看") }
         let store = EKEventStore()
         guard let cal = store.defaultCalendarForNewEvents else { return .failed("读不到默认日历") }
         let start = Calendar.current.startOfDay(for: Date())
@@ -196,7 +196,7 @@ enum AgentActionExecutor {
         guard let ident = action.param("eventIdentifier") ?? action.param("id") else {
             return .failed("没给要删的事件 ID")
         }
-        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到轻聊再删") }
+        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到Nori再删") }
         let store = EKEventStore()
         guard let ev = store.event(withIdentifier: ident) else {
             return .failed("找不到这个事件（可能已被删或 ID 过期）")
@@ -223,7 +223,7 @@ enum AgentActionExecutor {
         guard let ident = action.param("eventIdentifier") ?? action.param("id") else {
             return .failed("没给要改的事件 ID")
         }
-        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到轻聊再改") }
+        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到Nori再改") }
         let store = EKEventStore()
         guard let ev = store.event(withIdentifier: ident) else {
             return .failed("找不到这个事件（可能已被删或 ID 过期）")
@@ -344,7 +344,7 @@ enum AgentActionExecutor {
         if let reason = await AppPermissionKit.mutationGuard(.photos) {
             return .failed(reason)
         }
-        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到轻聊再删") }
+        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到Nori再删") }
         let identifiers: [String]
         if let ident = action.param("identifier") ?? action.param("localIdentifier") {
             identifiers = [ident]
@@ -382,7 +382,7 @@ enum AgentActionExecutor {
         }
         let body = action.param("body") ?? action.param("message") ?? "（无内容）"
         let content = UNMutableNotificationContent()
-        content.title = action.param("title") ?? "轻聊"
+        content.title = action.param("title") ?? "Nori"
         content.body = body
         content.sound = .default
         // 用即时 trigger：1 秒后（UNTimeIntervalNotificationTrigger 最小 0.01）
@@ -417,7 +417,7 @@ enum AgentActionExecutor {
     private static func sendMail(_ action: AgentAction, auth: AuthStore?) async -> Outcome {
         if let reason = await AppPermissionKit.mutationGuard(.mail) { return .failed(reason) }
         guard let to = action.param("to") else { return .failed("缺收件人") }
-        guard let auth else { return .failed("登录状态不可用，请回到轻聊重试") }
+        guard let auth else { return .failed("登录状态不可用，请回到Nori重试") }
         let subject = action.param("subject") ?? ""
         let body = action.param("body") ?? ""
         var payload: [String: Any] = ["to": to, "subject": subject, "body": body]

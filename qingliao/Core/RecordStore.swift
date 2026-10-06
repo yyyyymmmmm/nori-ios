@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - v3.9.71 记录容器 Store
 //
 // 与 TodoStore（v3.9.35）同款：**本地 UserDefaults + NAS JSON 双写，零后端改动**
-//（走 /api/files/pin_read | pin_write，路径 …/轻聊web/data/records.json）。
+//（走 /api/files/pin_read | pin_write，路径 …/Noriweb/data/records.json）。
 //
 // 三个坑照抄自 TodoStore，别删（都是踩出来的）：
 //   1. Codable 手写解码 + decodeIfPresent（在 RecordKit.RecordItem 里）——否则加字段 = 旧数据消失

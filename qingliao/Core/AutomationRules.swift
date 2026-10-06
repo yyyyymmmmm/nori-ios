@@ -120,26 +120,26 @@ enum RuleEventClient {
 
 // MARK: - 快捷指令入口
 
-/// 「发送事件给轻聊」——快捷指令里选这个动作，把系统事件交给轻聊的自动规则。
+/// 「发送事件给Nori」——快捷指令里选这个动作，把系统事件交给Nori的自动规则。
 ///
 /// 为什么走快捷指令而不是 App 内常驻监听：iOS **不允许**后台 App 监听 WiFi SSID 与充电状态，
 /// App 内地理围栏要 always 定位权限且冷启动唤醒不可靠；而快捷指令的触发器（到达/离开某地、
 /// 开始/停止充电、连接车载蓝牙…）是**系统级、零权限、不耗电**的，是"设备侧条件"唯一可靠来源。
 struct ReportEventIntent: AppIntent {
 
-    static var title: LocalizedStringResource { "发送事件给轻聊" }
+    static var title: LocalizedStringResource { "发送事件给Nori" }
 
     // ⚠️ 与 LiveActivityActions.swift 同因：Swift 6 下 `static var description = …`（非计算属性）
     // 会报 static property 非并发安全，CI Archive 直接失败——必须写成计算属性。
     static var description: IntentDescription {
-        IntentDescription("把系统事件（到达某地、开始充电、连上车载蓝牙…）交给轻聊的自动规则")
+        IntentDescription("把系统事件（到达某地、开始充电、连上车载蓝牙…）交给Nori的自动规则")
     }
 
     /// v3.9.32：快捷指令里这条动作的摘要行 —— 把事件名填进摘要，比系统默认的标题信息量大。
     /// 为什么必须显式写：不带参数的 intent 可以用默认摘要，带参数的默认摘要只列参数名，
     /// 用户想「看一眼这条动作在干什么」时看不出语义。
     static var parameterSummary: some ParameterSummary {
-        Summary("把事件 \(\.$event) 交给轻聊")
+        Summary("把事件 \(\.$event) 交给Nori")
     }
 
     @Parameter(title: "事件名", description: "如 geofence.enter / geofence.exit / device.charging")
@@ -155,6 +155,6 @@ struct ReportEventIntent: AppIntent {
             if p.count == 2 { body[String(p[0])] = String(p[1]) }
         }
         let ok = await RuleEventClient.report(event: event, extra: body)
-        return .result(dialog: ok ? "已交给轻聊自动规则" : "上报失败：检查轻聊是否已登录、网络是否可达")
+        return .result(dialog: ok ? "已交给Nori自动规则" : "上报失败：检查Nori是否已登录、网络是否可达")
     }
 }

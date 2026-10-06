@@ -120,7 +120,7 @@ enum SettingsSearchIndex {
               keywords: ["桌面", "快捷方式", "长按图标"]),
 
         // ── 关于 ──
-        .init(route: "about", title: "关于轻聊", icon: "info.circle.fill", group: "关于",
+        .init(route: "about", title: "关于Nori", icon: "info.circle.fill", group: "关于",
               keywords: ["关于", "版本", "更新", "版本号"]),
     ]
 

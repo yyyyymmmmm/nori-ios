@@ -728,7 +728,7 @@ struct SessionsView: View {
 
     /// 进会话（本地搜索结果行与远端命中行共用同一入口——markRead 只在这里调）
     private func open(_ s: ChatSession) {
-        // v3.9.76：这里**不许**再按会话标题做特殊分流。「轻聊投递」（qingliao_delivery）也是
+        // v3.9.76：这里**不许**再按会话标题做特殊分流。「Nori投递」（qingliao_delivery）也是
         // 一条普通会话，点它就该进会话内容看投递详情；v3.9.75 曾把它特判成开任务中心，
         // 用户实测直接否掉了（「点进去应该看到投递信息详情，不是跳任务中心」）。
         // 任务中心有自己的常驻入口，在聊天页 header 那一排（见 ChatView showTaskCenter）。
@@ -766,7 +766,7 @@ struct SessionsView: View {
         backgroundRunningIDs.contains(s.id)
     }
 
-    /// v4.0.20（#4）：固定会话（轻聊投递 / 轻聊主动）恒置顶 —— 它们是后端锁定 id 的功能壳，
+    /// v4.0.20（#4）：固定会话（Nori投递 / Nori主动）恒置顶 —— 它们是后端锁定 id 的功能壳，
     /// 掉到列表中间等于把「cron 详情」和「AI 主动开口」埋起来。
     private func isFixedSession(_ id: String) -> Bool {
         id == ChatStore.deliverySessionId || id == ChatStore.proactiveSessionId
@@ -798,7 +798,7 @@ struct SessionsView: View {
         //    **List 行里 SwiftUI 对每一行恒返回「非 identity」** → 每行常驻 `scaleEffect(0.965)` + `opacity(0.75)`，
         //    而不是设计意图的「进出视口时」才缩放。
         //    后果：会话卡比同一 List 内未挂该修饰器的卡（agent 卡 / 后台浮条 / 空态 / 搜索命中行）窄 ~14pt（每侧 ~7pt）
-        //    —— 用户 2026-10-05 报「轻聊 agent 这个框框的长度和下面的会话框框长度不一样」。
+        //    —— 用户 2026-10-05 报「Nori agent 这个框框的长度和下面的会话框框长度不一样」。
         //    实测（1179px 宽 · 393pt 屏）：agent 卡右缘 1137px = 14pt 边距（= Spacing.xxl 设计值）；
         //    会话卡右缘 1117px = 20.7pt；行内头像左缘 100px（未缩放应在 84px）→ 正是 0.965 缩放（0.965x 的卡边距 = 6.9pt/侧）。
         //    想恢复滚动层次感只有一条路：不要 List 外壳（改回 ScrollView + LazyVStack）——别只把这一行加回来。
@@ -828,9 +828,9 @@ struct SessionsView: View {
                           systemImage: archivedIDs.contains(s.id) ? "tray.and.arrow.up" : "archivebox")
                 }
             }
-            // v4.0.x：固定会话（投递壳 / 轻聊主动）标题锁定 → 不给「重命名」入口。
+            // v4.0.x：固定会话（投递壳 / Nori主动）标题锁定 → 不给「重命名」入口。
             // 后端只锁自动命名（SessionAutoName 闸门），用户手动改名是另一条路，
-            // 不护住就会把「轻聊投递」「轻聊主动」改名成别的，固定会话就找不到了。
+            // 不护住就会把「Nori投递」「Nori主动」改名成别的，固定会话就找不到了。
             if s.id != ChatStore.deliverySessionId && s.id != ChatStore.proactiveSessionId {
                 Button {
                     renameTarget = s
@@ -889,14 +889,14 @@ struct SessionsView: View {
             }
             // v4.1.x：清空会话内容（清消息、留会话与标题）——放在「删除会话」之前，
             // 两项都是 destructive，删除仍排最后（视觉与操作风险递增）。
-            // v4.0.18：固定会话（投递壳 / 轻聊主动）**也给入口**（用户拍板：这两个会话也要能清；
+            // v4.0.18：固定会话（投递壳 / Nori主动）**也给入口**（用户拍板：这两个会话也要能清；
             // 删除仍不给——后端 _PROTECTED_IDS 拒删，入口必须可用）。
             Button(role: .destructive) {
                 confirmClear = s
             } label: {
                 Label("清空会话内容", systemImage: "eraser")
             }
-            // v4.0.x：固定会话（投递壳 / 轻聊主动）不可删除 → 直接不给「删除会话」这个入口，
+            // v4.0.x：固定会话（投递壳 / Nori主动）不可删除 → 直接不给「删除会话」这个入口，
             // 而不是给一个点了会报错的按钮（所有可见 UI 入口都必须可用）。
             if s.id != ChatStore.deliverySessionId && s.id != ChatStore.proactiveSessionId {
                 Button(role: .destructive) {
@@ -955,7 +955,7 @@ struct SessionsView: View {
 
     /// 归档/取消归档（本地 UserDefaults，同置顶/收藏模式；先移出多选态防悬挂勾选）
     private func toggleArchive(_ s: ChatSession) {
-        // v4.0.35：固定会话（轻聊投递/轻聊主动）禁止归档——与 delete(_:) 同款拦截，
+        // v4.0.35：固定会话（Nori投递/Nori主动）禁止归档——与 delete(_:) 同款拦截，
         // 归档后从主列表消失（rank 置顶也救不回），cron 详情壳会被埋
         if s.id == ChatStore.deliverySessionId || s.id == ChatStore.proactiveSessionId {
             deleteError = "「\(s.title)」是固定会话，不能归档"
@@ -1161,7 +1161,7 @@ struct SessionsView: View {
     ///
     /// 不传 updatedAt：App 恒发 0，后端条件是 `incoming >= cur`，恒成立 → 覆盖生效。
     private func clearContent(_ s: ChatSession) {
-        // v4.0.18：固定会话（投递壳 / 轻聊主动）**允许**清空（用户拍板：这两个会话也要能清）。
+        // v4.0.18：固定会话（投递壳 / Nori主动）**允许**清空（用户拍板：这两个会话也要能清）。
         // 后端配套：投递壳走 _CLIENT_WINS_IDS（内容以客户端为准，v3.9.72）；
         // 主动会话由 merge_sessions 空数组特判采纳（显式清空意图，非空快照仍以 NAS 为准）。
         // 该会话有后台流在跑 → 先撤：跑完的答案会把刚清空的会话又写满。
@@ -1207,7 +1207,7 @@ struct SessionsView: View {
     }
 
     private func delete(_ s: ChatSession) {
-        // v4.0.x：固定会话（投递壳 / 轻聊主动）不可删除 —— 后端 _PROTECTED_IDS 会拒绝，
+        // v4.0.x：固定会话（投递壳 / Nori主动）不可删除 —— 后端 _PROTECTED_IDS 会拒绝，
         // 这里先拦在前端，不让用户点完才看到一个失败的报错。
         if s.id == ChatStore.deliverySessionId || s.id == ChatStore.proactiveSessionId {
             deleteError = "「\(s.title)」是固定会话，不能删除"
@@ -1284,7 +1284,7 @@ struct BotCard: View {
             .frame(width: 40, height: 40)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("轻聊 agent")
+                Text("Nori agent")
                     .font(.system(size: Typography.body, weight: .semibold))
                 // v2.0.50：模型名动态显示（之前硬编码，设置切模型不刷新）
                 Text(displayModel)
@@ -1336,12 +1336,12 @@ struct SessionRow: View {
     /// 原先共用一枚呼吸点，用户读不出「是我在问，还是后台自己在跑」。
     var runningForeground = false
     var runningBackground = false
-    /// v4.0.20（#4）：固定会话（轻聊投递 / 轻聊主动）——恒置顶 + 锁形图标 + 用途胶囊
+    /// v4.0.20（#4）：固定会话（Nori投递 / Nori主动）——恒置顶 + 锁形图标 + 用途胶囊
     var isFixed = false
     var action: () -> Void = {}
 
-    /// v4.0.20（#4）：固定会话用途一句话 —— 「轻聊投递」只装 cron/system 详情、
-    /// 「轻聊主动」是 AI 主动开口且可回复（后端两个固定会话语义不同，用户在列表里看不出）
+    /// v4.0.20（#4）：固定会话用途一句话 —— 「Nori投递」只装 cron/system 详情、
+    /// 「Nori主动」是 AI 主动开口且可回复（后端两个固定会话语义不同，用户在列表里看不出）
     private var fixedSessionHint: String? {
         guard isFixed else { return nil }
         return session.id == ChatStore.deliverySessionId ? "只装不答" : "可回复"
@@ -1713,6 +1713,6 @@ private extension View {
     }
 }
 
-/// v4.0.35：左滑删除的条件挂载——固定会话（投递壳/轻聊主动）不挂 trailing swipe，
+/// v4.0.35：左滑删除的条件挂载——固定会话（投递壳/Nori主动）不挂 trailing swipe，
 /// 免得「挂了修饰符但内容为空 if」留下一块死空白 swipe 区。
 /// isActive=false 时原样返回 content，不产生任何 swipe 手势。

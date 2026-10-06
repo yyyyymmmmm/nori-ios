@@ -260,7 +260,7 @@ struct RootView: View {
             if phase == .active {
                 Task { await LiveActivityManager.shared.convergeOrphanActivities() }
                 // v4.0.1：回前台时接一次分享扩展的**剪贴板通道** —— iOS 18 起扩展拉不起宿主 App
-                // （`extensionContext.open` 被系统拒），用户手动打开轻聊就是这条通道的唯一时机。
+                // （`extensionContext.open` 被系统拒），用户手动打开Nori就是这条通道的唯一时机。
                 // `resume` 内部先 `contains` 探再读（见 ShareIntake）：没有我们的载荷时连授权弹窗都不会出现。
                 ShareIntake.resume(loggedIn: auth.isLoggedIn)
             }

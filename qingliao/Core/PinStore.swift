@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 /// v3.0.74：钉一钉数据层 —— 本地 JSON 持久化 + 后端 API 同步
-/// 存储路径：默认 NAS /volume1/docker/hermes/微信文件/轻聊app/pins.json
+/// 存储路径：默认 NAS /volume1/docker/hermes/微信文件/Noriapp/pins.json
 /// 可在设置里自定义路径
 @Observable
 @MainActor

@@ -1302,7 +1302,7 @@ final class ChatStore {
         }
     }
 
-    /// 调一次既有一问一答入口（`/api/stream/chat` 非流式）——与 Siri「问轻聊」/ AI 摘要同一条链路，
+    /// 调一次既有一问一答入口（`/api/stream/chat` 非流式）——与 Siri「问Nori」/ AI 摘要同一条链路，
     /// 不新增后端接口。任何失败都返回 nil，由调用方静默回落。
     private func requestAutoName(auth: AuthStore, firstMessage: String) async -> String? {
         // 模型/provider 只认 CloudConfig.mainModelAndProvider（v3.9.79 口径：各处自己读 UserDefaults 会各说各话）
@@ -1353,7 +1353,7 @@ final class ChatStore {
     /// 导出当前会话为纯文本（用户/AI 消息 + 时间）
     func exportText() -> String {
         var lines: [String] = []
-        lines.append("轻聊会话导出 · " + (title.isEmpty ? "未命名会话" : title))
+        lines.append("Nori会话导出 · " + (title.isEmpty ? "未命名会话" : title))
         lines.append("===================================")
         for m in messages {
             let who = m.isUser ? "我" : "AI"

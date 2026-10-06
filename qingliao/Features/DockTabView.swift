@@ -654,7 +654,7 @@ private struct OrbMenuFromPetModifier: ViewModifier {
             // 聊天页宠物长按 ＝ 长按智慧球**同一套**菜单（用户：「长按宠物改成和长按智慧球一样的效果」）。
             // 只换锚点，动作分发仍走 handleOrbAction（单一真源，不在聊天页复制第二套）。
             // v4.0.x：第二条 `.qingliaoOpenOrbMenuAtPet` 是**同一件事**的第二条来路 ——
-            // 「打开轻聊快捷菜单」快捷指令从 App 外面进来，需要宠物锚点，走「dock 请求 → 宠物应答」握手
+            // 「打开Nori快捷菜单」快捷指令从 App 外面进来，需要宠物锚点，走「dock 请求 → 宠物应答」握手
             // （应答方在 ChatView，见 OrbPetAnchorRegistry）。两条合流到下面这一个消费点，
             // 别给应答那条再写第二份 showOrbMenu 逻辑（那才是真的复制第二套）。
             .onReceive(NotificationCenter.default.publisher(for: .qingliaoOrbMenuFromPet)) { (note: Notification) in
@@ -695,7 +695,7 @@ private struct OrbMenuFromPetModifier: ViewModifier {
 // 理由：不再往 DockTabView.body 的巨型修饰符链上多加一个泛型调用（CI run #571 类型检查超时那类风险）。
 
 
-/// v4.0.x：快捷指令 / Siri「打开轻聊某页」的投递落地（`.modifier(IntentRouteModifier(onRoute:))`）。
+/// v4.0.x：快捷指令 / Siri「打开Nori某页」的投递落地（`.modifier(IntentRouteModifier(onRoute:))`）。
 ///
 /// 两条腿缺一条就是「点快捷指令没反应」：
 ///   · 广播 —— App 已经在跑：进程内通知直达
@@ -932,7 +932,7 @@ private extension DockTabView {
             .onReceive(NotificationCenter.default.publisher(for: .qingliaoOpenChat)) { _ in
                 selected = .chat
             }
-            // v4.0.x：快捷指令 / Siri 的「打开轻聊…」动作（intent 走前台模式 + 进程内投递到这一层）。
+            // v4.0.x：快捷指令 / Siri 的「打开Nori…」动作（intent 走前台模式 + 进程内投递到这一层）。
             // 🚨 这段**必须**是独立 ViewModifier，不能在 body 巨型链上直接挂两个带闭包的修饰符：
             //    与上面 `OrbMenuFromPetModifier` 同一条红线（CI run #571 那类 Archive 类型检查超时）。
             .modifier(IntentRouteModifier(onRoute: applyRoute))

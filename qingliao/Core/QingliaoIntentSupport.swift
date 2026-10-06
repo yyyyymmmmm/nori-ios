@@ -86,7 +86,7 @@ enum QingliaoAIReply {
 /// 为什么不再走 `OpenURLIntent` + `qingliao://<tab>`：iOS 26 上让系统去开**自己的**自定义 scheme
 /// 会当场被拒 —— 快捷指令自动化里报
 /// `The provided URL scheme `qingliao` is unsupported; launch is prohibited`（用户在
-/// 「打开轻聊看板」自动化上实测到，intent 侧 `.result(opensIntent:)` 那一版）。
+/// 「打开Nori看板」自动化上实测到，intent 侧 `.result(opensIntent:)` 那一版）。
 /// 正路是 intent 声明**前台模式** `supportedModes`：系统先把 App 带到前台，
 /// intent 代码在 App 进程里跑 → 「打开哪一页」不必再过系统 launch 这一关，
 /// 直接投递给已经在跑的 `DockTabView`。

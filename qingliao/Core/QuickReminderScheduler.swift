@@ -198,7 +198,7 @@ final class QuickReminderStore {
     @discardableResult
     private func schedule(_ item: QuickReminder) async -> String? {
         let content = UNMutableNotificationContent()
-        content.title = "轻聊提醒"
+        content.title = "Nori提醒"
         content.body = item.notificationBody
         content.sound = .default
         content.threadIdentifier = "qingliao_reminder"

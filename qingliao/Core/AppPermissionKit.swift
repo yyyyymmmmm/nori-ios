@@ -57,7 +57,7 @@ enum AppCapability: String, CaseIterable, Identifiable, Sendable {
     // 真闸门在后端账号配置 —— 详见 AppPermissionKit.status(of: .mail) 里的注释。
     case mail
     case homekit
-    // v4.0.57 轻聊自己的待办清单（生活页 → 待办）。无系统 TCC 权限概念（App 内数据），
+    // v4.0.57 Nori自己的待办清单（生活页 → 待办）。无系统 TCC 权限概念（App 内数据），
     // 与「提醒事项」(EventKit) 分开：用户说「加入待办」指的是这里
     case todoList
     // v4.0.60 健康数据（HealthKit，只读）。⚠️ 与 HomeKit **不同档**：免费签名也能拿到，
@@ -116,7 +116,7 @@ enum AppCapability: String, CaseIterable, Identifiable, Sendable {
         case .clipboard:
             return "读写系统剪贴板。写入不需要许可；每次读取 iOS 都会弹一次系统「粘贴」提示，这是系统行为，App 关不掉。"
         case .files:
-            return "读写轻聊自己的文件目录（在「文件」App → 我的 iPhone → 轻聊 里能看到），碰不到其它 App 的文件。"
+            return "读写Nori自己的文件目录（在「文件」App → 我的 iPhone → Nori 里能看到），碰不到其它 App 的文件。"
         case .mail:
             return "让 AI 代你发邮件。App 侧没有系统授权可给；能否真发出去取决于「设置 → 邮件」里该账号是否开了「允许 AI 直接发信」。"
         case .notifications:
@@ -124,7 +124,7 @@ enum AppCapability: String, CaseIterable, Identifiable, Sendable {
         case .homekit:
             return "家庭（HomeKit）需要开发者证书授权，侧载安装无法使用。"
         case .todoList:
-            return "把事项加进轻聊生活页的「待办」清单（与系统提醒事项互不相干）；经你确认后可加。"
+            return "把事项加进Nori生活页的「待办」清单（与系统提醒事项互不相干）；经你确认后可加。"
         case .health:
             return "读步数/步行距离/活动能量/心率/静息心率/睡眠/运动记录（来自「健康」App）；只读不写。"
         }
@@ -382,7 +382,7 @@ enum AppPermissionKit {
     ///   3. 双闸门（AI 开关 + 系统授权）→ 拒绝
     @MainActor
     static func mutationGuard(_ c: AppCapability) async -> String? {
-        guard foregroundActive else { return "App 在后台，已拒绝执行（请回到轻聊后再试）" }
+        guard foregroundActive else { return "App 在后台，已拒绝执行（请回到Nori后再试）" }
         guard c.aiControllable else { return "\(c.displayName) 在当前安装方式下不可用" }
         let st = await status(of: c)
         guard st == .granted else { return "\(c.displayName)未授权（当前：\(st.label)）" }

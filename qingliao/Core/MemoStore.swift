@@ -5,7 +5,7 @@ import SwiftUI
 //
 // 定位：随手记 —— 从聊天气泡/大爆炸/生活页手动添加的短文本，看板生活页置顶卡片展示。
 // 存储：本地 UserDefaults 兜底 + NAS JSON 双写（复用 v3.0.74 钉一钉的 pin_write/pin_read 文件通道，
-//       零后端改动；文件与 pins.json 同目录：轻聊web/data/memos.json）。
+//       零后端改动；文件与 pins.json 同目录：Noriweb/data/memos.json）。
 // 与 PinStore 的差异：备忘录不需要"来源会话"跳转，只需内容 + 时间 + 来源标签。
 
 struct MemoItem: Identifiable, Codable, Equatable, Sendable {
@@ -126,7 +126,7 @@ final class MemoStore {
     // v3.9.41（SR33）：改为**强引用**。原先 weak → 快捷指令（AddMemoIntent）自己 new 的临时
     // AuthStore 在 perform() 返回瞬间就没人持有，本单例的 auth 随即变 nil：
     // save() 那条 detached 写 NAS 的任务在 `guard let auth` 处静默 return，
-    // 而 Siri 已经念过「已记到轻聊备忘录」→ 备忘只活在本地，NAS 上永远缺这一条。
+    // 而 Siri 已经念过「已记到Nori备忘录」→ 备忘只活在本地，NAS 上永远缺这一条。
     // 本类是进程级单例、AuthStore 由 App/extension 长期持有，强引用不会造成泄漏或环。
     var auth: AuthStore?
 

@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - v3.9.32 一句话本地定时提醒（模型 + 自然语言时间解析）
 //
-// 背景：轻聊是无 APNs 的侧载 App，此前所有通知都是 `trigger: nil` 的**即时**通知——用户说的「定个
+// 背景：Nori是无 APNs 的侧载 App，此前所有通知都是 `trigger: nil` 的**即时**通知——用户说的「定个
 // 提醒」只能靠后端 cron + 前台轮询，App 一杀就没了。本文件引入**系统级** `UNCalendarNotificationTrigger`
 // 的那一半：模型 + 自然语言时间解析（纯 Foundation、零网络、零第三方依赖）。
 //

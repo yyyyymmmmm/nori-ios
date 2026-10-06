@@ -5,7 +5,7 @@ enum QLServiceKind: String {
 
     var title: String {
         switch self {
-        case .qingliao: return "轻聊后端"
+        case .qingliao: return "Nori后端"
         case .hermes: return "智能体服务"
         }
     }
@@ -19,7 +19,7 @@ enum QLServiceKind: String {
 
     var subtitle: String {
         switch self {
-        case .qingliao: return "轻聊后端服务"
+        case .qingliao: return "Nori后端服务"
         case .hermes: return "智能体服务"
         }
     }
@@ -40,7 +40,7 @@ struct ServiceControlSheet: View {
 
     init(service: QLServiceKind) {
         self.service = service
-        _info = State(initialValue: service == .qingliao ? "管理轻聊后端服务" : "管理智能体服务")
+        _info = State(initialValue: service == .qingliao ? "管理Nori后端服务" : "管理智能体服务")
     }
 
     var body: some View {
@@ -155,7 +155,7 @@ struct ServiceControlSheet: View {
                 Text("重试服务")
                     .font(.system(size: Typography.body, weight: .semibold))
                     .foregroundStyle(.primary)
-                Text(service == .qingliao ? "重启轻聊后端进程" : "重启智能体服务")
+                Text(service == .qingliao ? "重启Nori后端进程" : "重启智能体服务")
                     .font(.system(size: Typography.caption))
                     .foregroundStyle(.secondary)
             }
@@ -173,7 +173,7 @@ struct ServiceControlSheet: View {
     .padding(.top, Spacing.lg)
     }
 
-    /// 停止服务卡 + 停止确认（仅轻聊后端，Hermes 网关不支持停止）
+    /// 停止服务卡 + 停止确认（仅Nori后端，Hermes 网关不支持停止）
     @ViewBuilder
     private var serviceStopCard: some View {
     // 停止卡（Hermes 网关不支持停止，隐藏）
@@ -193,7 +193,7 @@ struct ServiceControlSheet: View {
                 Text("停止服务")
                     .font(.system(size: Typography.body, weight: .semibold))
                     .foregroundStyle(.red)
-                Text("停止后轻聊将不可用")
+                Text("停止后Nori将不可用")
                     .font(.system(size: Typography.caption))
                     .foregroundStyle(.secondary)
             }
@@ -213,7 +213,7 @@ struct ServiceControlSheet: View {
     .buttonStyle(PressStyle())   // v3.4.29：统一按压反馈
     .padding(.horizontal, Spacing.section)
     .padding(.top, Spacing.lg)
-    .confirmationDialog("停止后轻聊将完全不可用，需在 NAS 上手动启动", isPresented: $showStopConfirm, titleVisibility: .visible) {
+    .confirmationDialog("停止后Nori将完全不可用，需在 NAS 上手动启动", isPresented: $showStopConfirm, titleVisibility: .visible) {
         Button("停止服务", role: .destructive) {
             stopService()
         }

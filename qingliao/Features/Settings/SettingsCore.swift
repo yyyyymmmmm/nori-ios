@@ -154,16 +154,16 @@ struct SettingsView: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 4)
-            // J 线 2026-10-06：顶部紧凑 AI 头像区（PetAvatar +「轻聊」+ 状态小字），
+            // J 线 2026-10-06：顶部紧凑 AI 头像区（PetAvatar +「Nori」+ 状态小字），
             // 点按进 AI 形象设置（复用 PetStudioSheet 链路）；原「AI形象」行删掉。
             Button {
                 Haptics.tap()
                 showPetStudio = true
             } label: {
                 HStack(spacing: 12) {
-                    PetAvatar(size: 52, state: .idle, keepDetail: true)
+                    ROTAvatarView(state: .idle, size: 52)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("轻聊")
+                        Text("Nori")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.primary)
                         Text(petSummary)
@@ -626,7 +626,7 @@ extension SettingsView {
 
     @ViewBuilder var aboutSection: some View {
         GraySettingsGroup(title: "关于") {
-            GraySettingsRow(icon: "info.circle", title: "关于轻聊") { showAbout = true }
+            GraySettingsRow(icon: "info.circle", title: "关于Nori") { showAbout = true }
             MuseRowDivider()
             GraySettingsRow(icon: "doc.text", title: "日志") { showLogs = true }
             MuseRowDivider()
@@ -829,7 +829,7 @@ extension SettingsView {
                         Text("▸ 直接问：查磁盘/内存/温度、控制设备、执行场景，自动调用工具回复")
                         Text("▸ 记忆规则：说「以后XX都用agent」，下次同类问题直接 Agent 处理")
                         Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
-                        Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考轻聊记忆与规则")
+                        Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考Nori记忆与规则")
                     }
                     .font(.system(size: 15))
                     .foregroundStyle(.secondary)
@@ -886,9 +886,9 @@ extension SettingsView {
             faceIDAuthFailed = true
             return
         }
-        context.localizedReason = "用于登录页一键登录轻聊"
+        context.localizedReason = "用于登录页一键登录Nori"
         context.evaluatePolicy(.deviceOwnerAuthentication,
-                               localizedReason: "用于登录页一键登录轻聊") { success, error in
+                               localizedReason: "用于登录页一键登录Nori") { success, error in
             DispatchQueue.main.async {
                 if success { return }
                 // v2.0.102：用户主动取消（userCancel）不算失败——保留开关不弹提示
@@ -909,9 +909,9 @@ extension SettingsView {
             appLockAuthFailed = true
             return
         }
-        context.localizedReason = "用于启动时解锁轻聊"
+        context.localizedReason = "用于启动时解锁Nori"
         context.evaluatePolicy(.deviceOwnerAuthentication,
-                               localizedReason: "用于启动时解锁轻聊") { success, error in
+                               localizedReason: "用于启动时解锁Nori") { success, error in
             DispatchQueue.main.async {
                 if success { return }
                 // v2.0.102：用户主动取消不算失败——保留开关不弹提示

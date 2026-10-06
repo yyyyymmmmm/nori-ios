@@ -36,6 +36,6 @@ extension AgentActionExecutor {
         if HealthStore.shared.authorizationState == .granted {
             return .failed("最近 \(days) 天没读到健康记录 —— 「健康」App 里可能确实没有这类数据")
         }
-        return .failed("健康数据没读到：可能还没授权，或最近 \(days) 天确实没记录。到「设置 → 权限与 AI 操控 → 健康」点一下授权（也可在系统「设置 → 隐私与安全性 → 健康 → 轻聊」里打开读取）")
+        return .failed("健康数据没读到：可能还没授权，或最近 \(days) 天确实没记录。到「设置 → 权限与 AI 操控 → 健康」点一下授权（也可在系统「设置 → 隐私与安全性 → 健康 → Nori」里打开读取）")
     }
 }

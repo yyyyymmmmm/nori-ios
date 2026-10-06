@@ -2,7 +2,7 @@ import Foundation
 
 /// v3.6.5：模型思考档位 —— 聊天页 header「思考胶囊」可选，随流式请求下发给后端。
 ///
-/// 后端把档位转成 Hermes 的按次思考配置（`model_options.reasoning`），只作用于轻聊发出的
+/// 后端把档位转成 Hermes 的按次思考配置（`model_options.reasoning`），只作用于Nori发出的
 /// 请求，不改 Hermes 全局配置。同一问题实测两轮（正文首字）：
 ///   medium 3.4~3.8s / low 1.6~2.2s / 关闭（reasoning.enabled=false）0.9~1.7s。
 enum ReasoningLevel: String, CaseIterable, Identifiable {

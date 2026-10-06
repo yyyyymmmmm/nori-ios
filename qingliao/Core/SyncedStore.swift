@@ -26,7 +26,7 @@ enum SyncedStore {
     /// 远端 JSON 文件的完整路径。空 storagePath 时落到默认 NAS 目录（5 个 Store 同一处）。
     static func remotePath(storagePath: String, fileName: String) -> String {
         let base = storagePath.isEmpty
-            ? "/volume1/docker/hermes/微信文件/轻聊web/data"
+            ? "/volume1/docker/hermes/微信文件/Noriweb/data"
             : storagePath
         return "\(base)/\(fileName)"
     }

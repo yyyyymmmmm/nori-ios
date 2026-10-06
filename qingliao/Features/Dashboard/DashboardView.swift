@@ -451,7 +451,7 @@ struct DashboardView: View {
                       sub: "整机占用", ratio: nas.cpu / 100.0, color: .blue)
             MeterCard(name: "内存", icon: "memorychip.fill", value: nas.memUsedText,
                       sub: "/ \(nas.memTotalText)", ratio: nas.memPct, color: .green)
-            ServiceCard(name: "轻聊后端", icon: "server.rack", running: nas.qingliaoAlive, detail: "Docker 内存 \(nas.qingliaoDockerMemText)")
+            ServiceCard(name: "Nori后端", icon: "server.rack", running: nas.qingliaoAlive, detail: "Docker 内存 \(nas.qingliaoDockerMemText)")
                 .tapButton { activeSheet = .service }
                 .matchedTransitionSource(id: DashboardSheet.service.id, in: sheetZoomNS)   // v3.9.0：卡片→详情 zoom
             ServiceCard(name: "智能体服务", icon: "sparkles", running: nas.hermesAlive, detail: nas.hermesMemText)

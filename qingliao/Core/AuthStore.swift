@@ -574,7 +574,7 @@ final class AuthStore {
             "pushEnabled": false,
             "agentEnabled": true,
             // v3.6.5：模型思考档位（聊天页 header 胶囊可选 关闭/低/中/高，默认 low）
-            // 后端译成 Hermes 按次思考配置 model_options.reasoning，只影响轻聊请求
+            // 后端译成 Hermes 按次思考配置 model_options.reasoning，只影响Nori请求
             "reasoning": ReasoningLevel.current.payload
         ]
         let bodyData = try JSONSerialization.data(withJSONObject: payload)

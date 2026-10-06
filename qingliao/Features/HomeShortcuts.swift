@@ -1,6 +1,6 @@
 //
 //  HomeShortcuts.swift
-//  轻聊
+//  Nori
 //
 //  v3.9.82：桌面 App 图标长按快捷方式（Home Screen Quick Actions）
 //

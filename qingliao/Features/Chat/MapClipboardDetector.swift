@@ -4,12 +4,12 @@ import UIKit
 // MARK: - v3.7.0 剪贴板地图链接探测（地图分享兜底入口）
 //
 // 背景（为什么需要它）：iOS 分享面板里出现第三方 App 的前提是 App 内打包
-// **Share Extension / Action Extension**（.appex）。轻聊是 SideStore 侧载安装，
+// **Share Extension / Action Extension**（.appex）。Nori是 SideStore 侧载安装，
 // 侧载不支持 App Extension（安装直接报 0xe8008017）——所以 iPhone 自带地图 → 分享地点
-// 的面板里永远找不到轻聊（不是配置缺 UTI 的问题，CFBundleDocumentTypes 只影响
+// 的面板里永远找不到Nori（不是配置缺 UTI 的问题，CFBundleDocumentTypes 只影响
 // "用其他 App 打开文件"，不影响分享面板）。
 //
-// 兜底路径：地图分享面板选「拷贝」→ 回到轻聊聊天页 → 顶部出现胶囊「检测到剪贴板里的位置/链接」
+// 兜底路径：地图分享面板选「拷贝」→ 回到Nori聊天页 → 顶部出现胶囊「检测到剪贴板里的位置/链接」
 // → 一键交给 AI（复用 v3.4.24 的地图链接解析 → 周边推荐）。
 //
 // 🚨🚨 v3.7.1 修复「打开 App 即闪退」（v3.7.0 上线即挂的 P0，类级坑）：

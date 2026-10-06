@@ -1182,7 +1182,7 @@ struct QuickReminderSheet: View {
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text("通知权限没开")
                     .font(.system(size: Typography.body, weight: .medium))
-                Text("没权限就不会响——去系统设置 →「通知 → 轻聊」打开")
+                Text("没权限就不会响——去系统设置 →「通知 → Nori」打开")
                     .font(.system(size: Typography.caption))
                     .foregroundStyle(.secondary)
             }

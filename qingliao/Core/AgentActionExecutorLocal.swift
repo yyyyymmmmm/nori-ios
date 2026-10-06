@@ -98,7 +98,7 @@ extension AgentActionExecutor {
     }
 
     private static func listReminders(_ action: AgentAction) async -> Outcome {
-        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到轻聊再看") }
+        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到Nori再看") }
         let days = max(1, min(Int(action.param("days") ?? "") ?? 7, 60))
         let store = EKEventStore()
         let start = Calendar.current.startOfDay(for: Date())
@@ -148,7 +148,7 @@ extension AgentActionExecutor {
         guard let ident = action.param("identifier") ?? action.param("id") else {
             return .failed("没给要删的提醒 ID（先用「查看提醒事项」拿到）")
         }
-        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到轻聊再删") }
+        guard AppPermissionKit.foregroundActive else { return .failed("App 在后台，先回到Nori再删") }
         let store = EKEventStore()
         guard let item = store.calendarItem(withIdentifier: ident) as? EKReminder else {
             return .failed("找不到这条提醒（可能已被删或 ID 过期）")
@@ -272,7 +272,7 @@ extension AgentActionExecutor {
     // MARK: - 剪贴板
 
     private static func readClipboard() async -> Outcome {
-        // 读剪贴板会弹 iOS 的「轻聊 粘贴自 …」系统提示 —— 这是系统行为，App 关不掉；
+        // 读剪贴板会弹 iOS 的「Nori 粘贴自 …」系统提示 —— 这是系统行为，App 关不掉；
         // 只在用户真的要求读时才走到这（协议侧也规定 AI 不许无事乱读）。
         let text = UIPasteboard.general.string ?? ""
         guard !text.isEmpty else { return .doneNoUndo(message: "剪贴板是空的（或里面不是文字）") }
@@ -292,12 +292,12 @@ extension AgentActionExecutor {
         return .doneNoUndo(message: "已复制到剪贴板（\(text.count) 字）")
     }
 
-    // MARK: - 文件（轻聊自己的沙盒目录，不是任意路径）
+    // MARK: - 文件（Nori自己的沙盒目录，不是任意路径）
 
     private static func listFiles(_ action: AgentAction) async -> Outcome {
         let fm = FileManager.default
         guard let dir = SandboxFiles.resolve(action.param("path")) else {
-            return .failed("路径不合法（只能读写轻聊自己的目录，不许 .. 或绝对路径）")
+            return .failed("路径不合法（只能读写Nori自己的目录，不许 .. 或绝对路径）")
         }
         var isDir: ObjCBool = false
         guard fm.fileExists(atPath: dir.path, isDirectory: &isDir) else {
@@ -333,7 +333,7 @@ extension AgentActionExecutor {
 
     private static func readFile(_ action: AgentAction) async -> Outcome {
         guard let url = SandboxFiles.resolve(action.param("path") ?? action.param("file")) else {
-            return .failed("路径不合法（只能读写轻聊自己的目录，不许 .. 或绝对路径）")
+            return .failed("路径不合法（只能读写Nori自己的目录，不许 .. 或绝对路径）")
         }
         guard FileManager.default.fileExists(atPath: url.path) else {
             return .failed("文件不存在：\(SandboxFiles.display(url))")
@@ -365,7 +365,7 @@ extension AgentActionExecutor {
             return .failed("没给文件名")
         }
         guard let url = SandboxFiles.resolve(raw) else {
-            return .failed("路径不合法（只能读写轻聊自己的目录，不许 .. 或绝对路径）")
+            return .failed("路径不合法（只能读写Nori自己的目录，不许 .. 或绝对路径）")
         }
         guard let content = action.param("content") ?? action.param("text") else {
             return .failed("没给要写的内容")
@@ -404,8 +404,8 @@ extension AgentActionExecutor {
 
 // MARK: - 沙盒路径解析
 
-/// 轻聊的文件区：App 自己的 Documents 目录（project.yml 里开了 UIFileSharingEnabled，
-/// 所以用户在「文件」App → 我的 iPhone → 轻聊 里也能看到、能自己放文件进去）。
+/// Nori的文件区：App 自己的 Documents 目录（project.yml 里开了 UIFileSharingEnabled，
+/// 所以用户在「文件」App → 我的 iPhone → Nori 里也能看到、能自己放文件进去）。
 ///
 /// 🚨 安全口径：**只允许相对路径**，且标准化后必须仍落在 Documents 内。
 ///    这是 AI 给路径的地方 —— `../../` 或绝对路径一律拒（否则等于把整个 App 容器
@@ -437,7 +437,7 @@ enum SandboxFiles {
         let p = url.standardizedFileURL.path
         guard p.hasPrefix(base) else { return url.lastPathComponent }
         let rel = String(p.dropFirst(base.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        return rel.isEmpty ? "轻聊（根目录）" : rel
+        return rel.isEmpty ? "Nori（根目录）" : rel
     }
 
     static func humanSize(_ bytes: Int) -> String {

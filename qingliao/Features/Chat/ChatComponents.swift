@@ -507,7 +507,7 @@ struct ChatPDFDocument: FileDocument {
             newPage()
 
             // 标题
-            let titleStr = title.isEmpty ? "轻聊会话导出" : title
+            let titleStr = title.isEmpty ? "Nori会话导出" : title
             let titleAttrs: [NSAttributedString.Key: Any] = [
                 .font: titleFont, .foregroundColor: UIColor.label
             ]
@@ -635,7 +635,7 @@ struct ChatHTMLDocument: FileDocument {
         <!DOCTYPE html>
         <html lang="zh-CN"><head><meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>\(esc(title.isEmpty ? "轻聊会话导出" : title))</title>
+        <title>\(esc(title.isEmpty ? "Nori会话导出" : title))</title>
         <style>
         body{font-family:-apple-system,'PingFang SC',sans-serif;background:#f5f5f7;margin:0;padding:16px;max-width:680px;margin:0 auto;}
         h1{font-size:18px;color:#1d1d1f;}
@@ -647,7 +647,7 @@ struct ChatHTMLDocument: FileDocument {
         .bubble p{margin:0;font-size:14px;line-height:1.6;color:#1d1d1f;word-break:break-word;}
         .bubble img{max-width:100%;border-radius:8px;margin-top:6px;}
         </style></head><body>
-        <h1>\(esc(title.isEmpty ? "轻聊会话导出" : title))</h1>
+        <h1>\(esc(title.isEmpty ? "Nori会话导出" : title))</h1>
         \(body.joined(separator: "\n"))
         </body></html>
         """
@@ -931,7 +931,7 @@ struct FileMessageCard: View {
 
 struct SessionCardView: View {
     let rows: [SessionCardKit.CardRow]
-    var title: String = "轻聊 AI 会话"   // v3.3.0：合并发送时自定义标题
+    var title: String = "Nori AI 会话"   // v3.3.0：合并发送时自定义标题
 
     /// 截断计划（条数/高度上限 → 尾注）；与高度估算共用同一组常量
     private var plan: SessionCardKit.Plan { SessionCardKit.layout(rows) }
@@ -982,7 +982,7 @@ struct SessionCardView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            Text("轻聊 AI")
+            Text("Nori AI")
                 .font(.system(size: Typography.tiny, weight: .semibold))
                 .foregroundStyle(.secondary)
         }

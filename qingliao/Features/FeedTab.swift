@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - 灰度重做 2026-10-06 晚（C 路）：资讯 tab = Muse「动态」feed
 //
-// 对标 Muse 动态页：顶栏（menu / 轻聊头像胶囊 / sliders）+ 大标题「动态」
+// 对标 Muse 动态页：顶栏（menu / Nori头像胶囊 / sliders）+ 大标题「动态」
 // + prompt 胶囊框 + 无边框 feed 卡片（分割线分隔）。
 // 数据：FeedStore；prompt 存 UserDefaults；units 尝试 GET /api/feed/units，
 // 后端暂无此接口 → 失败优雅降级，显示诚实空态（不编造假内容）。
@@ -104,7 +104,7 @@ struct FeedTabView: View {
         }
     }
 
-    // MARK: 顶栏：menu / 轻聊头像胶囊 / sliders（对标 Muse 动态页）
+    // MARK: 顶栏：menu / Nori头像胶囊 / sliders（对标 Muse 动态页）
 
     private var topBar: some View {
         HStack {

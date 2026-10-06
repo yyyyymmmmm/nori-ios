@@ -40,7 +40,7 @@ struct ChatView: View {
     /// 所以「矮屏」只认 `verticalSizeClass == .compact`。见 `AdaptiveLayout.isShort`。
     @Environment(\.verticalSizeClass) private var vSize
     @State var pinStore = PinStore.shared   // v3.0.74：钉一钉
-    // v3.7.0：剪贴板地图链接兜底入口（地图分享面板里没有轻聊 → 「拷贝」后在聊天页一键发送）
+    // v3.7.0：剪贴板地图链接兜底入口（地图分享面板里没有Nori → 「拷贝」后在聊天页一键发送）
     @State var showClipboardBanner = false
     // v3.9.71：输入收口——识别结果（动作条数据源）+ 剪贴板链接的「识别」提示
     @State var intentResult: RecognizedIntent?
@@ -596,7 +596,7 @@ struct ChatView: View {
             showTOCSheet = true
         }
         Button("清空本会话消息", role: .destructive) {
-            // v4.0.18：固定会话（投递壳 / 轻聊主动）**允许**清空（用户拍板：这两个会话也要能清）。
+            // v4.0.18：固定会话（投递壳 / Nori主动）**允许**清空（用户拍板：这两个会话也要能清）。
             // 后端配套：投递壳本就走 _CLIENT_WINS_IDS（v3.9.72 内容以客户端为准）；
             // 主动会话由 merge_sessions 空数组特判采纳（显式清空意图，非空快照仍以 NAS 为准防丢回复）。
             // 本会话正在收流 → 拦（流式回复结束后的落库写会把刚清空的会话又写满）。
@@ -1049,7 +1049,7 @@ struct ChatView: View {
             }
             Button("好的", role: .cancel) {}
         } message: {
-            Text("需要麦克风权限才能语音转文字（设备端识别，录音不会上传）。\n请在「设置 → 轻聊 → 麦克风」里允许。")
+            Text("需要麦克风权限才能语音转文字（设备端识别，录音不会上传）。\n请在「设置 → Nori → 麦克风」里允许。")
         }
         // v3.9.3：非权限类的失败（语音模型下载失败 / 系统未给可用格式 / 识别中断）
         .alert("语音识别启动失败", isPresented: Binding(
@@ -2395,7 +2395,7 @@ struct ChatView: View {
         }
         // 96×96 本体也要命中（overlay 虽已覆盖更大范围，但本体命中语义留一份，双保险）
         .contentShape(Rectangle())
-        .accessibilityLabel("轻聊智能体")
+        .accessibilityLabel("Nori智能体")
         // v3.9.78：量宠物在屏幕上的真实中心（菜单从这里绽放；键盘/滚动导致的位移会同步刷新）
         .onGeometryChange(for: CGPoint.self) { proxy in
             let r = proxy.frame(in: .global)
@@ -4892,7 +4892,7 @@ extension ChatView {
                         .navigationTransition(.zoom(sourceID: payload.sourceID, in: zoomNS))
                 }
             }
-            // v3.7.0：回前台时重探一次（用户刚在地图里「拷贝」→ 切回轻聊即出现胶囊）
+            // v3.7.0：回前台时重探一次（用户刚在地图里「拷贝」→ 切回Nori即出现胶囊）
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await checkMapClipboard() } }
             }
@@ -4982,15 +4982,15 @@ extension ChatView {
             .fileExporter(isPresented: $showExporter,
                           document: ChatLogDocument(text: exportText),
                           contentType: .plainText,
-                          defaultFilename: "轻聊会话") { _ in }
+                          defaultFilename: "Nori会话") { _ in }
             .fileExporter(isPresented: $showMarkdownExporter,
                           document: ChatMarkdownDocument(text: exportMarkdown),
                           contentType: ChatMarkdownDocument.markdownType,
-                          defaultFilename: "轻聊会话") { _ in }
+                          defaultFilename: "Nori会话") { _ in }
             .fileExporter(isPresented: $showPDFExporter,
                           document: ChatPDFDocument(data: exportPDFData ?? Data()),
                           contentType: .pdf,
-                          defaultFilename: "轻聊会话") { _ in }
+                          defaultFilename: "Nori会话") { _ in }
             // v3.4.28：导出格式选择面板 + HTML 导出
     }
 
@@ -5007,7 +5007,7 @@ extension ChatView {
             .fileExporter(isPresented: $showHTMLExporter,
                           document: ChatHTMLDocument(html: exportHTML),
                           contentType: .html,
-                          defaultFilename: "轻聊会话") { _ in }
+                          defaultFilename: "Nori会话") { _ in }
     }
 
     @MainActor

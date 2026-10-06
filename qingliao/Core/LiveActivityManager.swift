@@ -117,7 +117,7 @@ final class LiveActivityManager {
         guard isBusy, Self.isEnabled else { await end(); return }
         guard !sessionId.isEmpty, ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
-        let title = sessionTitle.isEmpty ? "轻聊" : sessionTitle
+        let title = sessionTitle.isEmpty ? "Nori" : sessionTitle
         let model = modelName.isEmpty ? "AI" : modelName
         let newSession = (currentSessionId != sessionId)
 
@@ -560,7 +560,7 @@ final class LiveActivityManager {
     /// 本轮活动的最小可展示信息（会话/标题/模型/开始时间）。
     ///
     /// 为什么落盘：`reconcileAfterBackgroundCheck` 可能在**被系统新拉起的进程**里执行，
-    /// 那时 `currentSessionId`/`lastTitle`/`lastModel` 全是空值 → 完成态只能渲染成「轻聊 / AI」。
+    /// 那时 `currentSessionId`/`lastTitle`/`lastModel` 全是空值 → 完成态只能渲染成「Nori / AI」。
     /// 挂件读不到它（免费签名没有 app group，两侧不共享容器），这里纯粹是给**主 App 自己**留的
     /// 跨进程记忆，所以不需要 `qingliao_stream_pending` 那样的多字段协议，够用即可。
     private static let roundSnapshotKey = "qingliao_live_activity_round"

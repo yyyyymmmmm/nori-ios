@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// v3.0.82：Hermes 主动推送给轻聊App 的收件箱（本地轮询版）。
+/// v3.0.82：Hermes 主动推送给NoriApp 的收件箱（本地轮询版）。
 ///
 /// 背景：App 是「App 主动请求 → 服务端响应」模型，服务端没法主动往 App 塞消息。
 /// 本 Store 轮询后端 /api/inbox（Hermes 主动推的消息队列），拉到就：
@@ -54,16 +54,16 @@ final class InboxStore {
         consumedOrder = saved.isEmpty ? saved : Array(consumedIds).sorted()
     }
 
-    /// v4.0.x：把一条主动 Agent 消息落进固定主动会话「轻聊主动」。
+    /// v4.0.x：把一条主动 Agent 消息落进固定主动会话「Nori主动」。
     ///
     /// 🚫 刻意**不**用 `chat.loadById(...)` 来"切到那个会话再 append" ——
     /// `load()` 会整体替换 ChatStore 的 messages/sessionId，用户正看着的对话会被当场清空。
     /// 注入必须对当前内存态**无感**。
     ///
     /// 落库职责在**后端**，不在这里：`inbox_api.push(task_type="agent")` 已经调用
-    /// `sessions_api.append_proactive_message()` 把这条消息写进「轻聊主动」了
+    /// `sessions_api.append_proactive_message()` 把这条消息写进「Nori主动」了
     /// （本轮 v4.0.x 给后端加的分支，已实测落库成功）。App 侧只负责**让气泡可见**：
-    ///   ① 用户此刻正停在「轻聊主动」里 → 直接 append（气泡实时出现）；
+    ///   ① 用户此刻正停在「Nori主动」里 → 直接 append（气泡实时出现）；
     ///   ② 停在别的会话（常见）→ 什么都不做，**绝不碰 ChatStore 内存态**。
     ///      用户切过去时 `loadById` 从 NAS 读到的就是后端已落库的那条。
     ///
@@ -311,7 +311,7 @@ final class InboxStore {
             //      **与会话能否回复无关** —— 所以投递壳里弹卡也不影响作答。
             if sid == ChatStore.deliverySessionId {
                 if taskType == "reply" {
-                    NotificationHelper.notify(title: "轻聊 · 推送", body: text, sessionId: sid)
+                    NotificationHelper.notify(title: "Nori · 推送", body: text, sessionId: sid)
                 }
                 await markDone(id, auth: auth)
                 return
@@ -346,9 +346,9 @@ final class InboxStore {
                 lastInjectedCount += 1
                 // 通知口径与各分支既有规则一致：reply 弹横幅、question 弹「需要你确认」、progress 静默
                 if taskType == "reply" {
-                    NotificationHelper.notify(title: "轻聊 · 推送", body: notifyBody, sessionId: sid)
+                    NotificationHelper.notify(title: "Nori · 推送", body: notifyBody, sessionId: sid)
                 } else if taskType == "question" {
-                    NotificationHelper.notify(title: "轻聊 · AI 需要你确认", body: notifyBody, sessionId: sid)
+                    NotificationHelper.notify(title: "Nori · AI 需要你确认", body: notifyBody, sessionId: sid)
                 }
                 // question 刻意不 markDone（卡要一直留着让用户随时能答，见下面对应分支的说明）
                 if taskType != "question" { await markDone(id, auth: auth) }
@@ -362,7 +362,7 @@ final class InboxStore {
             }
         }
         // v3.9.76：固定投递会话（qingliao_delivery）是「只装 cron/system 投递详情」的壳，
-        // App 侧**不许**把推送气泡注入进去。起因（用户实测）：「轻聊投递会混进普通 AI 推送内容」
+        // App 侧**不许**把推送气泡注入进去。起因（用户实测）：「Nori投递会混进普通 AI 推送内容」
         // ——投递会话里出现了「⏳ AI 正在回复（已生成 152 字，第 17 步 运行代码）」这种普通 AI 进度残片：
         // 后端只把 cron/system 写进该会话（`inbox_api.push` 刻意排除 reply/progress），
         // 混入源是**这里**——progress/reply 被无条件注入「当前会话」，当天用户开着的恰是投递壳。
@@ -378,7 +378,7 @@ final class InboxStore {
         //   agent 消息只弹通知不注入（quiet: 静默时段本来也不会有，但手动 run 兜底）。
         if chat.isDeliverySession, taskType == "reply" || taskType == "progress" || taskType == "agent" {
             if taskType == "reply" || taskType == "agent" {
-                NotificationHelper.notify(title: taskType == "agent" ? "轻聊 · 主动" : "轻聊 · 推送",
+                NotificationHelper.notify(title: taskType == "agent" ? "Nori · 主动" : "Nori · 推送",
                                           body: text, sessionId: chat.sessionId)
             }
             await markDone(id, auth: auth)
@@ -403,12 +403,12 @@ final class InboxStore {
             qmsg.questionOptions = parts.options.isEmpty ? nil : parts.options
             chat.append(qmsg)
             lastInjectedCount += 1
-            NotificationHelper.notify(title: "轻聊 · AI 需要你确认", body: parts.body,
+            NotificationHelper.notify(title: "Nori · AI 需要你确认", body: parts.body,
                                       sessionId: chat.sessionId)
             return
         }
         // v4.0.11：主动 Agent 消息（后端 proactive_agent 投的 task_type=agent）→
-        // 注入**固定主动会话**「轻聊主动」成**可回复的普通气泡**（不是任务中心卡片）。
+        // 注入**固定主动会话**「Nori主动」成**可回复的普通气泡**（不是任务中心卡片）。
         //
         // 🚨 v4.0.x 修（用户实测：「主动消息串进正常会话」）：原先这里 `chat.append(amsg)`
         // 注入的是**当前会话** —— 用户当时开着哪个会话，主动消息就落进哪个，
@@ -418,9 +418,9 @@ final class InboxStore {
         //   ① 不走 reply 去重（InboxDedup 是给「AI 回复双投」用的；主动消息与 AI 回复
         //      是两套不同来源，共用双向包含判据会把「你刚问的和你刚被主动提醒的
         //      话题相近」误判成重复 → 主动消息被吞。主动消息带 proactiveId 天然唯一）。
-        //   ② 弹通知标题写「轻聊 · 主动」而非「轻聊 · 推送」——用户能一眼分清
+        //   ② 弹通知标题写「Nori · 主动」而非「Nori · 推送」——用户能一眼分清
         //      这是 AI 主动开口，不是自己发问的回复。
-        //   ③ 注入目标固定 → 即使用户正停在别的会话，主动消息也只会进「轻聊主动」，
+        //   ③ 注入目标固定 → 即使用户正停在别的会话，主动消息也只会进「Nori主动」，
         //      不会打断当前对话（这正是本次要修的核心）。
         // isPush=true：留在会话展示但 historyPayload 会滤掉它 → 不进模型上下文。
         if taskType == "agent" {
@@ -430,7 +430,7 @@ final class InboxStore {
             amsg.pushKind = "agent"
             amsg.proactiveId = sourceTaskId?.isEmpty == false ? sourceTaskId : id
             injectToProactiveSession(amsg)
-            NotificationHelper.notify(title: "轻聊 · 主动", body: text,
+            NotificationHelper.notify(title: "Nori · 主动", body: text,
                                       sessionId: ChatStore.proactiveSessionId)
             await markDone(id, auth: auth)
             return
@@ -491,7 +491,7 @@ final class InboxStore {
             TaskCenterStore.shared.add(TaskCenterItem(
                 id: id, text: text, taskType: taskType,
                 sourceTaskId: sourceTaskId))
-            NotificationHelper.notify(title: "轻聊 · 任务", body: text, sessionId: chat.sessionId,
+            NotificationHelper.notify(title: "Nori · 任务", body: text, sessionId: chat.sessionId,
                                       sound: false)   // #10：定时/后台任务走静默，别抢前台对话铃声
             await markDone(id, auth: auth)
             return
@@ -527,7 +527,7 @@ final class InboxStore {
             if chat.appendPushReplyIfNew(msg) {
                 lastInjectedCount += 1
                 // 弹本地通知（侧载无 APNs，用本地通知横幅兜底；App 前台也弹）
-                NotificationHelper.notify(title: "轻聊 · 推送", body: text, sessionId: chat.sessionId)
+                NotificationHelper.notify(title: "Nori · 推送", body: text, sessionId: chat.sessionId)
             }
         }
         await markDone(id, auth: auth)

@@ -5,7 +5,7 @@ import Foundation
 //
 // 为什么要有这一层：AutomationRules.swift 里的 `ReportEventIntent` 曾是**唯一**一个 App Intent，
 // 而且全仓零引用、没有 AppShortcutsProvider —— 结果就是"写好了但用户看不见"：
-// 快捷指令 App 里没有轻聊的条目，Siri 也不会把条件事件交给轻聊的自动规则。
+// 快捷指令 App 里没有Nori的条目，Siri 也不会把条件事件交给Nori的自动规则。
 // 本文件把动作面补齐：每个 intent 都有 title/description/parameterSummary，
 // 文件末尾用 `QingliaoAppShortcuts` 登记 Siri 短语（App Shortcuts 才是真正的"零点击"入口）。
 //
@@ -17,11 +17,11 @@ import Foundation
 //     所以统一走 `QingliaoIntentClient.auth()`：新建一个 AuthStore —— 它 init 里就是读
 //     UserDefaults 的服务器地址 + Keychain 的 token，与 App 内**同一套存储**，不新造第二份凭据。
 //  2. **不能有 UI**。App Intent 可能在没有界面的进程里跑（App 被系统在后台拉起），
-//     所以「问轻聊」走后端 `/api/stream/chat`（一次性、非流式），不挂 App 内那套 StreamClient 轮询。
+//     所以「问Nori」走后端 `/api/stream/chat`（一次性、非流式），不挂 App 内那套 StreamClient 轮询。
 //  3. **回 App 到某页**：intent 声明前台模式（`supportedModes`）+ 进程内投递给 `DockTabView`。
 //     ⚠️ **别退回 `OpenURLIntent` + `qingliao://`**：iOS 26 上让系统去开自己的自定义 scheme 会当场被拒，
 //     快捷指令里报「The provided URL scheme `qingliao` is unsupported; launch is prohibited」
-//     （用户「打开轻聊看板」自动化实测）。`qingliao://` 深链仍归灵动岛 `widgetURL` / 分享回跳 /
+//     （用户「打开Nori看板」自动化实测）。`qingliao://` 深链仍归灵动岛 `widgetURL` / 分享回跳 /
 //     `onOpenURL` 用 —— 两个入口各管一段，不是二选一，也别互相顶替。
 //
 // ⚠️ App Shortcuts **每个 App 最多 10 条**，超了是**构建期**失败（appintentsmetadataprocessor 报
@@ -37,7 +37,7 @@ enum QingliaoIntentClient {
     static func auth() throws -> AuthStore {
         let a = AuthStore()
         guard a.isLoggedIn, !a.token.isEmpty else {
-            throw QingliaoIntentError(message: "轻聊还没登录：先打开 App 登录一次，再回来用快捷指令")
+            throw QingliaoIntentError(message: "Nori还没登录：先打开 App 登录一次，再回来用快捷指令")
         }
         return a
     }
@@ -78,7 +78,7 @@ enum QingliaoIntentClient {
                         timeout: TimeInterval = 120) async throws -> String {
         // 模型取源分两条，**别合并**：
         //   · 带图 → `modelForImage`（视觉模型 > Agent 模型 > 主模型，与 ChatView.resolveModel 同规则）
-        //   · 纯文本（AI 翻译 / 问轻聊 / 纪要）→ 只认 `CloudConfig.mainModelAndProvider`
+        //   · 纯文本（AI 翻译 / 问Nori / 纪要）→ 只认 `CloudConfig.mainModelAndProvider`
         //     （v3.9.79 口径：翻译浮层是按主模型配的 30s 超时，切到 Agent 档位会成片掐断）
         let (model, provider) = imageDataURL == nil
             ? CloudConfig.mainModelAndProvider
@@ -100,7 +100,7 @@ enum QingliaoIntentClient {
         let j = try await auth.json("/api/stream/chat", method: "POST", body: payload, timeout: timeout)
         let text = QingliaoAIReply.text(from: j)
         guard !text.isEmpty else {
-            throw QingliaoIntentError(message: "轻聊没有返回内容（后端 200 但正文为空）")
+            throw QingliaoIntentError(message: "Nori没有返回内容（后端 200 但正文为空）")
         }
         return text
     }
@@ -108,7 +108,7 @@ enum QingliaoIntentClient {
     /// 「带图时用哪个模型」的取源 —— 必须与 `ChatView.resolveModel` 同规则（视觉模型 > Agent 模型 > 主模型）。
     /// 为什么不能直接调它：那是 ChatView 的实例方法（读视图 @AppStorage 状态），这一层（无界面客户端）拿不到。
     /// ⚠️ 改口径时两处一起看 —— 别让「拍照识别用哪个模型」和「聊天页发图用哪个模型」分叉。
-    /// ⚠️ 纯文本链路（AI 翻译 / 问轻聊 / 纪要）**刻意不走这里** —— 那几条按 `CloudConfig.mainModelAndProvider`
+    /// ⚠️ 纯文本链路（AI 翻译 / 问Nori / 纪要）**刻意不走这里** —— 那几条按 `CloudConfig.mainModelAndProvider`
     ///   取源（见 `oneShot` 里那段注释），别顺手合并成一条：翻译浮层的 30s 超时是配主模型的。
     @MainActor
     static func modelForImage(_ hasImage: Bool) -> (model: String, provider: String) {
@@ -197,17 +197,17 @@ enum MemoPriority: String, AppEnum {
     }
 }
 
-// MARK: - 动作 1：问轻聊（把一句话发给 AI，取回回答）
+// MARK: - 动作 1：问Nori（把一句话发给 AI，取回回答）
 
 struct AskQingliaoIntent: AppIntent {
 
-    static var title: LocalizedStringResource { "问轻聊" }
+    static var title: LocalizedStringResource { "问Nori" }
 
     static var description: IntentDescription {
-        IntentDescription("把一句话发给轻聊的 AI，直接取回回答（可让 Siri 念出来，也可以在快捷指令里接下一步）")
+        IntentDescription("把一句话发给Nori的 AI，直接取回回答（可让 Siri 念出来，也可以在快捷指令里接下一步）")
     }
 
-    @Parameter(title: "问题", description: "要问轻聊的话，例如「今天 NAS 内存占用怎么样」")
+    @Parameter(title: "问题", description: "要问Nori的话，例如「今天 NAS 内存占用怎么样」")
     var question: String
 
     @Parameter(title: "回答风格", description: "留空按「一句话」处理")
@@ -217,7 +217,7 @@ struct AskQingliaoIntent: AppIntent {
     var readAloud: Bool
 
     static var parameterSummary: some ParameterSummary {
-        Summary("问轻聊 \(\.$question)")
+        Summary("问Nori \(\.$question)")
     }
 
     /// `@MainActor`：AuthStore 是 `@MainActor` 隔离的（LiveActivityActions.swift 同因，
@@ -227,7 +227,7 @@ struct AskQingliaoIntent: AppIntent {
         let answer = try await QingliaoIntentClient.ask(question, style: style ?? .concise)
         guard readAloud else {
             // 只回提示：完整回答仍然走 value，需要时在快捷指令里接「显示结果」之类的动作
-            return .result(value: answer, dialog: "轻聊已回答")
+            return .result(value: answer, dialog: "Nori已回答")
         }
         return .result(value: answer, dialog: qlDialog(QingliaoAIReply.shorten(answer)))
     }
@@ -237,10 +237,10 @@ struct AskQingliaoIntent: AppIntent {
 
 struct AddMemoIntent: AppIntent {
 
-    static var title: LocalizedStringResource { "记到轻聊备忘录" }
+    static var title: LocalizedStringResource { "记到Nori备忘录" }
 
     static var description: IntentDescription {
-        IntentDescription("把一句话记进轻聊的备忘录（生活页），可选择置顶")
+        IntentDescription("把一句话记进Nori的备忘录（生活页），可选择置顶")
     }
 
     @Parameter(title: "内容", description: "要记下来的话")
@@ -250,7 +250,7 @@ struct AddMemoIntent: AppIntent {
     var priority: MemoPriority?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("记到轻聊备忘录 \(\.$content)")
+        Summary("记到Nori备忘录 \(\.$content)")
     }
 
     @MainActor
@@ -279,7 +279,7 @@ struct AddMemoIntent: AppIntent {
         if priority == .pinned, let first = store.memos.first, first.content == text {
             store.togglePin(first)
         }
-        return .result(dialog: priority == .pinned ? "已记到轻聊备忘录并置顶" : "已记到轻聊备忘录")
+        return .result(dialog: priority == .pinned ? "已记到Nori备忘录并置顶" : "已记到Nori备忘录")
     }
 }
 
@@ -287,18 +287,18 @@ struct AddMemoIntent: AppIntent {
 
 struct CheckInboxIntent: AppIntent {
 
-    static var title: LocalizedStringResource { "检查轻聊收件箱" }
+    static var title: LocalizedStringResource { "检查Nori收件箱" }
 
     static var description: IntentDescription {
-        IntentDescription("看一眼轻聊收件箱里还没处理的消息（只读，不改变已处理状态）")
+        IntentDescription("看一眼Nori收件箱里还没处理的消息（只读，不改变已处理状态）")
     }
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let texts = try await QingliaoIntentClient.inboxTexts()
-        guard !texts.isEmpty else { return .result(dialog: "轻聊收件箱是空的") }
+        guard !texts.isEmpty else { return .result(dialog: "Nori收件箱是空的") }
         let head = texts.prefix(3).map { QingliaoAIReply.shorten($0, limit: 40) }.joined(separator: "；")
-        return .result(dialog: qlDialog("轻聊收件箱 \(texts.count) 条：\(head)"))
+        return .result(dialog: qlDialog("Nori收件箱 \(texts.count) 条：\(head)"))
     }
 }
 
@@ -314,8 +314,8 @@ struct CheckInboxIntent: AppIntent {
 // · `openAppWhenRun` 仍不用：iOS 16–26 已标 Deprecated，扩展里置 true 还会直接编译报错。
 
 struct OpenChatIntent: AppIntent {
-    static var title: LocalizedStringResource { "打开轻聊聊天" }
-    static var description: IntentDescription { IntentDescription("打开轻聊并回到聊天页") }
+    static var title: LocalizedStringResource { "打开Nori聊天" }
+    static var description: IntentDescription { IntentDescription("打开Nori并回到聊天页") }
     /// 计算属性而非 `static let`：与 `title` 同一理由——Swift 6 严格并发下静态存储属性会报
     /// nonisolated global shared mutable state，CI Archive 直接失败。
     static var supportedModes: IntentModes { .foreground(.immediate) }
@@ -328,8 +328,8 @@ struct OpenChatIntent: AppIntent {
 }
 
 struct OpenSessionsIntent: AppIntent {
-    static var title: LocalizedStringResource { "打开轻聊对话" }
-    static var description: IntentDescription { IntentDescription("打开轻聊并切到对话页") }
+    static var title: LocalizedStringResource { "打开Nori对话" }
+    static var description: IntentDescription { IntentDescription("打开Nori并切到对话页") }
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
     @MainActor
@@ -340,8 +340,8 @@ struct OpenSessionsIntent: AppIntent {
 }
 
 struct OpenFeedIntent: AppIntent {
-    static var title: LocalizedStringResource { "打开轻聊资讯" }
-    static var description: IntentDescription { IntentDescription("打开轻聊并切到资讯页") }
+    static var title: LocalizedStringResource { "打开Nori资讯" }
+    static var description: IntentDescription { IntentDescription("打开Nori并切到资讯页") }
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
     @MainActor
@@ -352,8 +352,8 @@ struct OpenFeedIntent: AppIntent {
 }
 
 struct OpenLifeIntent: AppIntent {
-    static var title: LocalizedStringResource { "打开轻聊点子" }
-    static var description: IntentDescription { IntentDescription("打开轻聊并切到点子页（备忘灵感）") }
+    static var title: LocalizedStringResource { "打开Nori点子" }
+    static var description: IntentDescription { IntentDescription("打开Nori并切到点子页（备忘灵感）") }
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
     @MainActor
@@ -365,8 +365,8 @@ struct OpenLifeIntent: AppIntent {
 
 // 灰度重做 2026-10-06：看板 tab（原「我的」已删）。快捷指令/深链入口。
 struct OpenDashboardIntent: AppIntent {
-    static var title: LocalizedStringResource { "打开轻聊看板" }
-    static var description: IntentDescription { IntentDescription("打开轻聊并切到看板页") }
+    static var title: LocalizedStringResource { "打开Nori看板" }
+    static var description: IntentDescription { IntentDescription("打开Nori并切到看板页") }
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
     @MainActor
@@ -385,8 +385,8 @@ struct OpenDashboardIntent: AppIntent {
 // 前台模式与上面四条同一理由：iOS 26 不许 intent 里让系统 launch 自己的 scheme。
 
 struct OpenQuickActionsIntent: AppIntent {
-    static var title: LocalizedStringResource { "打开轻聊快捷菜单" }
-    static var description: IntentDescription { IntentDescription("打开轻聊并弹出智慧球快捷菜单（8 个常用动作）") }
+    static var title: LocalizedStringResource { "打开Nori快捷菜单" }
+    static var description: IntentDescription { IntentDescription("打开Nori并弹出智慧球快捷菜单（8 个常用动作）") }
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
     @MainActor
@@ -398,7 +398,7 @@ struct OpenQuickActionsIntent: AppIntent {
 
 // MARK: - App Shortcuts（Siri 短语）
 //
-// 没有这一段，动作只出现在快捷指令 App 里；有了它才能"嘿 Siri，问轻聊"。
+// 没有这一段，动作只出现在快捷指令 App 里；有了它才能"嘿 Siri，问Nori"。
 // 规则（Apple 文档 + 构建期/运行时校验，逐条对过）：
 //  · 每条短语**必须**含 `\(.applicationName)`：构建期给告警，运行时索引直接丢弃该条短语，
 //    用户喊了永远没反应 —— 而且短语是"已发布的契约"，改词会破坏用户已有的口令记忆；
@@ -418,7 +418,7 @@ struct QingliaoAppShortcuts: AppShortcutsProvider {
                     "问一下\(.applicationName)",
                     "\(.applicationName)问答",
                 ],
-                shortTitle: "问轻聊",
+                shortTitle: "问Nori",
                 systemImageName: "bubble.left.and.bubble.right"
             )
             AppShortcut(

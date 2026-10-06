@@ -7,7 +7,7 @@ import UIKit
 //   ① `.onOpenURL` 收到 `qingliao://share?...`（扩展 `extensionContext.open` 成功时；
 //      也可能来自用户手打同一个 scheme）；
 //   ② 回前台 / 冷启动时发现系统剪贴板里有本协议的载荷（`open` 被 iOS 18 挡住时的兜底 ——
-//      用户自己打开轻聊这条路径）。协议与两条通道的定义见 `ShareLinkCodec`。
+//      用户自己打开Nori这条路径）。协议与两条通道的定义见 `ShareLinkCodec`。
 //
 // 不新造机制：文本与图片**都**走 `ShareRouter` + `.qingliaoShareIncoming`（v3.4.14 系统分享
 // 那条既有通道）。投递前先 post `.qingliaoOpenChat` 请宿主切到聊天页 —— 载荷的两条落点都

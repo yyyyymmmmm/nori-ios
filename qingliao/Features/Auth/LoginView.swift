@@ -149,7 +149,7 @@ struct LoginView: View {
                     .shadow(color: Color.blue.opacity(0.3), radius: 14, y: 5)
             }
             VStack(spacing: 6) {
-                Text("轻聊")
+                Text("Nori")
                     .font(.system(size: Typography.display, weight: .bold))
                 Text("家庭 NAS 上的 AI 助手")
                     .font(.system(size: Typography.subhead))
@@ -337,9 +337,9 @@ struct LoginView: View {
                     return
                 }
                 let context = LAContext()
-                context.localizedReason = "验证后自动登录轻聊"
+                context.localizedReason = "验证后自动登录Nori"
                 context.evaluatePolicy(.deviceOwnerAuthentication,
-                                       localizedReason: "验证后自动登录轻聊") { success, _ in
+                                       localizedReason: "验证后自动登录Nori") { success, _ in
                     DispatchQueue.main.async {
                         guard success, let cred = FaceIDStore.load() else { return }
                         // v2.0.102：Face ID 凭据服务器与当前输入不一致时提示（防静默登录到旧服务器）

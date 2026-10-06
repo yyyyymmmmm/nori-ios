@@ -19,7 +19,7 @@ struct AppLockView: View {
                 Image(systemName: "lock.shield.fill")
                     .font(.system(size: 52))
                     .foregroundStyle(LinearGradient(colors: [.blue, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing))
-                Text("轻聊已锁定")
+                Text("Nori已锁定")
                     .font(.system(size: Typography.headline, weight: .bold))
                 Text("验证 Face ID 后进入")
                     .font(.system(size: Typography.subhead))
@@ -83,7 +83,7 @@ struct AppLockView: View {
         verifying = true
         failed = false
         let context = LAContext()
-        context.localizedReason = "解锁轻聊"
+        context.localizedReason = "解锁Nori"
         // v3.9.41（SR43）：先探测可用性——不可用（无锁屏密码等）时给出出口，而不是恒失败把用户锁死
         var policyError: NSError?
         if !context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &policyError) {
@@ -93,7 +93,7 @@ struct AppLockView: View {
             return
         }
         context.evaluatePolicy(.deviceOwnerAuthentication,
-                               localizedReason: "解锁轻聊") { success, _ in
+                               localizedReason: "解锁Nori") { success, _ in
             DispatchQueue.main.async {
                 verifying = false
                 if success {
