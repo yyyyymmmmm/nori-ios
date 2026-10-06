@@ -169,6 +169,7 @@ extension ChatView {
 ///   · 读：pttOverlay（面板 bottom padding 用）
 /// `@Observable` 订阅：pttOverlay 的 body 里读到 `topFromBottom` 即自动订阅，值变自动重排面板位置。
 @Observable
+@MainActor
 final class PTTPanelAnchor {
     static let shared = PTTPanelAnchor()
 
