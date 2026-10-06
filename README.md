@@ -4,7 +4,7 @@
 
 iOS 26 原生液态玻璃 + 中性系统灰度。iOS 17+，SideStore 侧载分发。
 
-> 🔗 **后端**：配套后端服务在 [`github.com/yyyyymmmmm/qingliao-backend`](https://github.com/yyyyymmmmm/qingliao-backend)，Docker 部署，含 `docker-compose` + `.env.example` + 部署文档。
+> 🔗 **后端**：配套后端服务在 [`github.com/yyyyymmmmm/nori-backend`](https://github.com/yyyyymmmmm/nori-backend)，Docker 部署，含 `docker-compose` + `.env.example` + 部署文档。
 
 > 本文档面向**接手开发/发版的 AI 代理**：读完可独立完成「改功能 → 自查 → 发版 → 交付」全流程。
 
