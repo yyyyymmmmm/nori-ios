@@ -15,6 +15,54 @@ struct ReadAloudSheet: View {
     @State private var sysRateIndex = SpeechManager.systemRateIndex
     @State private var voiceOptions: [SpeechVoiceOption] = []
     @State private var voiceHintText = ""
+    // v4.4.x：TTS 厂商 API Key 配置（后端 /api/tts/key）
+    @State private var ttsKeyConfigured = false
+    @State private var ttsKeyInput = ""
+    @State private var ttsKeySaving = false
+    @State private var ttsKeyMessage = ""
+
+    private func ttsKeyStatusText(provider: String) -> String {
+        ttsKeyConfigured ? "已配置" : "未配置（朗读会回退系统语音）"
+    }
+
+    @MainActor
+    private func refreshTTSKeyStatus() async {
+        ttsKeyMessage = ""
+        do {
+            let (data, _) = try await AuthStore.shared.request(
+                "/api/tts/key?provider=\(ttsProvider)", method: "GET")
+            if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let ok = obj["ok"] as? Bool, ok {
+                ttsKeyConfigured = (obj["configured"] as? Bool) ?? false
+            }
+        } catch {
+            ttsKeyMessage = "查不到配置状态"
+        }
+    }
+
+    @MainActor
+    private func saveTTSKey() async {
+        let key = ttsKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { ttsKeyMessage = "先填密钥"; return }
+        ttsKeySaving = true
+        ttsKeyMessage = ""
+        do {
+            let (data, _) = try await AuthStore.shared.request(
+                "/api/tts/key", method: "POST",
+                body: ["provider": ttsProvider, "api_key": key])
+            if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let ok = obj["ok"] as? Bool, ok {
+                ttsKeyConfigured = true
+                ttsKeyInput = ""
+                ttsKeyMessage = "已保存"
+            } else {
+                ttsKeyMessage = "保存失败"
+            }
+        } catch {
+            ttsKeyMessage = "保存失败：网络不通"
+        }
+        ttsKeySaving = false
+    }
 
     private var ttsStatusText: String {
         ttsOn ? "已开启：\(CloudConfig.ttsVoicesFor(provider: ttsProvider, model: ttsModel).first { $0.id == ttsVoice }?.name ?? ttsVoice)" : "关闭（使用系统语音）"
@@ -91,6 +139,37 @@ struct ReadAloudSheet: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
+                            MuseRowDivider()
+                            // v4.4.x：TTS 厂商 API Key（后端 /api/tts/key），按当前所选模型对应厂商
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Text("密钥")
+                                        .font(.system(size: 17))
+                                        .foregroundStyle(.secondary)
+                                    Spacer(minLength: 8)
+                                    Text(ttsKeyStatusText(provider: ttsProvider))
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(ttsKeyConfigured ? .green : .orange)
+                                }
+                                SecureField("粘贴 \(ttsModelOptions.first { "\($0.provider)|\($0.model)" == "\(ttsProvider)|\(ttsModel)" }?.label ?? "厂商") API Key", text: $ttsKeyInput)
+                                    .textFieldStyle(.roundedBorder)
+                                    .autocapitalization(.none)
+                                    .disableAutocorrection(true)
+                                HStack {
+                                    if !ttsKeyMessage.isEmpty {
+                                        Text(ttsKeyMessage)
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    Spacer()
+                                    Button(ttsKeySaving ? "保存中…" : "保存密钥") {
+                                        Task { await saveTTSKey() }
+                                    }
+                                    .disabled(ttsKeySaving || ttsKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
                         }
                         .padding(.horizontal, 16)
                     } else {
@@ -158,6 +237,10 @@ struct ReadAloudSheet: View {
                 // v3.9.10 口径：系统音色列表只在 onAppear 异步取一次快照，不在 body 里枚举
                 let opts = await SpeechManager.voiceCatalog()
                 voiceOptions = opts
+                await refreshTTSKeyStatus()
+            }
+            .onChange(of: ttsProvider) { _, _ in
+                Task { await refreshTTSKeyStatus() }
             }
         }
     }
