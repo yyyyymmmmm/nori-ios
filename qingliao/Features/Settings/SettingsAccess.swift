@@ -31,6 +31,8 @@ struct ConnSettingsView: View {
     // v4.4.x：连接中心——服务状态（后端 /api/connections）
     @State private var connections: [ConnectionInfo] = []
     @State private var showHADetail = false
+    // v4.4.x：模型选择（后端 /api/agent/hermes/models）
+    @State private var showModelPicker = false
 
     private var currentHermesModel: String {
         UserDefaults.standard.string(forKey: "qingliao_model") ?? ""
