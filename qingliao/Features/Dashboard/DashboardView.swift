@@ -1325,7 +1325,7 @@ struct DashboardView: View {
     // v3.9.74c：面板关闭后真正呈现在弹的设置页（与 pending 意图分开，防 dismiss/present 同帧抖动）
     @State private var presentedAfterPanel: AfterPanelSheet?
     enum AfterPanelSheet: String, Identifiable {
-        case mcp, mail, cloudDrive
+        case mcp, lifeCards, mail, cloudDrive
         var id: String { rawValue }
     }
 
@@ -1459,7 +1459,7 @@ struct DashboardView: View {
             // 面板内跳转走本页已有 sheet 机制；MCP/生活卡设置弹窗在面板 dismiss 后弹出（防 sheet 叠 sheet）。
             ConnectorPanelSheet(
                 onOpenMCP: { activeSheet = nil; pendingSheetAfterPanel = .mcp },
-                onOpenLifeCards: { },
+                onOpenLifeCards: { activeSheet = nil; pendingSheetAfterPanel = .lifeCards },
                 onOpenMail: { activeSheet = nil; pendingSheetAfterPanel = .mail },
                 onOpenCloudDrive: { activeSheet = nil; pendingSheetAfterPanel = .cloudDrive },
                 haCount: haAvailableCount,
@@ -1603,6 +1603,9 @@ extension DashboardView {
                 switch target {
                 case .mcp:
                     MCPSettingsSheet()
+                        .presentationDetents([.medium, .large])
+                case .lifeCards:
+                    LifeCardsSettingsView()
                         .presentationDetents([.medium, .large])
                 // v4.0.x 第 3 项：接入中心一页新增两个直达口（邮件 / 网盘）。
                 // 复用设置页里那同一份 sheet，**不新做一套 UI**（用户口径：
