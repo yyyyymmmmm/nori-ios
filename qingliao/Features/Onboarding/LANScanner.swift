@@ -22,6 +22,7 @@ struct DiscoveredServer: Identifiable, Hashable {
 }
 
 @Observable
+@MainActor
 final class LANScanner {
     var isScanning = false
     var servers: [DiscoveredServer] = []

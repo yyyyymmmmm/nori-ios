@@ -7,6 +7,7 @@ import SwiftUI
 // 取最近 8 条。侧边栏打开时触发一次加载（DockTabView 的 onChange(of: sidebarOpen)），
 // 3 秒内不重复拉；未登录 / 拉取失败诚实留空，不弹错误。
 @Observable
+@MainActor
 final class SidebarHistoryStore {
     var sessions: [ChatSession] = []
     var isLoading = false
