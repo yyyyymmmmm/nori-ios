@@ -33,8 +33,9 @@ struct ChatView: View {
     @Environment(StreamClient.self) var stream
     @Environment(InboxStore.self) var inbox   // v3.4.0：底部上拉手动拉取收件箱
     @Environment(KeyboardObserver.self) var kb
-    /// 灰度重做 2026-10-06 晚：悬浮 tab bar 避让 —— 输入框底部 inset 用（safeArea.bottom）
-    @Environment(\.safeAreaInsets) private var safeAreaInsets
+    /// 灰度重做 2026-10-06 晚：悬浮 tab bar 避让 —— 输入框底部 inset 用。
+    /// v4.1.0 D路：SwiftUI 没有 \.safeAreaInsets 这个 EnvironmentKey（CI 挂），改 GeometryReader 实测。
+    @State private var safeAreaBottom: CGFloat = 0
     /// v3.9.79：横屏判据 —— iPhone 横屏的 `horizontalSizeClass` 仍是 `.compact`（只有 Plus/Max 变 `.regular`），
     /// 所以「矮屏」只认 `verticalSizeClass == .compact`。见 `AdaptiveLayout.isShort`。
     @Environment(\.verticalSizeClass) private var vSize
@@ -223,6 +224,76 @@ struct ChatView: View {
         stream.status == "error" && !stream.errorMessage.isEmpty
             && !isRetryableStreamError(stream.errorMessage)
     }
+
+    // MARK: - v4.1.0 D路：对话页顶部 AI 状态条（对标 Muse 头像+名字胶囊）
+    /// 后台任务名（任务中心同一数据源 `/api/agent/tasks/active`，20s 轮询；未登录/无任务 = nil）
+    @State private var stripTaskTitle: String? = nil
+
+    /// 状态条：左 PetAvatar（44pt，用户已选样式）+ 中"轻聊"胶囊/状态文字 + 右 chevron；
+    /// 点整条 → 任务中心（与侧边栏同一入口，一个功能一个入口）。有消息时也显示，不只欢迎页。
+    private var aiStatusStrip: some View {
+        Button {
+            NotificationCenter.default.post(name: .qingliaoOpenTaskCenter, object: nil)
+        } label: {
+            HStack(spacing: 10) {
+                // 52pt 槽位给走动位移留余量（±0.145×44≈±6pt）；形象本身按 44pt 直接画
+                // （PetAvatar 有警告：不许 96 画 + 小 frame 显示，会溢出压住别的元素）
+                PetAvatar(size: 44, state: aiStripPetState, patTrigger: 0)
+                    .frame(width: 52, height: 52)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("轻聊")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .background(Color.secondary.opacity(0.12), in: Capsule())
+                    Text(aiStripStatusText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("AI 状态，打开任务中心")
+        .task { await refreshStripTaskLoop() }
+    }
+
+    /// 状态文字：离线/失败 > 思考中 > 后台任务 > 在线
+    private var aiStripStatusText: String {
+        if serverOnline == false || generationFailed { return "连接异常" }
+        if aiBusy { return "正在思考…" }
+        if let t = stripTaskTitle, !t.isEmpty { return "正在执行：" + t }
+        return "在线"
+    }
+
+    /// 状态条宠物的态：复用 PetAvatar 的 thinking 动画；任务执行中也用 thinking 态
+    private var aiStripPetState: PetState {
+        if serverOnline == false || generationFailed { return .alert }
+        if aiBusy || stripTaskTitle != nil { return .thinking }
+        return .idle
+    }
+
+    /// 后台任务轮询（条在树上就跑，ChatView 卸载即取消；一次轻量 GET / 20s）
+    private func refreshStripTaskLoop() async {
+        while !Task.isCancelled {
+            if auth.isLoggedIn {
+                let tasks = await auth.fetchActiveTasks()
+                let title = tasks.filter { $0.status == "running" }
+                    .sorted { $0.createdAt > $1.createdAt }.first?.title
+                await MainActor.run { stripTaskTitle = title }
+            } else {
+                await MainActor.run { stripTaskTitle = nil }
+            }
+            try? await Task.sleep(for: .seconds(20))
+        }
+    }
     private var visibleMessageCount: Int { min(chat.messages.count, displayLimit) }
     /// 可见窗口起始绝对索引（用于日期分隔线的 prevTs 取真实前一条）
     private var visibleStartIndex: Int { chat.messages.count - visibleMessageCount }
@@ -236,6 +307,12 @@ struct ChatView: View {
         let prevMsg: ChatMessage?
         var id: String { msg.id }
     }
+    /// v4.1.0 D路：显示层可合并的 assistant 消息 —— 只有纯文本普通气泡才进合并；
+    /// 问题卡/媒体/撤回/折叠/错误占位各走自己的渲染，不掺进来。
+    private static func displayMergeable(_ m: ChatMessage) -> Bool {
+        m.questionId == nil && m.imageDataURL == nil && m.audioPath == nil
+            && !m.withdrawn && !m.edited && !m.isErrorPlaceholder
+    }
     // v3.0.51 A2 fix：缓存可见消息数组——仅在消息数量/显示上限变化时重建，
     // 避免每帧 stream.delta 触发 body 重建 O(visible) 数组
     func refreshVisibleMessages() {
@@ -246,9 +323,39 @@ struct ChatView: View {
         // 注意旧序列必须取**真实可见窗口**（而不是 chat.messages 全量）：visibleMessagesCache
         // 装的就是它，两者窗口一致才能让「前缀相同」真正等价于「这一条是新插进来的」。
         let prevIDs = visibleMessagesCache.map(\.id)
-        let next = (start..<msgs.count).map {
-            MessageRowItem(index: $0, msg: msgs[$0], prevMsg: $0 > 0 ? msgs[$0 - 1] : nil)
+        // v4.1.0 D路：显示层合并连续 assistant 消息 —— 一条 AI 回复 = 一个气泡（对标 Muse）。
+        // 只动显示层：chat.messages 落库不动；合并单元 id 取组内第一条，重发/删除/待办挂账等
+        // 按消息 id 走的逻辑不受影响。user 消息不动。
+        var merged: [MessageRowItem] = []
+        var i = start
+        while i < msgs.count {
+            let m = msgs[i]
+            if m.role == "assistant", Self.displayMergeable(m) {
+                var j = i
+                var parts: [String] = []
+                var lastSuggestions: [String]? = nil
+                var anyAgent = false
+                var anyPush = false
+                while j < msgs.count, msgs[j].role == "assistant", Self.displayMergeable(msgs[j]) {
+                    parts.append(msgs[j].content)
+                    if let s = msgs[j].suggestions, !s.isEmpty { lastSuggestions = s }
+                    anyAgent = anyAgent || msgs[j].agent
+                    anyPush = anyPush || msgs[j].isPush
+                    j += 1
+                }
+                var dm = msgs[i]
+                dm.content = parts.joined(separator: "\n\n")
+                if let s = lastSuggestions { dm.suggestions = s }
+                dm.agent = anyAgent
+                dm.isPush = anyPush
+                merged.append(MessageRowItem(index: i, msg: dm, prevMsg: i > 0 ? msgs[i - 1] : nil))
+                i = j
+            } else {
+                merged.append(MessageRowItem(index: i, msg: m, prevMsg: i > 0 ? msgs[i - 1] : nil))
+                i += 1
+            }
         }
+        let next = merged
         let pureAppend = MessageInsertAnim.isSingleAppend(prev: prevIDs, next: next.map(\.id))
         if pureAppend {
             // 🚨 只有纯追加才播气泡插入动画。整组替换 / 清空 / 切会话不播（v3.9.31 批量移除闪退）。
@@ -892,6 +999,7 @@ struct ChatView: View {
             // 只保留手动控制，输入框精确贴键盘。
             VStack(spacing: 0) {
                 chatHeaderBar
+                aiStatusStrip
                 chatStatusBannerStrip
                 chatTranscriptArea
                 // 🚨 v3.9.71 修复（用户截图报「输入法会遮住输入框」）：空态（欢迎页）在键盘弹起时把输入栏挤没了。
@@ -903,6 +1011,14 @@ struct ChatView: View {
                 //   配套：welcomeView 自己在键盘弹起时收缩（见那里的注释），否则会看到被截断的欢迎页。
                 chatComposerArea
             }
+            // v4.1.0 D路：实测底部安全区（替代不存在的 \.safeAreaInsets EnvironmentKey，CI 修错）
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { safeAreaBottom = proxy.safeAreaInsets.bottom }
+                        .onChange(of: proxy.safeAreaInsets.bottom) { _, v in safeAreaBottom = v }
+                }
+            )
         )))))))
     }
 
@@ -1629,7 +1745,7 @@ struct ChatView: View {
         // 灰度重做 2026-10-06 晚：悬浮灰胶囊 tab bar 会盖住输入框（真机截图）→ 键盘收起时底部
         // 再垫一个 tab bar 位，让输入框坐在 tab bar 上方（从下往上：tab bar、输入框、内容）；
         // 键盘弹起时不垫 —— 键盘盖住 tab bar，输入框仍精确贴键盘（v2.0.140 红线，不动显隐逻辑）。
-        .padding(.bottom, Spacing.xs + (kb.isVisible ? 0 : GrayCapsuleTabBar.bodyHeight + GrayCapsuleTabBar.bottomGap + safeAreaInsets.bottom))
+        .padding(.bottom, Spacing.xs + (kb.isVisible ? 0 : GrayCapsuleTabBar.bodyHeight + GrayCapsuleTabBar.bottomGap + safeAreaBottom))
         // 🚨 v3.9.72（审查修正）：`layoutPriority(1)` 只挂**输入栏这一层**，不挂整个 chatComposerArea。
         // 整组里还有选图条/动作条/附件面板/引用条/上下文条（各自定高，合计 ≈380pt）：把整组抬到最高
         // 优先 = 键盘与动作条同开时输入栏本身仍会被顶出可见区，且空态欢迎页（非 ScrollView）被压到
