@@ -2532,27 +2532,23 @@ struct ChatView: View {
     /// v4.0.52 待做池 ⑧：链接预览缓存（按消息 id；行级 @State，随 ChatView 生命周期）。
     @State private var linkPreviews = LinkPreviewStore.shared
 
-    /// v3.0.51：单条消息整行（日期分隔 + 时间分隔 + 气泡）——拆独立方法防 ForEach type-check 超时
-    /// v3.4.2：改吃 entry 快照（prevMsg），渲染不再索引可变 chat.messages（越界 SIGTRAP 根治）
+    /// 2026-10-07：微信式时间戳统一口径（AI/用户同一规则，不区分发送方）——
+    /// 会话首条显示；与上一条间隔 > 5 分钟显示；跨天显示日期+时间；其余不显示。
+    /// 替代旧的 dateDivider（跨天胶囊）+ timeDivider（5分钟分隔）两套样式，统一为居中小灰字。
+    /// 纯逻辑抽独立函数：@ViewBuilder 内不允许 if-let 套 let 声明再套条件视图（type '()' 错）。
+    private func shouldShowTime(for entry: MessageRowItem) -> Bool {
+        guard let curTs = entry.msg.timestamp else { return false }
+        guard let prevTs = entry.prevMsg?.timestamp else { return true } // 可见窗口首条
+        let cur = Date(timeIntervalSince1970: curTs / 1000)
+        let prev = Date(timeIntervalSince1970: prevTs / 1000)
+        return !Calendar.current.isDate(cur, inSameDayAs: prev) || curTs - prevTs > 300_000
+    }
+
     @ViewBuilder
     private func messageRow(entry: MessageRowItem) -> some View {
         let msg = entry.msg
-        // 2026-10-07：微信式时间戳统一口径（AI/用户同一规则，不区分发送方）——
-        // 会话首条显示；与上一条间隔 > 5 分钟显示；跨天显示日期+时间；其余不显示。
-        // 替代旧的 dateDivider（跨天胶囊）+ timeDivider（5分钟分隔）两套样式，统一为居中小灰字。
-        if let curTs = msg.timestamp {
-            let showTime: Bool
-            if let prevTs = entry.prevMsg?.timestamp {
-                let sameDay = Calendar.current.isDate(
-                    Date(timeIntervalSince1970: curTs / 1000),
-                    inSameDayAs: Date(timeIntervalSince1970: prevTs / 1000))
-                showTime = !sameDay || curTs - prevTs > 300_000
-            } else {
-                showTime = true // 会话（可见窗口）首条
-            }
-            if showTime {
-                messageTimeDivider(curTs)
-            }
+        if shouldShowTime(for: entry), let ts = msg.timestamp {
+            messageTimeDivider(ts)
         }
         chatMessageBubble(msg)
             .id(msg.id)
