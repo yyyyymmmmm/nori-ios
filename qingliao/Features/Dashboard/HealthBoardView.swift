@@ -47,8 +47,6 @@ struct HealthBoardView: View {
                     }
                     .accessibilityLabel("同步正常")
                 }
-                    .accessibilityLabel("健康数据已同步")
-                }
             }
             .navigationDestination(isPresented: $showAllData) {
                 HealthDataView()
