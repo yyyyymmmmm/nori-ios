@@ -170,6 +170,9 @@ struct ChatView: View {
     @State var pttPressDate = Date()    // 按下时刻（<0.3s 视为轻触误触）
     @State var pttToastMessage: String? // 轻提示（没听清/按住说话/模型准备中）
     @State var pttToastToken = 0        // toast 代次防抖
+    /// L线：两段式语音模式（对标 Today）——轻点麦克风进入（输入区变"按住说话"），
+    /// 长按"按住说话"才录音；点键盘键退出。与 pttActive（录音中）是两件事。
+    @State var pttVoiceMode = false
     // v2.0.88：AI 回答中发送的消息队列（回答结束后自动逐条发送）
     @State var pendingQueue: [PendingSend] = []
     // v3.4.0：底部上拉拉取收件箱状态（@Observable 引用——拖动高频写不重建 ChatView body）
@@ -721,7 +724,10 @@ struct ChatView: View {
                     pttActive: pttActive,
                     onPTTStart: { startPTT() },
                     onPTTUpdate: { updatePTT(cancelArmed: $0) },
-                    onPTTEnd: { endPTT(cancelled: $0) })
+                    onPTTEnd: { endPTT(cancelled: $0) },
+                    pttVoiceMode: pttVoiceMode,
+                    onEnterVoiceMode: { enterPTTVoiceMode() },
+                    onExitVoiceMode: { exitPTTVoiceMode() })
                     // v2.0.129：球态输入框 —— 绑定会话 id，切会话重建复位（展开态在切会话后回球态）
                     .id(chat.sessionId)
                     // v2.0.135：消费输入栏区域的点击，防冒泡到消息区 ZStack 根手势误收键盘

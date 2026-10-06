@@ -53,6 +53,7 @@ struct AITopCapsule: View {
     @Environment(AuthStore.self) private var auth
     @Environment(StreamClient.self) private var stream
     @State private var capsuleState = AITopCapsuleState.shared
+    @ObservedObject private var speech = PetSpeechDrive.shared
 
     /// 状态小字：连接异常 > 正在执行任务 > 正在思考… > 在线（D路文案口径）
     private var statusText: String {
@@ -62,9 +63,9 @@ struct AITopCapsule: View {
         return "在线"
     }
 
-    /// 宠物态：复用 PetAvatar 的 thinking 动画；任务执行中也用 thinking 态
-    private var petState: PetState {
-        if capsuleState.online == false { return .alert }
+    /// L线：动态猫头像状态（ROTAvatarView）——朗读中 > 任务/思考中 > 在线/异常
+    private var avatarState: ROTAvatarState {
+        if speech.isSpeaking { return .speaking }
         if capsuleState.taskTitle != nil || stream.isStreaming { return .thinking }
         return .idle
     }
@@ -74,19 +75,16 @@ struct AITopCapsule: View {
             Haptics.tap()
             NotificationCenter.default.post(name: .qingliaoOpenTaskCenter, object: nil)
         } label: {
+            // L线：三行不重叠——56pt 头像 → 4pt 间距 → 名字胶囊 → 状态小字
+            // （之前 ZStack bottom 对齐把名字压在头像下半截，真机截图实锤重叠）
             VStack(spacing: 4) {
-                ZStack(alignment: .bottom) {
-                    // 64pt 槽位给走动位移留余量；形象本身按 56pt 直接画
-                    // （PetAvatar 警告：不许大尺寸画 + 小 frame 显示，会溢出压住别的元素）
-                    PetAvatar(size: 56, state: petState, patTrigger: 0)
-                        .frame(width: 64, height: 64)
-                    Text("轻聊")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.12), in: Capsule())
-                }
+                ROTAvatarView(state: avatarState, size: 56)
+                Text("ROT")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(Color.secondary.opacity(0.12), in: Capsule())
                 Text(statusText)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)

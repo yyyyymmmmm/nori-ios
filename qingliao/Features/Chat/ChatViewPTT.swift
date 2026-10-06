@@ -63,6 +63,21 @@ extension ChatView {
         }
     }
 
+    /// L线：两段式语音（对标 Today）——进入 / 退出语音模式。
+    /// 进入：先收键盘（TextField 暂时离场，退出时全新挂载，无 v3.9.53 重建坑）；
+    /// 录音中（pttActive）不许进出，松手再说。
+    func enterPTTVoiceMode() {
+        guard !pttActive, !liveSpeech.isRunning else { return }
+        Haptics.tap()
+        inputFocus = false
+        withAnimation(Motion.snap) { pttVoiceMode = true }
+    }
+
+    func exitPTTVoiceMode() {
+        guard !pttActive else { return }
+        withAnimation(Motion.snap) { pttVoiceMode = false }
+    }
+
     /// E路：按住期间手指位移更新（上滑超 60pt → 取消待命，给一格刻度触感）
     func updatePTT(cancelArmed: Bool) {
         guard pttActive, pttCancelArmed != cancelArmed else { return }
@@ -194,10 +209,24 @@ struct PTTRecordingPanel: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Text(cancelArmed ? "松手取消" : (preparing ? "语音模型准备中…" : "松手发送，上滑取消"))
-                .font(.system(size: 17, weight: .medium))
-                // 取消态弱化：灰度 + 次级字，不用大红（灰度纪律）
-                .foregroundStyle(cancelArmed ? .secondary : .primary)
+            if cancelArmed {
+                // L线：微信式红色取消指示——上滑超 60pt 时出现，手指在此松手则取消。
+                // 红色是功能性（危险/取消语义），非装饰，与灰度纪律不冲突。
+                HStack(spacing: 8) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("松手取消")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(Color.red, in: Capsule())
+            } else {
+                Text(preparing ? "语音模型准备中…" : "松手发送，上滑取消")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(.primary)
+            }
             PTTWaveform(level: level)
                 .frame(height: 30)
         }

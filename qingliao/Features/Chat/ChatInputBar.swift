@@ -112,6 +112,11 @@ struct ChatInputBar: View {
     var onPTTStart: () -> Void = {}
     var onPTTUpdate: (Bool) -> Void = { _ in }
     var onPTTEnd: (Bool) -> Void = { _ in }
+    /// L线：两段式语音模式（对标 Today）——轻点麦克风进入语音模式（输入区变"按住说话"），
+    /// 长按"按住说话"才录音；点键盘键退出。⚠️ 追加在末尾：调用点走成员初始化器且按声明序传参。
+    var pttVoiceMode: Bool = false
+    var onEnterVoiceMode: () -> Void = {}
+    var onExitVoiceMode: () -> Void = {}
     /// G线：PTT 感知的等效转写态 —— `transcribing` 入参混入了 `liveSpeech.isPreparing`（准备窗口），
     /// PTT 按住期间它会变 true；若直接用它，麦克风键/占位符/转圈会被旧语音 UI 抢走。
     /// 主 bug 回放：准备期 transcribing=true → showMicButton 变 false → 麦克风键（DragGesture 宿主）
@@ -263,14 +268,28 @@ struct ChatInputBar: View {
             .buttonStyle(PressStyle())
             .hitArea44(h: 6, v: 6)
             .accessibilityLabel("更多功能")
-            textArea
+            if pttVoiceMode {
+                // L线：语音模式（对标 Today）——居中"按住说话"，长按此区才录音。
+                // 进入语音模式时 ChatView 已 inputFocus=false 收键盘，TextField 暂时离场；
+                // 不存在 v3.9.53"键盘动画中途 TextField 被重建"的坑；退出时 TextField 全新挂载。
+                Text("按住说话")
+                    .font(.system(size: Typography.body))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(pttPressGesture)
+            } else {
+                textArea
+            }
             // v3.9.68（用户：「输入框可以优化的精致一点视觉上更美观一点」）：
             // 文字区与发送键之间补一条 **0.8pt 淡分隔线**（Tint.faint 同全站描边口径）——
             // 单行时代发送键与文字同层贴得太近，分层后两侧各有 5pt 空隙仍显「一坨」；
             // 一条细线把「输入区」与「操作键」分成两个视觉组，是「精致」的最低成本做法
             // （全站卡片/分组均以 0.8pt 描边分区，口径一致）。
             // 命中区零影响：allowsHitTesting(false) + HStack spacing 不变（线占 0 宽）。
-            divider
+            if !pttVoiceMode {
+                divider
+            }
             trailingButtons
         }
         .frame(minHeight: ChatInputBarLayout.messageRowMinHeight)
@@ -566,7 +585,10 @@ struct ChatInputBar: View {
             // v4.1.0 E路：发送/转写按钮组——长按进语音已摘除（PTT 接管），只剩轻点发送/转写中转圈
             // G线：PTT 期间走 transcribingEffective（准备期不抢按钮，见 showMicButton 注释）
             Group {
-                if transcribingEffective {
+                if pttVoiceMode {
+                    // L线：语音模式右键 = 键盘键，点按退回文字模式（对标 Today）
+                    keyboardButton
+                } else if transcribingEffective {
                     HStack(spacing: 6) {
                         ProgressView()
                             .tint(.white)
@@ -609,31 +631,50 @@ struct ChatInputBar: View {
         (text.isEmpty || pttActive) && !streaming && !voiceMode && !transcribingEffective && voiceEnabled
     }
 
-    /// v4.1.0 E路：按住说话按钮。DragGesture(minimumDistance: 0) 按下瞬间即触发 onPTTStart；
-    /// 上滑超 60pt → onPTTUpdate(true)（面板变"松手取消"）；松手 → onPTTEnd。
-    /// 不是 Button（避免 Button 内置手势与 DragGesture 互斥的老坑）；按压反馈由录音面板 + 触感承担。
+    /// L线：两段式语音（对标 Today）——麦克风键改为轻点进入语音模式，
+    /// 长按录音的手势搬到语音模式的"按住说话"文字区（pttPressGesture）。
     private var micButton: some View {
-        Image(systemName: "mic.fill")
-            .font(.system(size: Typography.body, weight: .medium))
-            .foregroundStyle(.white)
-            .frame(width: 32, height: 32)
-            .contentShape(Circle())
-            // v3.9.34：命中区 44×44（视觉 32×32 → 外扩 6），手势挂在最外层，整片 44 可按
-            .hitArea44(h: 6, v: 6)
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        // G线：每次 onChanged 都调 onPTTStart —— startPTT 自带 `!pttActive` 幂等 guard，
-                        // 重复调用直接返回，无害。不用本地旗标判定"新按压"：手势若中途被撕，
-                        // onEnded 不触发、旗标会僵死，导致下次按压永远调不到启动（pttPressDate 陈旧）。
-                        onPTTStart()
-                        onPTTUpdate(value.translation.height < -60)
-                    }
-                    .onEnded { value in
-                        onPTTEnd(value.translation.height < -60)
-                    }
-            )
-            .accessibilityLabel("按住说话")
+        Button(action: onEnterVoiceMode) {
+            Image(systemName: "mic.fill")
+                .font(.system(size: Typography.body, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressStyle())
+        // v3.9.34：命中区 44×44（视觉 32×32 → 外扩 6）
+        .hitArea44(h: 6, v: 6)
+        .accessibilityLabel("语音输入")
+    }
+
+    /// L线：语音模式右键——键盘图标，点按退回文字模式（对标 Today）
+    private var keyboardButton: some View {
+        Button(action: onExitVoiceMode) {
+            Image(systemName: "keyboard")
+                .font(.system(size: Typography.body, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressStyle())
+        .hitArea44(h: 6, v: 6)
+        .accessibilityLabel("返回文字输入")
+    }
+
+    /// L线：两段式语音的长按手势（挂在语音模式"按住说话"文字区）。
+    /// 与旧 micButton 的 DragGesture 同逻辑：onChanged 即 onPTTStart
+    /// （startPTT 自带 !pttActive 幂等 guard，重复调用无害）；上滑超 60pt → 取消待命；
+    /// 松手 → 结束。G线"手势宿主被撕"的前提是按钮按住中途被替换——语音模式下
+    /// trailingButtons 恒为键盘键、不再替换，宿主稳定。
+    private var pttPressGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                onPTTStart()
+                onPTTUpdate(value.translation.height < -60)
+            }
+            .onEnded { value in
+                onPTTEnd(value.translation.height < -60)
+            }
     }
 
     /// v4.1.0 E路：发送键（从 trailingButtons 拆出；手势改为纯轻点）。
