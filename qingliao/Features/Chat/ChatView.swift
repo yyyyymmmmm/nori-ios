@@ -122,6 +122,8 @@ struct ChatView: View {
     /// v3.9.58c：ScrollViewReader proxy 引用（构造时写回，供引用块跳转等非 onChange 路径滚动定位）
     @State var scrollProxyRef: ScrollViewProxy?
     @State var showLongContextAlert = false
+    /// 2026-10-07：上拉显示"回到底部"悬浮按钮（对标 Muse 小箭头）
+    @State private var showScrollToBottom = false
     // v3.9.58c：「上次任务未完」横幅——标记存在但不在当前会话（自动恢复被归属校验跳过）时显示
     @State var pendingResumeInfo: (sessionId: String, taskId: String, ageMinutes: Int)?
     @State var showCompressingAlert = false  // v3.0.81：AI 摘要压缩中
@@ -3170,6 +3172,12 @@ struct ChatView: View {
                     // v4.0.48：三条 padding（水平 6 / 上 md / 下 md）合并成一条 —— 类型名少两层，
                     // 给启动期类型解析留栈余量；视觉完全等价（同边同值）。
                     .padding(EdgeInsets(top: Spacing.md, leading: 6, bottom: Spacing.md, trailing: 6))
+                    // 2026-10-07：底部锚点——用于"回到底部"按钮的显示/隐藏判定
+                    Color.clear
+                        .frame(height: 1)
+                        .id("chatBottomAnchor")
+                        .onAppear { showScrollToBottom = false }
+                        .onDisappear { showScrollToBottom = true }
                     // v4.0.34：内容不满一屏时的对齐口径。原为 `.bottom`（微信式贴底：不足的高度
                     // 全留在列表顶部，最新气泡紧贴输入框上方）。
                     // 🚨 v4.0.54（用户 2026-10-05：「第一条气泡就是在最上，后面的气泡不断往上挤」）：
@@ -3185,6 +3193,28 @@ struct ChatView: View {
                 }
             .modifier(MessageListScroll1(host: self, proxy: proxy))
             .modifier(MessageListScroll2(host: self, proxy: proxy))
+            // 2026-10-07："回到底部"悬浮按钮（对标 Muse 小箭头）——上拉时显示，点即回最新
+            .overlay(alignment: .bottom) {
+                if showScrollToBottom {
+                    Button {
+                        Haptics.tap()
+                        withAnimation(Motion.tap) {
+                            proxy.scrollTo("chatBottomAnchor", anchor: .bottom)
+                        }
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.accentColor, in: Circle())
+                            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, 12)
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .animation(Motion.tap, value: showScrollToBottom)
             .modifier(MessageListScroll3(host: self, proxy: proxy))
 
         }
