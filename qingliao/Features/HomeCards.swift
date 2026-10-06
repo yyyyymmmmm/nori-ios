@@ -667,9 +667,8 @@ struct HomeCardFace: View {
         VStack(alignment: .leading, spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .frame(width: 24, height: 24)
-                .background(tint, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             Spacer(minLength: 0)
             Text(title)
                 .font(.system(size: Typography.subhead, weight: .semibold))
@@ -714,29 +713,6 @@ struct HomeCardFace: View {
         case .goal: return "flag.checkered"
         case .clipboard: return "doc.on.clipboard.fill"
         case .custom: return "plus"
-        }
-    }
-
-    private var tint: Color {
-        switch kind {
-        case .mail: return .blue
-        case .resume: return .indigo
-        case .todo: return .green
-        case .weather: return .teal
-        case .expense: return .orange
-        case .agentTip: return .purple
-        // v4.0.29 十张新卡
-        case .nextReminder: return .red
-        case .memo: return .yellow
-        case .express: return .brown
-        case .stock: return .mint
-        case .kb: return .cyan
-        case .scene: return .blue
-        case .device: return .gray
-        case .cloud: return .teal
-        case .goal: return .orange
-        case .clipboard: return .indigo
-        case .custom: return .gray
         }
     }
 

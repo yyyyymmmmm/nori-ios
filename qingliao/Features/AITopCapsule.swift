@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - F线 2026-10-06：AI 形象胶囊（Muse 式，五页顶栏统一）
 //
-// 顶部居中：PetAvatar（56pt，动画跟任务状态走）+ 下方压着"Nori"名字胶囊 + 状态小字。
+// 顶部居中：单行小胶囊——28pt 动态猫头像 + "Nori" + 状态小字，总高 ~40pt。
 // 状态：连接异常 / 正在执行任务 / 正在思考… / 在线（D路 aiStatusStrip 的文案口径）。
 // 点击 → 发 .qingliaoOpenTaskCenter 通知（ChatView 既有链路弹任务中心，不新造状态）。
 //
@@ -75,21 +75,20 @@ struct AITopCapsule: View {
             Haptics.tap()
             NotificationCenter.default.post(name: .qingliaoOpenTaskCenter, object: nil)
         } label: {
-            // L线：三行不重叠——56pt 头像 → 4pt 间距 → 名字胶囊 → 状态小字
-            // （之前 ZStack bottom 对齐把名字压在头像下半截，真机截图实锤重叠）
-            VStack(spacing: 4) {
-                ROTAvatarView(state: avatarState, size: 56)
+            // v4.x item8：单行小胶囊（Muse 式）——28pt 头像 + 名字 + 状态，总高 ~40pt
+            HStack(spacing: 8) {
+                ROTAvatarView(state: avatarState, size: 28)
                 Text("Nori")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
-                    .background(Color.secondary.opacity(0.12), in: Capsule())
                 Text(statusText)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.secondary.opacity(0.12), in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("AI 状态，打开任务中心")

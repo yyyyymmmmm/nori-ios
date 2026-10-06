@@ -14,6 +14,35 @@ enum DashboardSheet: String, Identifiable {
     var id: String { rawValue }
 }
 
+/// v2.0.104：剩余时间文案（倒计时显示）
+/// v4.4.x item5③：从 DashboardView 方法提升为文件级函数，供 AutomationCountdownCard 用
+private func remainText(_ s: Int) -> String {
+    if s >= 3600 { return String(format: "%d小时%02d分", s / 3600, (s % 3600) / 60) }
+    if s >= 60 { return String(format: "%d分%02d秒", s / 60, s % 60) }
+    return "\(s) 秒后执行"
+}
+
+/// v4.4.x item5③：自动化倒计时卡——1s TimelineView 下沉到卡片内部。
+/// 由头：原先 TimelineView 直接包在 automationsBlock 的 ForEach 行里，时间源挂在栏目级
+/// 视图树上；下沉后每秒 tick 只重绘这一张卡，整页其余部分不受影响。
+private struct AutomationCountdownCard: View {
+    let item: AutomationItem
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            // v2.0.104b：runAt 在未来，timeIntervalSince(a.runAt) 是负值——
+            // 修正为 runAt.timeIntervalSince(now) 得剩余正秒数（原实现倒计时反向递增）
+            let remain = max(Int(item.runAt.timeIntervalSince(ctx.date)), 0)
+            DeviceCard(name: item.name,
+                       icon: "timer",
+                       value: remainText(remain),
+                       sub: "到点自动执行 · 长按取消",
+                       status: .on)
+                .opacity(remain <= 0 ? 0.35 : 1)
+        }
+    }
+}
+
 struct DashboardView: View {
     // v3.4.26：看板是否激活（DockTabView 直传 selected == .dashboard）——替代 Leave/Refresh 通知
     // 激活才跑 30s 轮询/切回立即刷新；去通知隐式耦合，生命周期收进自身
@@ -77,6 +106,11 @@ struct DashboardView: View {
     @State private var clashBusy = false
     /// v3.9.41（SR39）：refresh() 的在途闸门（见该方法内注释）
     @State private var refreshing = false
+    /// v4.4.x item5①：上次聚合加载的时间戳（SessionsView v3.0.7 三秒节流的同款思路）。
+    /// 切回看板时距上次不足 dashboardFreshness 则整批跳过——零网络、@State 不碰 = 零重绘。
+    @State private var lastLoadAt: Date?
+    /// v4.4.x item5①：看板全量新鲜度窗口（秒）——对齐 30s 轮询间隔，轮询本来就会兜底
+    private static let dashboardFreshness: TimeInterval = 30
     @State private var scrollPos = ScrollPosition()
 
     @State private var activeSheet: DashboardSheet?
@@ -384,25 +418,16 @@ struct DashboardView: View {
         } else {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(automations) { a in
-                    // TimelineView 每秒驱动倒计时刷新
-                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                        // v2.0.104b：runAt 在未来，timeIntervalSince(a.runAt) 是负值——
-                        // 修正为 runAt.timeIntervalSince(now) 得剩余正秒数（原实现倒计时反向递增）
-                        let remain = max(Int(a.runAt.timeIntervalSince(ctx.date)), 0)
-                        DeviceCard(name: a.name,
-                                   icon: "timer",
-                                   value: remainText(remain),
-                                   sub: "到点自动执行 · 长按取消",
-                                   status: .on)
-                            .opacity(remain <= 0 ? 0.35 : 1)
-                    }
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            cancelAutomation(a)
-                        } label: {
-                            Label("取消自动化", systemImage: "xmark.circle")
+                    // v4.4.x item5③：1s 倒计时的 TimelineView 下沉到卡片内部
+                    // （AutomationCountdownCard）——每秒 tick 只重绘这一张卡，不驱动栏目/整页
+                    AutomationCountdownCard(item: a)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                cancelAutomation(a)
+                            } label: {
+                                Label("取消自动化", systemImage: "xmark.circle")
+                            }
                         }
-                    }
                 }
             }
         }
@@ -550,12 +575,13 @@ struct DashboardView: View {
     @ViewBuilder
     private var routerBlock: some View {
         sectionTitle("路由器", card: .router)
+        // v4.4.x item5④：栏目级 onAppear 单独拉取已合并进 dashboardTask 的聚合 refresh()
+        //（含 loadRouter；首刷/30s 轮询/下拉刷新全覆盖）——滚动进视野不再触发额外请求
         RouterPanel(router: router,
                     busy: clashBusy,
                     onStart: { clashAction("start") },
                     onStop: { clashAction("stop") },
                     onRefresh: { Task { await loadRouter() } })
-            .onAppear { Task { await loadRouter() } }
     }
 
     /// 钉一钉
@@ -766,6 +792,9 @@ struct DashboardView: View {
         guard !refreshing else { return }
         refreshing = true
         defer { refreshing = false }
+        // v4.4.x item5①：聚合加载起跑即刷新鲜度（SessionsView 三秒节流同款口径：起跑记时，
+        // 不等成功——失败也不让切回 Tab 时无脑重打）
+        lastLoadAt = Date()
         // v3.0.x：并行请求——7 个独立 API 并发（原串行，每个等前一个完成才发下一个）
         // v3.0.81c：不用 TaskGroup+addTask{@MainActor}——Xcode 26.6 Swift 6 区域隔离检查器对
         // 「闭包捕获 self」的这种写法直接报编译错误（checker bug）。
@@ -914,13 +943,6 @@ struct DashboardView: View {
         } else {
             smartSuggestion = "建议生成失败，请重试"
         }
-    }
-
-    /// v2.0.104：剩余时间文案（倒计时显示）
-    private func remainText(_ s: Int) -> String {
-        if s >= 3600 { return String(format: "%d小时%02d分", s / 3600, (s % 3600) / 60) }
-        if s >= 60 { return String(format: "%d分%02d秒", s / 60, s % 60) }
-        return "\(s) 秒后执行"
     }
 
     /// v2.0.104：取消自动化（长按卡片）
@@ -1418,19 +1440,30 @@ struct DashboardView: View {
     }
 
     /// 看板生命周期：首刷全套 + 30s 轮询（隐藏页 task 取消即停）
+    /// v4.4.x item5：① 首刷全量、之后按新鲜度走（lastLoadAt 比对）；② 轮询只在有进行中任务时跑
     private func dashboardTask() async {
         guard isActive else { return }   // 隐藏态不启动（首次在非看板 tab 时无空转）
-        // v2.0.86：硬件温度（CPU / NVMe）首屏加载
-        await loadHw()
-        // v3.0.74：从 NAS 加载钉一钉数据
-        await pinStore.loadFromServer()
-        // 首刷全套（首次进入 / 每次切回 task 重启都会执行——等效原 onAppear + Refresh 通知）
-        await refresh()
-        await loadDockerCount()
-        await loadWeatherWithCity()
+        // item5①：距上次聚合加载不足 30s → 整批跳过（@State 一个不碰 = 零网络、零重绘）。
+        // 下拉刷新/空态刷新按钮/场景执行补刷照常走 refresh()（同样刷新鲜度）。
+        var batchStale = true
+        if let last = lastLoadAt {
+            batchStale = Date().timeIntervalSince(last) >= Self.dashboardFreshness
+        }
+        if batchStale {
+            // v2.0.86：硬件温度（CPU / NVMe）首屏加载
+            await loadHw()
+            // v3.0.74：从 NAS 加载钉一钉数据
+            await pinStore.loadFromServer()
+            // 首刷全套（首次进入 / 距上次全量超 30s 的切回——等效原 onAppear + Refresh 通知）
+            await refresh()
+            await loadDockerCount()
+            await loadWeatherWithCity()
+        }
         // 30s 自动刷新（v2.0.87c：10→30s，省电省流量，看板数据变化不敏感）
         // v2.0.133f：仅看板可见时刷——隐藏页轮询会抢 TabView 切页动画帧（isActive 变 false → task 取消即停）
+        // item5②：只在有未到期的自动化（进行中任务）时轮询；无任务直接停，下次切回 task 重启
         while !Task.isCancelled {
+            guard automations.contains(where: { $0.runAt > Date() }) else { break }
             try? await Task.sleep(for: .seconds(30))
             await refresh()
             await loadHw()

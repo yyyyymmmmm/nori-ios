@@ -773,19 +773,21 @@ private extension DockTabView {
             }
     }
 
-    /// F线 2026-10-06：系统 tab bar 选中态灰色（`label` 主灰 / 未选中次级灰），不准蓝色。
+    /// F线 2026-10-06：系统 tab bar 选中态灰色（`label` 纯黑 / 未选中 tertiaryLabel 更淡），不准蓝色。
     /// 三种 layoutAppearance 全配（iOS 26 横竖屏/紧凑模式走不同的 layout）。
+    /// v4.x item4：选中标题加一档字重（semibold），未选中换更淡的 tertiaryLabel 拉开对比。
     /// 只改颜色，不动背景/玻璃（v3.9.47 透明化判无效的前车之鉴）。
     private static func configureGrayTabBarAppearance() {
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
         let selected = UIColor.label
-        let normal = UIColor.secondaryLabel
+        let normal = UIColor.tertiaryLabel
         for layout in [appearance.stackedLayoutAppearance,
                        appearance.inlineLayoutAppearance,
                        appearance.compactInlineLayoutAppearance] {
             layout.selected.iconColor = selected
-            layout.selected.titleTextAttributes = [.foregroundColor: selected]
+            layout.selected.titleTextAttributes = [.foregroundColor: selected,
+                                                   .font: UIFont.systemFont(ofSize: 10, weight: .semibold)]
             layout.normal.iconColor = normal
             layout.normal.titleTextAttributes = [.foregroundColor: normal]
         }

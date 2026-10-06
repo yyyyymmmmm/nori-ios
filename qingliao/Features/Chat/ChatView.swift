@@ -804,12 +804,12 @@ struct ChatView: View {
     private var attachmentMenuBar: some View {
         if showAttachmentMenu {
             HStack(spacing: 26) {
-                menuButton("photo.on.rectangle", "图片", Color.blue, idx: 0) { showPhotoPicker = true }
-                menuButton("doc.fill", "文件", Color.indigo, idx: 1) { showFileImporter = true }
+                menuButton("photo.on.rectangle", "图片", .primary, idx: 0) { showPhotoPicker = true }
+                menuButton("doc.fill", "文件", .primary, idx: 1) { showFileImporter = true }
                 // v2.0.43：快捷指令（常用 prompt 模板）
-                menuButton("bolt.fill", "指令", Color.orange, idx: 2) { showQuickPrompts = true }
+                menuButton("bolt.fill", "指令", .primary, idx: 2) { showQuickPrompts = true }
                 // v3.9.28：云端模式移除，Hermes 捷径恒显示（v3.0.6 的按模式隐藏随之作废）
-                menuButton("sparkles", "Hermes 捷径", Color.purple, idx: 3) { showHermesShortcut = true }
+                menuButton("sparkles", "Hermes 捷径", .primary, idx: 3) { showHermesShortcut = true }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, Spacing.xl)
@@ -2474,10 +2474,7 @@ struct ChatView: View {
             // v3.4.25：问候语随时段变化
             Text(welcomeGreeting)
                 .font(.system(size: Typography.title, weight: .bold))
-                .foregroundStyle(
-                    LinearGradient(colors: [.blue, .purple],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
+                .foregroundStyle(.primary)
             Text(welcomeSubtitle)
                 .font(.system(size: Typography.subhead))
                 .foregroundStyle(.secondary)

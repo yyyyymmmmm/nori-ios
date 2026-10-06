@@ -421,8 +421,9 @@ struct SiriGlowOverlay: View {
             if reduceMotion {
                 glow(breathe: (0.30 + glowAmp / 2) * glowBrightness)
             } else {
-                let schedule: AnimationTimelineSchedule = .animation(minimumInterval: 1.0 / 30.0)
-                TimelineView(schedule) { context in
+                // v4.4.x item7：`.animation`（可暂停调度，切后台回来降频突跳）→ `.periodic`
+                // 墙钟调度；呼吸是 t 的纯正弦，语义等价（30fps 约定不变）
+                TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { context in
                     let t = context.date.timeIntervalSinceReferenceDate
                     glow(breathe: (0.30 + glowAmp * (sin(t * glowFreq) + 1) / 2) * glowBrightness)
                 }
@@ -485,8 +486,9 @@ struct IslandGlowOverlay: View {
             if reduceMotion {
                 glow(breathe: (0.46 + glowAmp / 2) * glowBrightness)
             } else {
-                let schedule: AnimationTimelineSchedule = .animation(minimumInterval: 1.0 / 30.0)
-                TimelineView(schedule) { context in
+                // v4.4.x item7：`.animation`（可暂停调度，切后台回来降频突跳）→ `.periodic`
+                // 墙钟调度；呼吸是 t 的纯正弦，语义等价（30fps 约定不变）
+                TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { context in
                     let t = context.date.timeIntervalSinceReferenceDate
                     // 呼吸（与 Siri 发光同公式，参数联动）；灵动岛版底值 0.30→0.46：整体更亮（0.46~0.64）
                     glow(breathe: (0.46 + glowAmp * (sin(t * glowFreq) + 1) / 2) * glowBrightness)

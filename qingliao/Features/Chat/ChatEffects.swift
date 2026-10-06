@@ -23,11 +23,12 @@ struct FullScreenBurst: View {
         // 类型错误会让编译器报外层 generic parameter 'Content' could not be inferred（check_swift.sh 查不出）
         GeometryReader { geo in
             // 粒子层：160 颗飞散粒子（v2.0.138：波纹层已移除，仅粒子）
-            let schedule: AnimationTimelineSchedule = .animation(minimumInterval: 1.0 / 30.0)
             if reduceMotion {
                 Color.clear          // 降低动态效果：不播粒子
             } else {
-                TimelineView(schedule) { context in
+                // v4.4.x item7：`.animation` 是可暂停调度（切后台回来降频突跳）→ `.periodic`
+                // 墙钟调度永不暂停；粒子位置是 date 的纯函数，语义等价
+                TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { context in
                     BurstCanvas(date: context.date, spawn: spawn, originFromBottom: originFromBottom)
                 }
             }
@@ -155,10 +156,11 @@ struct SiriBallView: View {
         // v3.6.2：帧率可调——dock 槽位常驻显示（5 个 tab 全程可见），空闲呼吸降 15fps 省电，
         // 流式思考中保留 30fps 让 orbits 旋转顺滑（原写死 30fps）
         // v3.9.19：降低动态效果时近乎不刷新（视觉静止，同时省电）。
-        // ⚠️ 必须用 AnimationTimelineSchedule 自身构造：`.periodic(from:by:)` 返回的是
-        // PeriodicTimelineSchedule，与这里期望的类型不同 —— CI #502 就是栽在这一行
-        let schedule = AnimationTimelineSchedule(minimumInterval: reduceMotion ? 600 : 1.0 / fps)
-        TimelineView(schedule) { context in
+        // v4.4.x item7：`.animation`（可暂停调度，切后台回来降频突跳）→ `.periodic` 墙钟调度；
+        // 呼吸/脉冲都是 t 的纯正弦，语义等价。
+        // ⚠️ 保留 CI #502 教训：不给 schedule 写 AnimationTimelineSchedule 类型注解——
+        // `.periodic(from:by:)` 返回的是 PeriodicTimelineSchedule，直接内联才编得过
+        TimelineView(.periodic(from: .now, by: reduceMotion ? 600 : 1.0 / fps)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             let breathe = 0.35 + 0.30 * (sin(t * 2.2) + 1) / 2
             let glowColors: [Color] = [

@@ -7,7 +7,7 @@ import SwiftUI
 // 程序化动画（对标 Muse 待机小头像的第一层：预置动画 + 状态机，不跑 AI 生成）：
 //   · 呼吸：整体 2~3% 缩放正弦循环（3.2s）
 //   · 眨眼：两组错开周期（4.3s / 6.1s+1.7s 偏移）制造不规律感，包络 0.18s：
-//     在双眼位置盖毛色椭圆做 scaleY 1→0.06→1
+//     在双眼位置盖毛色椭圆，高度 0→全高→0（睁眼时不可见，眨眼时盖住模拟闭眼）
 //   · 状态差异：idle=呼吸+眨眼；listening=轻微前倾（放大 4% + 上移 1pt）；
 //     thinking=左右微摆（±3°，4s 周期）；speaking=按 TTS 音量小幅 bounce
 //     （PetSpeechDrive.shared.amount 0…1，无朗读时为 0）。
@@ -52,12 +52,12 @@ struct ROTAvatarView: View {
             let pose = Self.pose(for: state, t: t)
             ZStack {
                 croppedHead
-                // 眨眼盖片：平时 scaleY=1（盖片与毛色一致，不可见），眨眼时压扁
+                // 眨眼盖片：平时高度≈0（不可见），眨眼时恢复高度盖住眼睛模拟闭眼
                 ForEach(0..<eyes.count, id: \.self) { i in
                     Ellipse()
                         .fill(Self.fur)
                         .frame(width: eyeW * size,
-                               height: max(1.5, eyeH * size * blink))
+                               height: eyeH * size * (1 - blink))
                         .position(x: eyes[i].x * size, y: eyes[i].y * size)
                 }
             }
@@ -81,7 +81,7 @@ struct ROTAvatarView: View {
             .clipped()
     }
 
-    /// 眨眼包络：两组错开周期，0.18s 内 1→0.06→1；其余时间返回 1（盖片不可见）
+    /// 眨眼包络：两组错开周期，0.18s 内 1→0.06→1；其余时间返回 1（盖片高度≈0 不可见）
     private static func blinkScale(at t: Double) -> CGFloat {
         for (period, phase) in [(4.3, 0.0), (6.1, 1.7)] {
             let p = (t + phase).truncatingRemainder(dividingBy: period)

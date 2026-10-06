@@ -209,8 +209,9 @@ struct OrbCanvasView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let schedule: AnimationTimelineSchedule = .animation(minimumInterval: 1.0 / fps)
-        TimelineView(schedule) { context in
+        // v4.4.x item7：`.animation`（可暂停调度，切后台回来降频突跳）→ `.periodic` 墙钟调度；
+        // 粒子帧是 t 的纯函数（renderOrb 确定性渲染），语义等价
+        TimelineView(.periodic(from: .now, by: 1.0 / fps)) { context in
             let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
             let speed: CGFloat = mode == .orbits ? 1.885 : 3.24
             let colors = dotColors

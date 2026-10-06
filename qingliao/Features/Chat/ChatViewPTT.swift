@@ -2,8 +2,8 @@
 //
 // 交互层重写，不动转写引擎（LiveSpeechTranscriber）：
 //   · 输入框右侧麦克风键（空输入时替代发送键）→ 按下即录音（DragGesture minimumDistance: 0）
-//   · 录音面板：iOS 26 玻璃底 + "松手发送，上滑取消" + 30fps 实时波形
-//   · 松手 → 定稿 → 非空直接发送（走 ChatView.send()）；上滑超 60pt → "松手取消"
+//   · 录音面板：iOS 26 玻璃底 + "松手确认，上滑取消" + 30fps 实时波形 + 即时录音红点
+//   · 松手 → 定稿 → 非空只填入输入框（用户点发送键再发）；上滑超 60pt → "松手取消"
 //   · 旧 voiceMode 入口（发送键长按 / 输入框长按）已摘除，一个功能一个入口；
 //     toggleVoiceMode / exitVoiceMode 函数体保留备查，不再有调用方。
 //
@@ -115,10 +115,9 @@ extension ChatView {
                 inputText = pttBaseline
                 showPTTToast("没听清，请再说一次")
             } else {
-                // 直接发送：走现有发送通道（与输入框点发送同一条路，不重复造逻辑）
+                // 松手只定稿填入输入框，不直接发送——用户点发送键再发
                 inputText = final
                 Haptics.notify(.success)
-                send()
             }
         }
     }
@@ -223,9 +222,21 @@ struct PTTRecordingPanel: View {
                 .padding(.vertical, Spacing.lg)
                 .background(Color.red, in: Capsule())
             } else {
-                Text(preparing ? "语音模型准备中…" : "松手发送，上滑取消")
-                    .font(.system(size: Typography.title, weight: .medium))
-                    .foregroundStyle(.primary)
+                HStack(spacing: 8) {
+                    // Item 6①：按下瞬间即亮的录音红点——面板只在 pttActive 时渲染，
+                    // 红点与 pttActive 同源，不等 liveSpeech.start() 异步完成；
+                    // 脉动给出"正在录"的即时感（引擎就绪前波形还是平的）。
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 10, height: 10)
+                        .phaseAnimator([1.0, 0.3]) { dot, phase in
+                            dot.opacity(phase)
+                        }
+                        .accessibilityHidden(true)
+                    Text(preparing ? "语音模型准备中…" : "松手确认，上滑取消")
+                        .font(.system(size: Typography.title, weight: .medium))
+                        .foregroundStyle(.primary)
+                }
             }
             PTTWaveform(level: level)
                 .frame(height: 30)

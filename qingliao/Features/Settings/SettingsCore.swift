@@ -124,7 +124,9 @@ struct SettingsView: View {
     @State var showPetStudio = false
     // v4.0.22：设置页搜索（顶部搜索框 + 结果区；索引见 Core/SettingsSearchIndex.swift）
     @State var settingsQuery = ""
-    @State var searchScrollTarget: String?   // 结果里「滚到分组看」的锚点（sec-account / sec-ai / sec-appearance）
+    /// 2026-10-07：一级页收成 6 个分组行后，搜索「滚到分组看」改为直接打开对应二级页
+    /// （分组内容已搬进二级页，一级页没有滚动锚点了）
+    @State var searchNavTarget: SettingsSubpage?
     @AppStorage(PetKeys.style) var petStyle: PetStyle = .liquid
     @AppStorage(PetKeys.face) var petFace: PetFace = .calm
     var body: some View {
@@ -154,70 +156,71 @@ struct SettingsView: View {
             .padding(.horizontal, Spacing.section)
             .padding(.top, Spacing.md)
             .padding(.bottom, Spacing.xs)
-            // J 线 2026-10-06：顶部紧凑 AI 头像区（PetAvatar +「Nori」+ 状态小字），
-            // 点按进 AI 形象设置（复用 PetStudioSheet 链路）；原「AI形象」行删掉。
-            Button {
-                Haptics.tap()
-                showPetStudio = true
-            } label: {
-                HStack(spacing: 12) {
-                    ROTAvatarView(state: .idle, size: 52)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Nori")
-                            .font(.system(size: Typography.title, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        Text(petSummary)
-                            .font(.system(size: Typography.subhead))
+            // 2026-10-07 Item 2：AI 形象独立大卡片（Muse 订阅卡同款）：64pt 头像 +
+            // 「Nori」大标题 + petSummary 副标题 + 右箭头；点按进 AI 形象设置
+            // （复用 PetStudioSheet 链路，showPetStudio 不变）。
+            GraySettingsGroup(title: "AI形象") {
+                Button {
+                    Haptics.tap()
+                    showPetStudio = true
+                } label: {
+                    HStack(spacing: 16) {
+                        ROTAvatarView(state: .idle, size: 64)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Nori")
+                                .font(.system(size: Typography.titleXL, weight: .bold))
+                                .foregroundStyle(.primary)
+                            Text(petSummary)
+                                .font(.system(size: Typography.subhead))
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(2)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: Typography.subhead, weight: .semibold))
                             .foregroundStyle(.tertiary)
-                            .lineLimit(1)
                     }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: Typography.subhead, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                    .padding(20)
+                    .contentShape(Rectangle())
                 }
-                .padding(.horizontal, Spacing.section)
-                .padding(.vertical, Spacing.lg)
-                .background(Color(uiColor: .secondarySystemGroupedBackground),
-                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.horizontal, Spacing.section)
             .padding(.top, Spacing.xs)
             // v4.0.22：设置项越堆越多，顶部给一行搜索框（索引与匹配见 Core/SettingsSearchIndex.swift）
             SettingsSearchBar(text: $settingsQuery)
             ScrollView {
-                ScrollViewReader { proxy in
-                    // 灰度重做 B 路 2026-10-06：分组之间大间距（对标 Today 参考）
-                    VStack(spacing: 28) {
-                        // v4.0.22：搜索结果插在最上面；下面各分组照旧全在 —— 点「滚到分组看」那条结果时
-                        // 锚点一定在树上，不需要「先清查询、等一帧再滚」的时序把戏
-                        if !settingsQuery.isEmpty {
-                            SettingsSearchList(query: settingsQuery) { openSearchEntry($0) }
-                        }
-                        // J 线 2026-10-06：6 分组（智能体 / 连接 / 通用 / 账号与安全 / 通知 / 关于）
-                        agentSection.id("sec-ai")
-                        connectionSection
-                        generalSection.id("sec-appearance")
-                        accountSection.id("sec-account")
-                        notificationSection
-                        aboutSection
+                // 2026-10-07 Item 1：一级页只剩 6 个分组行（大厂顺序：个人中心在前），
+                // 各组内容整体搬进二级页（见 SettingsGroups.swift），GraySettingsGroup 原样复用
+                VStack(spacing: 28) {
+                    // v4.0.22：搜索结果插在最上面（逻辑不变）；下面是 6 个分组行
+                    if !settingsQuery.isEmpty {
+                        SettingsSearchList(query: settingsQuery) { openSearchEntry($0) }
                     }
-                    .onChange(of: searchScrollTarget) { _, target in
-                        guard let target else { return }
-                        withAnimation(Motion.snap) { proxy.scrollTo(target, anchor: .top) }
-                        searchScrollTarget = nil
+                    GraySettingsGroup(title: "") {
+                        groupLink(.profile)
+                        MuseRowDivider()
+                        groupLink(.ai)
+                        MuseRowDivider()
+                        groupLink(.connector)
+                        MuseRowDivider()
+                        groupLink(.general)
+                        MuseRowDivider()
+                        groupLink(.notify)
+                        MuseRowDivider()
+                        groupLink(.about)
                     }
-                    .padding(.horizontal, Spacing.xxl)
-                    .padding(.bottom, 100)
-                    // v3.4.28：横屏限宽居中
-                    .frame(maxWidth: .infinity)
-                    .frame(maxWidth: AdaptiveLayout.contentMaxWidth(hSizeSettings))
                 }
+                .padding(.horizontal, Spacing.xxl)
+                .padding(.bottom, 100)
+                // v3.4.28：横屏限宽居中
+                .frame(maxWidth: .infinity)
+                .frame(maxWidth: AdaptiveLayout.contentMaxWidth(hSizeSettings))
             }
             .scrollPosition($scrollPos)
         }
+        // 2026-10-07：搜索 sec:xxx 直达二级页（编程式 push；分组行本身用 NavigationLink 被动跳转）
+        .navigationDestination(item: $searchNavTarget) { subpage(for: $0) }
         // 灰度重做 B 路：浅灰分组底（参考图是浅色渐变；灰度语言里用 systemGroupedBackground）
         .background(Color(uiColor: .systemGroupedBackground))
         .background(settingsCold1())
@@ -445,7 +448,8 @@ struct SettingsView: View {
 
     // MARK: - v4.0.22 设置页搜索
 
-    /// 搜索结果点开：弹窗类直接开对应弹窗，开关类滚到所属分组（清空查询后各分组就在下面）。
+    /// 搜索结果点开：弹窗类直接开对应弹窗；原来「滚到所属分组看」的 sec:xxx 现在直开对应二级页
+    /// （2026-10-07：一级页只剩 6 个分组行，内容全搬进二级页，滚动锚点已删除）。
     /// 这些 route 字面量与 Core/SettingsSearchIndex.swift 的 entries 一一对应 ——
     /// 真值表反向核验「索引里每条 route 都在这里被处理」，漏一条就是「搜到了、点下去没反应」。
     private func openSearchEntry(_ entry: SettingsSearchEntry) {
@@ -487,19 +491,18 @@ struct SettingsView: View {
         case "agentModel":
             connOpenPinPath = false
             showConnSettings = true
-        case "agentHelp":
-            // 使用说明是**行内展开**（不是弹窗）：点结果就把那一段展开，并滚到它所在的分组
-            showAgentHelp = true
-            searchScrollTarget = "sec-ai"
+        case "agentHelp": showAgentHelp = true   // 弹窗直开（原行内展开已收进二级页，锚点不再存在）
         case "agentKeywords": showAgentKeywords = true
         case "agentMemory": showAgentMemory = true
         case "appearance": showAppearance = true
         case "pet": showPetStudio = true
         case "homeShortcuts": showHomeShortcuts = true
         case "about": showAbout = true
-        case "sec:account": searchScrollTarget = "sec-account"
-        case "sec:ai": searchScrollTarget = "sec-ai"
-        case "sec:appearance": searchScrollTarget = "sec-appearance"
+        // 2026-10-07：一级页收成 6 个分组行后，「滚到分组看」改为直开对应二级页
+        // （分组内容已搬进二级页，一级页没有锚点了）
+        case "sec:account": searchNavTarget = .profile
+        case "sec:ai": searchNavTarget = .ai
+        case "sec:appearance": searchNavTarget = .general
         default: break
         }
     }
@@ -507,16 +510,16 @@ struct SettingsView: View {
 
 // MARK: ===== 以下原为 Features/Settings/SettingsViewSections.swift =====
 
-// MARK: - Section 计算属性（J 线 2026-10-06：6 分组，对标 Muse 设置参考图）
+// MARK: - Section 计算属性（2026-10-07：一级/二级重构：6 分组改名，内容整体搬进二级页）
 // 只搬行、不改功能：所有 @State 弹窗/sheet 开关与行为原样保留。
 // 行 = 单色线条图标 + 标题(+副标题) + 灰 chevron；行间细分割线用 MuseRowDivider。
 
 extension SettingsView {
 
-    // MARK: - 智能体
+    // MARK: - AI设置
 
     @ViewBuilder var agentSection: some View {
-        GraySettingsGroup(title: "智能体") {
+        GraySettingsGroup(title: "AI设置") {
             GraySettingsRow(icon: "brain.head.profile", title: "AI 记忆", value: "\(memoryCount) 条") { showMemory = true }
             MuseRowDivider()
             GraySettingsRow(icon: "list.bullet.rectangle", title: "Agent 记忆",
@@ -543,10 +546,10 @@ extension SettingsView {
         }
     }
 
-    // MARK: - 连接
+    // MARK: - 连接器
 
     @ViewBuilder var connectionSection: some View {
-        GraySettingsGroup(title: "连接") {
+        GraySettingsGroup(title: "连接器") {
             GraySettingsRow(icon: "network", title: "连接设置") { showConnSettings = true }
             MuseRowDivider()
             GraySettingsRow(icon: "square.grid.2x2", title: "连接应用",
@@ -559,10 +562,10 @@ extension SettingsView {
         }
     }
 
-    // MARK: - 通用
+    // MARK: - 通用设置
 
     @ViewBuilder var generalSection: some View {
-        GraySettingsGroup(title: "通用") {
+        GraySettingsGroup(title: "通用设置") {
             GraySettingsRow(icon: "paintbrush", title: "外观", value: appearanceName) {
                 withAnimation(Motion.snap) { showAppearance = true }
             }
@@ -582,10 +585,10 @@ extension SettingsView {
         }
     }
 
-    // MARK: - 账号与安全
+    // MARK: - 个人中心
 
     @ViewBuilder var accountSection: some View {
-        GraySettingsGroup(title: "账号与安全") {
+        GraySettingsGroup(title: "个人中心") {
             GraySettingsStaticRow(icon: "person.circle", title: auth.username, subtitle: "已登录")
             MuseRowDivider()
             GraySettingsRow(icon: "key", title: "修改密码") { showPasswordSheet = true }
@@ -622,10 +625,10 @@ extension SettingsView {
         }
     }
 
-    // MARK: - 关于
+    // MARK: - 关于我们
 
     @ViewBuilder var aboutSection: some View {
-        GraySettingsGroup(title: "关于") {
+        GraySettingsGroup(title: "关于我们") {
             GraySettingsRow(icon: "info.circle", title: "关于Nori") { showAbout = true }
             MuseRowDivider()
             GraySettingsRow(icon: "doc.text", title: "日志") { showLogs = true }
