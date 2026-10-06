@@ -35,7 +35,7 @@ struct ChatView: View {
     @Environment(KeyboardObserver.self) var kb
     /// 灰度重做 2026-10-06 晚：悬浮 tab bar 避让 —— 输入框底部 inset 用。
     /// v4.1.0 D路：SwiftUI 没有 \.safeAreaInsets 这个 EnvironmentKey（CI 挂），改 GeometryReader 实测。
-    @State private var safeAreaBottom: CGFloat = 0
+    @State var safeAreaBottom: CGFloat = 0
     /// v3.9.79：横屏判据 —— iPhone 横屏的 `horizontalSizeClass` 仍是 `.compact`（只有 Plus/Max 变 `.regular`），
     /// 所以「矮屏」只认 `verticalSizeClass == .compact`。见 `AdaptiveLayout.isShort`。
     @Environment(\.verticalSizeClass) private var vSize
