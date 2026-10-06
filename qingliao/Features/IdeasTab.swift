@@ -1,149 +1,150 @@
 import SwiftUI
 
-// MARK: - 灰度重做 2026-10-06 晚（C 路）：点子 tab = AI 推荐任务
+// MARK: - H 线：点子 tab = AI 动态推荐（对标 Muse 点子页）
 //
-// 对标 Today「任务」页：大标题「点子」+ 右上圆形 + 按钮 → 发给 AI 自由创建；
-// 「为你推荐」分组 + 玻璃圆角 20 推荐卡片（图标/标题/描述/右白色圆形 +）。
-// 点 + → 同一条通道 `.qingliaoTaskSend` 发给 AI（一个功能一个入口：创建走对话）。
-// 用户明确：不是待办清单，是 AI 推荐任务。
-
-/// 一条 AI 推荐任务模板（本地模板；后端有推荐接口后再接）
-struct RecommendationTemplate: Identifiable {
-    let id = UUID()
-    let icon: String
-    let title: String
-    let desc: String
-    /// 点 + 时发给 AI 的文本
-    let ask: String
-}
-
-enum RecommendationsStore {
-    static let templates: [RecommendationTemplate] = [
-        RecommendationTemplate(
-            icon: "list.bullet.clipboard",
-            title: "每日优先事项简报",
-            desc: "每天早上从日程、待办和消息里整理最重要的几件事。",
-            ask: "请为我生成今天的优先事项简报"
-        ),
-        RecommendationTemplate(
-            icon: "envelope",
-            title: "邮件今日速览",
-            desc: "把新邮件按需要回复、需要行动、等待结果和仅供了解分类。",
-            ask: "请帮我速览今天的邮件"
-        ),
-        RecommendationTemplate(
-            icon: "envelope.open",
-            title: "待回复事项检查",
-            desc: "找出邮件和消息里仍需要你回复、确认或补材料的对话。",
-            ask: "请检查我有哪些待回复的事项"
-        ),
-        RecommendationTemplate(
-            icon: "calendar",
-            title: "今日会议准备",
-            desc: "提前整理今天重要会议的背景、议程和需要确认的问题。",
-            ask: "请帮我准备今天的会议"
-        ),
-        RecommendationTemplate(
-            icon: "chart.line.uptrend.xyaxis",
-            title: "每周项目进展汇总",
-            desc: "每周整理重点项目的进展、风险、阻塞和下一步。",
-            ask: "请汇总本周的项目进展"
-        ),
-        RecommendationTemplate(
-            icon: "alarm",
-            title: "截止事项提前检查",
-            desc: "提前发现未来两周的重要 Deadline，整理材料、依赖和风险。",
-            ask: "请检查未来两周的截止事项"
-        ),
-    ]
-}
+// 顶部 chrome：左 sidebar / 中 AITopCapsule（F 线组件）/ 右无按钮（用户要求去掉 +）
+// + 大标题「点子」。
+// 内容：AI 生成的个性化推荐卡片（图标 + 加粗标题 + 灰色详细描述），按 group 分组；
+// 顶部 loading；下拉刷新；后端/AI 不通回退内置模板（IdeasStore.fallbackTemplates）。
+// 交互：点卡片 → onFillInput(完整提示词)，填进对话输入框，用户自己发送（不自动发）。
 
 struct IdeasTabView: View {
-    /// 发给 AI 的唯一出口（DockTabView.askAI：切聊天页 + 0.35s 闸 + post）
-    let onAskAI: (String) -> Void
+    /// 填进对话页输入框的唯一出口（DockTabView 侧：切聊天页 + 填入输入框，不自动发送）
+    let onFillInput: (String) -> Void
+    @State private var store = IdeasStore()
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    HStack {
-                        Text("点子")
-                            .font(.system(size: 34, weight: .bold))
-                            .foregroundStyle(.primary)
-                        Spacer(minLength: 0)
-                        Button {
-                            Haptics.tap()
-                            onAskAI("请帮我创建一个新的任务")
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(.primary)
-                                .frame(width: 44, height: 44)
-                                .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("让 AI 自由创建任务")
-                    }
-                    .padding(.top, 12)
-
-                    Text("为你推荐")
-                        .font(.system(size: 17, weight: .semibold))
+                    topBar
+                        .padding(.top, 12)
+                    Text("点子")
+                        .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.primary)
-                        .padding(.top, 20)
-                        .padding(.bottom, 12)
-
-                    VStack(spacing: 12) {
-                        ForEach(RecommendationsStore.templates) { t in
-                            RecommendationCard(template: t) {
-                                onAskAI(t.ask)
-                            }
-                        }
+                        .padding(.top, 10)
+                    if store.isLoading && store.ideas.isEmpty {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    } else {
+                        ideaGroups
                     }
                 }
                 .padding(.horizontal, Spacing.section)
-                .padding(.bottom, 100)   // 给悬浮 tab bar 留空
+                .padding(.bottom, 12)
             }
             .toolbar(.hidden, for: .navigationBar)
+            .task { await store.refresh() }
+            .refreshable { await store.refresh(force: true) }
         }
     }
-}
 
-/// 推荐卡片：玻璃圆角 20（对标 Today 任务页）
-private struct RecommendationCard: View {
-    let template: RecommendationTemplate
-    let onAdd: () -> Void
+    // MARK: 顶栏：sidebar / AI 形象胶囊 / 右占位（+ 已按用户要求去掉）
 
-    var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: template.icon)
-                .font(.system(size: 22))
-                .foregroundStyle(.primary)
-                .frame(width: 30)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(template.title)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.primary)
-                Text(template.desc)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 8)
-
-            Button(action: onAdd) {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .medium))
+    private var topBar: some View {
+        HStack {
+            Button {
+                Haptics.tap()
+                NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
+            } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 20))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .background(Color.white, in: Circle())
-                    .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
+                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("把「\(template.title)」发给 AI")
+            .accessibilityLabel("打开侧边栏")
+
+            Spacer(minLength: 0)
+
+            // F 线组件：顶部居中 AI 头像 + 名字胶囊 + 状态小字（无参数）
+            AITopCapsule()
+
+            Spacer(minLength: 0)
+
+            // 右上占位：+ 按钮已去掉；留 44pt 保证胶囊居中
+            Color.clear
+                .frame(width: 44, height: 44)
         }
-        .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    // MARK: 分组（保持首次出现顺序）
+
+    private struct IdeaGroup: Identifiable {
+        var name: String?
+        var ideas: [AIdea]
+        var id: String { name ?? "__ungrouped" }
+    }
+
+    private var grouped: [IdeaGroup] {
+        var order: [String] = []
+        var map: [String: [AIdea]] = [:]
+        var ungrouped: [AIdea] = []
+        for idea in store.ideas {
+            if let g = idea.group, !g.isEmpty {
+                if map[g] == nil { order.append(g) }
+                map[g, default: []].append(idea)
+            } else {
+                ungrouped.append(idea)
+            }
+        }
+        var result: [IdeaGroup] = []
+        if !ungrouped.isEmpty { result.append(IdeaGroup(name: nil, ideas: ungrouped)) }
+        for g in order { result.append(IdeaGroup(name: g, ideas: map[g] ?? [])) }
+        return result
+    }
+
+    private var ideaGroups: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(grouped) { g in
+                if let name = g.name {
+                    Text(name)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .padding(.top, 20)
+                        .padding(.bottom, 4)
+                }
+                VStack(spacing: 0) {
+                    ForEach(g.ideas) { idea in
+                        Button {
+                            Haptics.tap()
+                            onFillInput(idea.prompt)
+                        } label: {
+                            HStack(alignment: .top, spacing: 14) {
+                                Image(systemName: idea.icon)
+                                    .font(.system(size: 24, weight: .light))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 34, alignment: .top)
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(idea.title)
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundStyle(.primary)
+                                    Text(idea.desc)
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(.secondary)
+                                        .lineSpacing(3)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 14)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("用「\(idea.title)」问 AI")
+                        Divider()
+                    }
+                }
+            }
+            // 兜底时诚实标注（不假装是 AI 生成的）
+            if store.isFallback {
+                Text("AI 推荐暂不可用，当前显示为内置推荐")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 24)
+            }
+        }
     }
 }
