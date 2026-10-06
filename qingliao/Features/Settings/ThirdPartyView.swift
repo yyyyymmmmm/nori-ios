@@ -86,9 +86,7 @@ struct ThirdPartyView: View {
     @ViewBuilder
     private func platformRow(_ p: ThirdPartyPlatform) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: p.icon)
-                .font(.system(size: 20))
-                .foregroundStyle(.primary)
+            platformIcon(p)
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 3) {
                 Text(p.name)
@@ -124,6 +122,24 @@ struct ThirdPartyView: View {
     }
 
     // MARK: - 数据
+
+    /// 图标：有 simple-icons 真实品牌图的用品牌 glyph + 品牌色（已定的品牌色例外），
+    /// 找不到品牌图的（钉钉/飞书/企业微信/bluebubbles）与系统通道（email/sms）继续用 SF Symbols 灰度兜底。
+    @ViewBuilder
+    private func platformIcon(_ p: ThirdPartyPlatform) -> some View {
+        if let b = p.brand {
+            Image(b.asset)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(Color(hex: b.hex))
+                .frame(width: 24, height: 24)
+        } else {
+            Image(systemName: p.icon)
+                .font(.system(size: 20))
+                .foregroundStyle(.primary)
+        }
+    }
 
     private func load() async {
         loading = true
@@ -201,6 +217,23 @@ struct ThirdPartyPlatform: Identifiable {
         }
     }
 
+    /// 有 simple-icons 真实品牌图的平台 →（asset 名，品牌色 hex）。
+    /// hex 取自 simple-icons 数据（develop 分支；slack 取自 v15.0.0，develop 已下架）。
+    var brand: (asset: String, hex: String)? {
+        switch id {
+        case "weixin":        return ("brand_wechat", "07C160")
+        case "telegram":      return ("brand_telegram", "26A5E4")
+        case "discord":       return ("brand_discord", "5865F2")
+        case "whatsapp":      return ("brand_whatsapp", "25D366")
+        case "signal":        return ("brand_signal", "3B45FD")
+        case "slack":         return ("brand_slack", "4A154B")
+        case "matrix":        return ("brand_matrix", "000000")
+        case "mattermost":    return ("brand_mattermost", "0058CC")
+        case "homeassistant": return ("brand_homeassistant", "18BCF2")
+        default:              return nil
+        }
+    }
+
     init?(json: [String: Any]) {
         guard let id = json["id"] as? String,
               let name = json["name"] as? String else { return nil }
@@ -208,5 +241,21 @@ struct ThirdPartyPlatform: Identifiable {
         self.name = name
         self.configured = (json["configured"] as? Bool) ?? false
         self.enabled = (json["enabled"] as? Bool) ?? false
+    }
+}
+
+// MARK: - 小工具
+
+private extension Color {
+    /// "RRGGBB" / "#RRGGBB"
+    init(hex: String) {
+        let s = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")).uppercased()
+        var v: UInt64 = 0
+        _ = Scanner(string: s).scanHexInt64(&v)
+        self.init(
+            red: Double((v >> 16) & 0xFF) / 255,
+            green: Double((v >> 8) & 0xFF) / 255,
+            blue: Double(v & 0xFF) / 255
+        )
     }
 }
