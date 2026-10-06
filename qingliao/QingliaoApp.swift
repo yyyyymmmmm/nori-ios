@@ -160,6 +160,10 @@ struct RootView: View {
     // v3.4.25：崩溃日志查看/导出弹窗（AlertSheet 内含 UIActivityViewController）
     @State private var showCrashLogSheet = false
     @State private var showSplash = true
+    // 2026-10-07 首次启动引导：未完成引导且未登录 → 走引导页（引导内完成服务器连接+登录）。
+    // 登录成功后仍停在引导内（showOnboarding 未撤），走完 6 屏才进主界面。
+    // 老用户（已存过服务器地址）OnboardingStore.hasCompleted 默认为 true，不打扰。
+    @State private var showOnboarding = !OnboardingStore.hasCompleted
     // v3.9.45：登录成功后的「卡片飞成首页」交接（④）。原来 isLoggedIn 一翻真假，if/else
     // 立刻把 LoginView 摘掉，登录卡片自己的退场演出还没起头就没了。这里让 LoginView 在多挂
     // 0.95s（正好覆盖它 .delay(0.2)+0.45 的退场动画）里演完再撤。
@@ -179,13 +183,23 @@ struct RootView: View {
             // zIndex 2：压在 DockTabView 之上、AppLockView(5) 之下——登录页不能盖住锁屏。
             // allowsHitTesting(false)：那 0.95s 里半透明的登录卡片不再吃点击，避免误触输入框弹键盘。
             let loggedIn = auth.isLoggedIn
-            if loggedIn {
-                DockTabView()
-            }
-            if !loggedIn || loginHandoff {
-                LoginView(revealed: !showSplash)
-                    .zIndex(loggedIn ? 2 : 0)
-                    .allowsHitTesting(!loggedIn)
+            // 2026-10-07：首次启动引导门禁。引导页覆盖全屏（zIndex 4，登录页之下、锁屏之下），
+            // 引导内登录成功不提前撤（showOnboarding 由引导流程自己控制）。
+            if showOnboarding {
+                OnboardingFlowView {
+                    OnboardingStore.hasCompleted = true
+                    showOnboarding = false
+                }
+                .zIndex(4)
+            } else {
+                if loggedIn {
+                    DockTabView()
+                }
+                if !loggedIn || loginHandoff {
+                    LoginView(revealed: !showSplash)
+                        .zIndex(loggedIn ? 2 : 0)
+                        .allowsHitTesting(!loggedIn)
+                }
             }
 
             // v2.0.92：App 锁遮罩（已登录 + 开关开 + 未解锁时覆盖，splash 之下）
