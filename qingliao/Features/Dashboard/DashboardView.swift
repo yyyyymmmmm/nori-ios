@@ -1,16 +1,29 @@
 import SwiftUI
 
-// MARK: - 看板页（智能家居 2x3 可控制 + NAS 2x3 + 磁盘弹出式）
+// MARK: - 看板页（w5 重做：对标 Muse 设计语言）
+//
+// 结构：Hero 大卡（家庭状态总览）→ 快捷入口（今日建议通栏 + 2 列文件夹网格）
+//       → 服务状态 → 动态信息流（任务执行记录 / 自动规则 / 连接器动态 / 用量一行）。
+// 分组标题统一小灰字（groupTitle），圆角：Hero 28pt，其余沿用卡片体系 16pt。
+//
+// 收敛（w5）：diagnoseBlock 并入 Hero 一句话（删独立卡）；pinBlock 从看板移除
+// （聊天长按已有钉一钉入口）；routerBlock 状态并入服务状态区的路由器行（删独立栏目）；
+// usageBlock + tokenUsageBlock 合并为信息流里"用量"一行。
+// 旧的 12 栏目自定义排序/隐藏体系（BoardCard / BoardCardOrder / 拖动栏目头）
+// 随固定结构一并移除 —— BoardCardOrder.swift 等文件保留（别的入口不用动它，也不报错）。
 
 // v3.9.25：新增 weather（天气弹窗）——注意 switch 穷尽性由 ql.py ios check 把关
 // v3.9.46：新增 lock/temps/doorbell/cpu/memory 五张详情弹窗（用户点名"卡片点击要看细节"）
 //         + alarmArmAsk（布防/撤防确认）走 confirmationDialog，不占 sheet 通道
-// v3.9.54：CPU / 内存两张详情弹窗**删除**（用户：「去掉CPU和内存卡片的弹窗，只显示卡片，
-//         点击不再弹窗」）——enum 少两个 case，下面的 `.sheet(item:)` switch 同步少两个分支。
+// v3.9.54：CPU / 内存两张详情弹窗**删除**（用户：「去掉CPU和内存卡片的弹窗，
+//         只显示卡片，点击不再弹窗」）——enum 少两个 case，下面的 `.sheet(item:)` switch 同步少两个分支。
 //         ⚠️ 新增/删除 case 时两处一起改，穷尽性才会被 CI 那道检查抓住。
+// w5：新增 sceneSheet / deviceSheet / automationSheet / routerSheet / todoSheet
+//     五个文件夹式入口弹窗（同样两处一起改）。
 enum DashboardSheet: String, Identifiable {
     case lights, climate, service, serviceHermes, disks, docker, weather, connectorPanel
     case lock, temps, doorbell
+    case sceneSheet, deviceSheet, automationSheet, routerSheet, todoSheet
     var id: String { rawValue }
 }
 
@@ -43,6 +56,12 @@ private struct AutomationCountdownCard: View {
     }
 }
 
+/// w5：信息流任务行文案。remainText 的"秒"分支自带"后执行"后缀，分钟以上才需补后缀。
+private func feedRemainText(_ a: AutomationItem) -> String {
+    let r = max(Int(a.runAt.timeIntervalSince(Date())), 0)
+    return r < 60 ? remainText(r) : "剩余" + remainText(r) + "后执行"
+}
+
 struct DashboardView: View {
     // v3.4.26：看板是否激活（DockTabView 直传 selected == .dashboard）——替代 Leave/Refresh 通知
     // 激活才跑 30s 轮询/切回立即刷新；去通知隐式耦合，生命周期收进自身
@@ -53,52 +72,15 @@ struct DashboardView: View {
     @Environment(\.horizontalSizeClass) private var hSizeBoard
 
     @State private var nas = NASStatus()
-    // v3.0.36：模型使用量栏（/api/nas/providers-usage）
+    // v3.0.36：模型使用量栏（/api/nas/providers-usage）——w5 只取个数进"用量"一行，不再逐卡展示
     @State private var providerUsages: [ProviderUsage] = []
     @State private var usageError = ""
     // v3.9.82：token 用量卡（今日/本月，单位 M；后端读 Hermes state.db 的真实用量）
     @State private var tokenUsage: TokenUsage?
     @State private var tokenUsageError = ""
-    // v3.4.2b：模型使用量卡隐藏集合——长按单卡只隐藏该 provider（逗号分隔 id 持久化）
-    @AppStorage("dashboard_hidden_usage_providers") private var hiddenUsageRaw = ""
-    @State private var showUsageRestore = false
+    // w5：用量行"用量"长按重置的确认态（原 TokenUsageCard 的长按重置能力保留）
+    @State private var showUsageResetConfirm = false
 
-    private var hiddenUsageProviders: Set<String> {
-        Set(hiddenUsageRaw.split(separator: ",").map(String.init))
-    }
-    private func hideUsageProvider(_ id: String) {
-        var s = hiddenUsageProviders
-        s.insert(id)
-        hiddenUsageRaw = s.sorted().joined(separator: ",")
-    }
-    private func unhideUsageProvider(_ id: String) {
-        var s = hiddenUsageProviders
-        s.remove(id)
-        hiddenUsageRaw = s.sorted().joined(separator: ",")
-    }
-    // v3.9.40（#15）：看板栏目卡片自定义——顺序与显隐各自持久化（逗号分隔 BoardCard.rawValue）
-    // v4.0.20：键字面量收进 BoardCardStore（单一真源），长按拖拽与编辑器共用同一对键。
-    @AppStorage(BoardCardStore.orderKey) private var cardOrderRaw = ""
-    @AppStorage(BoardCardStore.hiddenKey) private var hiddenCardsRaw = ""
-    @State private var showCardEditor = false
-    // v4.0.20：长按拖动排序的在途状态（落位几何全在 BoardCardOrder，这里只存 UI 状态）
-    @State private var dragCard: BoardCard?                         // 正在被拖的栏目（nil = 没在拖）
-    @State private var dragOffsetY: CGFloat = 0                     // 拖拽中的竖直位移（视觉反馈）
-    @State private var sectionHeights: [BoardCard: CGFloat] = [:]   // 各栏目实测高度（落位几何要用）
-
-    /// 完整顺序（含被隐藏的栏目）。归一化口径收在 BoardCardOrder.resolve（真值表直接编它）。
-    /// SR13：去重——旧版本的编辑器把隐藏项重复写进了 dashboard_card_order，
-    /// 这些脏值会一直流到这里 → 看板同一张卡片渲染两遍。parse 就地清掉，老数据自愈。
-    private var orderedCards: [BoardCard] {
-        BoardCardOrder.resolve(order: cardOrderRaw)
-    }
-    private var hiddenCards: Set<BoardCard> {
-        Set(BoardCardOrder.parse(hiddenCardsRaw))   // v4.0.20：收进单一真源，别在视图里再写一份 parse
-    }
-    private var visibleCards: [BoardCard] {
-        let h = hiddenCards
-        return orderedCards.filter { !h.contains($0) }
-    }
     @State private var haEntities: [HAEntity] = []
     @State private var router = RouterStatus()
     /// v3.9.41（SR36）：Clash 起停的在途闸门。原先放在 `RouterStatus.busy` 里，
@@ -136,14 +118,12 @@ struct DashboardView: View {
     // v2.0.116：智能建议（天气/NAS/设备 → Agent 生成）
     @State private var smartSuggestion = ""
     @State private var smartLoading = false
-    // v3.0.18：设备一键体检（六维诊断：服务/磁盘/容器/负载/内存/温度）
-    @State private var diagnoseItems: [DiagnoseItem] = []
+    // v3.0.18：设备一键体检 —— w5 并入 Hero 一句话，只保留 level/summary（删独立卡）
     @State private var diagnoseLevel = ""
     @State private var diagnoseSummary = ""
-    @State private var diagnoseError = ""
-    @State private var diagnosing = false
-    // v3.0.74：钉一钉
-    @State private var pinStore = PinStore.shared
+    // w5：任务中心 / 待办的数据（Hero 四宫格用；@Observable 单例，@State 持有即响应式）
+    @State private var taskStore = TaskCenterStore.shared
+    @State private var todoStore = TodoStore.shared
     // v3.9.46：安防卡点击布防/撤防。confirmArmTarget 走 confirmationDialog（危险动作既有方言，
     // 同「执行场景」「停止服务」）；alarmBusy 是下发在途闸门；alarmError 是失败回执。
     @State private var confirmArmTarget: Bool?
@@ -155,23 +135,33 @@ struct DashboardView: View {
             ScrollView {
                 // v2.0.133f：VStack → LazyVStack——TabView 切页动画期间看板全量卡片一次性布局是切页卡顿主因，
                 // 懒加载后只渲染可见卡片（与 v2.0.132 ChatView 消息列表同款方案；看板无批量移除路径，安全）
-                LazyVStack(alignment: .leading, spacing: BoardCardOrder.sectionSpacing) {
+                LazyVStack(alignment: .leading, spacing: Spacing.section) {
                     // F线：大标题（原来 PageHeader 的标题位，五页统一 Muse 式）
                     Text("看板")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.primary)
                         .padding(.top, Spacing.lg)
-                    // v3.9.40（#15）：10 个栏目由写死顺序改为按用户自定义顺序渲染（可隐藏）
-                    // v4.0.20：每个栏目量高（列高不等 → 落位几何必须喂实测高度）+ 拖动中的
-                    //          位移/放大/阴影反馈。
-                    // ⚠️ onGeometryChange 必须排在 .offset 之前 —— 它量的是栏目**自然高度**，
-                    //    拖动位移不该污染高度（否则落位会拿自己算自己）。
-                    ForEach(visibleCards) { card in
-                        boardBlock(card)
-                            // v4.0.50：量高→位移→放大→阴影→层级 5 条链折成具名组（见本文件末 applyDashboardCardChrome）
-                            .modifier(DashboardCardChrome(host: self, card: card))
-                    }
-                    cardEditorEntry
+
+                    // w5-1：总览 Hero
+                    heroBlock
+
+                    // MARK: - 记忆卡接入点（coordinator 统一接入 MemoryHeroCard）
+
+                    // w5-2：快捷入口
+                    groupTitle("快捷入口")
+                    suggestionBanner
+                    folderGrid
+
+                    // w5-3：服务状态（原 NAS 面板；路由器状态并入本区一行）
+                    groupTitle("服务状态")
+                    nasPanelBlock
+
+                    // w5-4：动态信息流（全宽卡按时间倒序）
+                    groupTitle("动态")
+                    taskFeedBlock
+                    rulesBlock
+                    connectorsBlock
+                    usageRowBlock
                 }
                 .padding(.horizontal, Spacing.xxl)
                 .padding(.bottom, 100)
@@ -179,11 +169,7 @@ struct DashboardView: View {
                 .frame(maxWidth: .infinity)
                 .frame(maxWidth: AdaptiveLayout.contentMaxWidth(hSizeBoard))
             }
-            // v4.0.50 启动链折叠：ScrollView 上 10 条修饰器折成两个具名组。
-            // 滚动定位/下拉刷新/三张 sheet → DashboardScrollChrome；
-            // 三条 alert + 两条 confirmationDialog → DashboardDialogChrome。
-            // 视图树与语义逐条守恒，链在本文件末的 applyXxx 里解析。
-            // v4.0.62：滚边玻璃（`safeAreaBar`）推广 —— 页头从 VStack 第一行改挂在滚动视图上，
+            // v4.0.62：滚边玻璃（`safeAreaBar`）——页头挂在滚动视图上，
             // 滚动时内容在页头下沿走系统级模糊/渐隐（同生活页 v4.0.61 试点形态，逐字同款）。
             // 回退：删掉本块、在 VStack 第一行恢复 PageHeader(...) 即可。
             .safeAreaBar(edge: .top) {
@@ -226,29 +212,147 @@ struct DashboardView: View {
         }
         // v2.0.96b：切回看板立即刷新（对话里生成场景后看板即时联动）
         // v2.0.102：单一刷新入口（.task 首刷+轮询）——修并发双刷/旧响应覆盖
-        // v3.4.26：通知 → isActive 参数直传生命周期驱动——
-        //   DockTabView 传 selected==.dashboard；task(id:) 激活即启：首刷全套 → 30s 轮询；
-        //   离开 = task 取消（sleep 中断）→ 隐藏页零轮询不抢帧；切回 = task 重启自动首刷（等效原 Refresh 通知）
+        // v3.4.26：通知 → isActive 参数直传生命周期驱动
         .task(id: isActive) {
             await dashboardTask()
         }
     }
 
-    // MARK: - v3.10.x 看板分区（巨型 body 拆分）
-    //
-    // 由头：此 body 单块 424 行，是本仓已踩过两次的「Unable to type-check this
-    // expression in reasonable time」高危形态（一次漏检 = 20 分钟 CI 循环）。
-    // 这里把每个栏目原样搬成独立 @ViewBuilder 属性 —— **纯搬运**：视图顺序、层级、
-    // 条件分支、闭包、修饰符逐字未变，渲染结果与拆分前一致，只为把类型检查表达式打小。
+    // MARK: - w5 分组标题（小灰字，无拖动）
 
-    /// 智能建议
+    /// w5：分组标题 = 小灰字（Muse 式弱分组），替代旧的栏目头（标题 + 拖动把手 + 长按排序）。
+    private func groupTitle(_ s: String) -> some View {
+        Text(s)
+            .font(.system(size: Typography.subhead, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.top, Spacing.sm)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: - w5-1 总览 Hero
+
+    /// Nori 后端存活（"Nori后端"服务卡同源）
+    private var noriAlive: Bool { nas.qingliaoAlive }
+
+    /// 未到期的自动化 = 进行中任务
+    private var activeAutomationCount: Int {
+        automations.filter { $0.runAt > Date() }.count
+    }
+
+    /// 未完成待办
+    private var openTodoCount: Int {
+        todoStore.todos.filter { !$0.done }.count
+    }
+
+    /// Hero 一句话：设备在线 + 进行中任务 + 体检（原 diagnoseBlock 并入此处，删独立卡）
+    private var heroSummary: String {
+        var parts = ["\(haAvailableCount) 台设备在线", "\(activeAutomationCount) 个任务执行中"]
+        switch diagnoseLevel {
+        case "ok": parts.append("体检良好")
+        case "warn": parts.append("体检有待留意项")
+        case "error": parts.append("体检发现异常")
+        default: break
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// w5-1：顶部 Hero「家庭状态总览」——左 Nori 状态 + 一句话；右 2x2 mini tiles（数字，点击进现有页/sheet）。
     @ViewBuilder
-    private var smartSuggestionBlock: some View {
+    private var heroBlock: some View {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            HStack(spacing: Spacing.sm) {
+                Circle()
+                    .fill(noriAlive ? Color.green : Color.red)
+                    .frame(width: 10, height: 10)
+                Text("Nori · \(noriAlive ? "运行中" : "已停止")")
+                    .font(.system(size: Typography.body, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: Typography.caption, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+            .tapButton { activeSheet = .service }
+            .accessibilityLabel("Nori 状态：\(noriAlive ? "运行中" : "已停止")，点击查看服务详情")
+
+            Text(heroSummary)
+                .font(.system(size: Typography.subhead))
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("家庭状态总览：\(heroSummary)")
+
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: Spacing.md),
+                                GridItem(.flexible(), spacing: Spacing.md)],
+                      spacing: Spacing.md) {
+                heroTile(icon: "timer", tint: .orange, title: "进行中任务",
+                         count: activeAutomationCount,
+                         a11y: "进行中任务 \(activeAutomationCount) 个，点击查看自动化") {
+                    activeSheet = .automationSheet
+                }
+                heroTile(icon: "checklist", tint: .blue, title: "今日待办",
+                         count: openTodoCount,
+                         a11y: "今日待办 \(openTodoCount) 个未完成，点击速记待办") {
+                    activeSheet = .todoSheet
+                }
+                heroTile(icon: "wifi", tint: .green, title: "在线设备",
+                         count: haAvailableCount,
+                         a11y: "在线设备 \(haAvailableCount) 台，点击查看智能家居") {
+                    activeSheet = .deviceSheet
+                }
+                heroTile(icon: "bell", tint: .red, title: "待处理提醒",
+                         count: taskStore.uncompleted,
+                         a11y: "待处理提醒 \(taskStore.uncompleted) 个，点击打开任务中心") {
+                    // 既有链路：侧边栏 / AI 胶囊同款通知 → ChatView 弹任务中心，不新造状态
+                    NotificationCenter.default.post(name: .qingliaoOpenTaskCenter, object: nil)
+                }
+            }
+        }
+        .padding(Spacing.xxl)
+        .dashboardCard(cornerRadius: 28)   // w5：Hero 大圆角 ~28pt
+    }
+
+    /// Hero 右区 mini tile：图标 + 大数字 + 小标题
+    private func heroTile(icon: String, tint: Color, title: String, count: Int,
+                         a11y: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: Typography.title))
+                    .foregroundStyle(tint)
+                    .frame(width: 38, height: 38)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(count)")
+                        .font(.system(size: Typography.titleXL, weight: .bold))
+                        .foregroundStyle(.primary)
+                        .monospacedDigit()
+                    Text(title)
+                        .font(.system(size: Typography.caption))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(Spacing.md)
+            .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(a11y)
+    }
+
+    // MARK: - w5-2 快捷入口
+
+    /// 今日建议横向通栏卡（内容复用原 smartSuggestionBlock）
+    @ViewBuilder
+    private var suggestionBanner: some View {
         // v2.0.116：智能建议（基于天气/NAS/设备状态，Agent 生成）
-        // v2.0.118：门锁卡同风格（普通圆角卡背景）+ 标题左上 + 内容靠左 + 重新生成右上
-        sectionTitle("智能建议", card: .suggestion)
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
+                Image(systemName: "sparkles")
+                    .font(.system(size: Typography.subhead, weight: .semibold))
+                    .foregroundStyle(.purple)
                 Text("今日建议")
                     .font(.system(size: Typography.subhead, weight: .semibold))
                     .foregroundStyle(.secondary)
@@ -296,15 +400,80 @@ struct DashboardView: View {
         }
         .padding(Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // v3.8.1：本来手写 background+描边、圆角 12 → 改用统一卡片样式（16），与看板/生活其它卡片对齐
         .dashboardCard()
+        .accessibilityLabel("今日建议。\(smartSuggestion.isEmpty ? "暂无建议，可生成" : smartSuggestion)")
     }
 
-    /// 智能家居设备栅格
+    /// w5-2：2 列文件夹网格（场景 / 设备 / 自动化 / 连接器）——文件夹式白卡 + 计数，点击进对应弹窗/页
+    private var folderGrid: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            folderCard(icon: "bolt.fill", tint: .yellow, title: "场景",
+                       countText: "\(scenes.count) 个",
+                       a11y: "场景，\(scenes.count) 个，点击管理") {
+                activeSheet = .sceneSheet
+            }
+            .matchedTransitionSource(id: DashboardSheet.sceneSheet.id, in: sheetZoomNS)
+            folderCard(icon: "house.fill", tint: .blue, title: "设备",
+                       countText: "\(haAvailableCount) 台在线",
+                       a11y: "设备，\(haAvailableCount) 台在线，点击控制") {
+                activeSheet = .deviceSheet
+            }
+            .matchedTransitionSource(id: DashboardSheet.deviceSheet.id, in: sheetZoomNS)
+            folderCard(icon: "timer", tint: .orange, title: "自动化",
+                       countText: "\(automations.count) 个",
+                       a11y: "自动化，\(automations.count) 个，点击管理") {
+                activeSheet = .automationSheet
+            }
+            .matchedTransitionSource(id: DashboardSheet.automationSheet.id, in: sheetZoomNS)
+            folderCard(icon: "rectangle.connected.to.line.2", tint: .teal, title: "连接器",
+                       countText: "工具 · 家居 · 生活",
+                       a11y: "连接器，点击查看工具服务总览") {
+                activeSheet = .connectorPanel
+            }
+            .matchedTransitionSource(id: DashboardSheet.connectorPanel.id, in: sheetZoomNS)
+        }
+    }
+
+    /// 文件夹式白卡：图标底板 + 标题 + 计数 + 右箭头
+    private func folderCard(icon: String, tint: Color, title: String, countText: String,
+                           a11y: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            HStack(spacing: Spacing.md) {
+                Image(systemName: icon)
+                    .font(.system(size: Typography.title, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 44, height: 44)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.inset))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: Typography.body, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text(countText)
+                        .font(.system(size: Typography.caption))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: Typography.caption, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(Spacing.xl)
+            .dashboardCard()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(a11y)
+    }
+
+    // MARK: - w5 内容区块（无标题纯内容；标题由分组或弹窗提供）
+
+    /// 智能家居设备栅格（内容复用原 homeDevicesBlock；弹窗里展示）
     @ViewBuilder
-    private var homeDevicesBlock: some View {
-        sectionTitle("智能家居", card: .home)
-    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+    private var homeDevicesContent: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             DeviceCard(name: "开关", icon: "lightbulb.fill", value: haLights, sub: "\(lightsOn) 盏开启 · 点击控制", status: lightsOn > 0 ? .on : .off)
                 .tapButton { activeSheet = .lights }
                 .matchedTransitionSource(id: DashboardSheet.lights.id, in: sheetZoomNS)   // v3.9.0：卡片→详情 zoom
@@ -332,13 +501,11 @@ struct DashboardView: View {
         }
     }
 
-    /// 智慧场景
+    /// 智慧场景（内容复用原 scenesBlock；弹窗里展示）
     @ViewBuilder
-    private var scenesBlock: some View {
+    private var scenesContent: some View {
         // v2.0.96：场景（AI 对话生成动作组，点一下逐条执行）
-        // v2.0.96b：改「智慧场景」标题 + HomeKit 卡片风格（对齐 DeviceCard）
         // v2.0.96c：空态可点击刷新（TabView 切 tab 不触发 onAppear 的 iOS 版本差异兜底）
-        sectionTitle("智慧场景", card: .scenes)
         if scenes.isEmpty {
             HStack(spacing: 6) {
                 Image(systemName: "bolt.fill")
@@ -385,11 +552,10 @@ struct DashboardView: View {
         }
     }
 
-    /// 自动化
+    /// 自动化（内容复用原 automationsBlock；弹窗里展示完整管理）
     @ViewBuilder
-    private var automationsBlock: some View {
+    private var automationsContent: some View {
         // v2.0.104：自动化（AI 生成"X分钟后执行Y"，倒计时到点自动执行后消失）
-        sectionTitle("自动化", card: .automations)
         if automations.isEmpty {
             HStack(spacing: 6) {
                 Image(systemName: "timer")
@@ -441,13 +607,12 @@ struct DashboardView: View {
         }
     }
 
-    /// 自动规则
+    /// 自动规则（内容复用原 rulesBlock；信息流全宽卡）
     @ViewBuilder
     private var rulesBlock: some View {
         // v3.9.21：自动规则（条件触发）——规则本体在后端 rules_engine：时间窗/HA 实体/上报事件
         // 命中且过冷却才执行；App 只负责列出、开关、删除（新建走对话/快捷指令，不在 App 里堆表单）
         if !rules.isEmpty {
-            sectionTitle("自动规则", card: .rules)
             VStack(spacing: 10) {
                 ForEach(rules) { r in
                     RuleRow(item: r,
@@ -462,13 +627,13 @@ struct DashboardView: View {
             }
             .padding(Spacing.xl)
             .dashboardCard()
+            .accessibilityLabel("自动规则，\(rules.count) 条")
         }
     }
 
-    /// NAS 面板
+    /// 服务状态（原 NAS 面板网格；路由器状态并入本区一行，原 routerBlock 删独立栏目）
     @ViewBuilder
     private var nasPanelBlock: some View {
-        sectionTitle("NAS 面板", card: .nas)
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             // v3.9.46：CPU / 内存卡曾接详情弹窗；**v3.9.54 用户判掉**：「去掉CPU和内存卡片的弹窗，
             // 只显示卡片，点击不再弹窗」→ 摘掉 tapButton 与 zoom 源，sub 里那句"点击查看"一并改实话。
@@ -495,119 +660,191 @@ struct DashboardView: View {
                 .tapButton { activeSheet = .disks }
                 .matchedTransitionSource(id: DashboardSheet.disks.id, in: sheetZoomNS)   // v3.9.0：卡片→详情 zoom
         }
+        // w5：原 routerBlock 状态并入服务状态区一行（完整启停面板进弹窗，功能不丢）
+        routerRow
     }
 
-    /// 模型使用量
+    /// 路由器状态行（原 routerBlock 的收敛形态；点击进完整面板弹窗）
+    private var routerRow: some View {
+        Button {
+            Haptics.tap()
+            activeSheet = .routerSheet
+        } label: {
+            HStack(spacing: Spacing.sm) {
+                Circle()
+                    .fill(router.clashRunning ? Color.green : Color.secondary)
+                    .frame(width: 8, height: 8)
+                Image(systemName: "wifi.router")
+                    .font(.system(size: Typography.subhead, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text("路由器")
+                    .font(.system(size: Typography.subhead, weight: .medium))
+                    .foregroundStyle(.primary)
+                Text(routerStatusText)
+                    .font(.system(size: Typography.caption))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: Typography.caption, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, Spacing.xl)
+            .padding(.vertical, Spacing.md)
+            .dashboardCard()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("路由器，\(routerStatusText)，点击管理")
+    }
+
+    /// 路由器行副文案：有错说错，否则报 Clash 起停
+    private var routerStatusText: String {
+        if !router.error.isEmpty { return router.error }
+        return router.clashRunning ? "Clash 运行中" : "Clash 已停止"
+    }
+
+    // MARK: - w5-4 动态信息流
+
+    /// 任务执行记录（信息流全宽卡；完整管理在"自动化"弹窗，信息流只做概览行）
     @ViewBuilder
-    private var usageBlock: some View {
-        // v3.0.36：模型使用量（DeepSeek/StepFun 官方余额；无接口 provider 降级显示）
-        // v3.4.2b：长按任意用量卡 → 只隐藏该 provider 卡（持久化）；
-        // 节底部显示"已隐藏 N 个 · 点击恢复"（弹菜单逐张恢复/全部恢复）
-        sectionTitle("模型使用量", card: .usage)
-        if usageError.isEmpty && providerUsages.isEmpty {
-            Text("加载中…")
-                .font(.system(size: Typography.subhead))
-                .foregroundStyle(.secondary)
-                .padding(.vertical, Spacing.sm)
-        } else if !usageError.isEmpty {
-            Text(usageError)
-                .font(.system(size: Typography.subhead))
-                .foregroundStyle(.secondary)
-                .padding(.vertical, Spacing.sm)
-        } else {
-            let visible = providerUsages.filter { !hiddenUsageProviders.contains($0.id) }
-            if visible.isEmpty {
-                Text("已全部隐藏 · 点下方恢复")
+    private var taskFeedBlock: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack {
+                Image(systemName: "timer")
+                    .font(.system(size: Typography.subhead, weight: .semibold))
+                    .foregroundStyle(.orange)
+                Text("任务执行记录")
+                    .font(.system(size: Typography.subhead, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if activeAutomationCount > 0 {
+                    Text("\(activeAutomationCount) 个进行中")
+                        .font(.system(size: Typography.caption))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            if automations.isEmpty {
+                Text("暂无待执行的任务")
                     .font(.system(size: Typography.subhead))
                     .foregroundStyle(.tertiary)
-                    .padding(.vertical, Spacing.sm)
+                    .padding(.vertical, Spacing.xs)
             } else {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    ForEach(visible) { u in
-                        UsageCard(usage: u)
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    hideUsageProvider(u.id)
-                                } label: {
-                                    Label("隐藏此卡片", systemImage: "eye.slash")
-                                }
-                            }
+                // 按执行时间排序（最近到点的在前）
+                let feed = automations.sorted { $0.runAt < $1.runAt }
+                ForEach(feed) { a in
+                    HStack(spacing: Spacing.sm) {
+                        Circle()
+                            .fill(a.runAt > Date() ? Color.orange : Color.secondary)
+                            .frame(width: 8, height: 8)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(a.name)
+                                .font(.system(size: Typography.subhead, weight: .medium))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            Text(feedRemainText(a))
+                                .font(.system(size: Typography.caption))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: Typography.caption, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                    .tapButton { activeSheet = .automationSheet }
+                    .padding(.vertical, Spacing.xs)
+                    if a.id != feed.last?.id {
+                        Divider().opacity(0.5)
                     }
                 }
             }
         }
-        if !hiddenUsageProviders.isEmpty {
-            usageRestoreRow()
-        }
+        .padding(Spacing.xl)
+        .dashboardCard()
+        .accessibilityLabel("任务执行记录，\(activeAutomationCount) 个进行中")
     }
 
-    /// token 用量（v3.9.82：今日/本月，单位 M）
+    /// 连接器动态（内容复用原 connectorsBlock；信息流全宽卡，点击进连接器面板）
     @ViewBuilder
-    private var tokenUsageBlock: some View {
-        sectionTitle("token 用量", card: .tokens)
+    private var connectorsBlock: some View {
+        // v3.9.74 P1.5 连接器面板（Muse 借鉴）：MCP 工具 + 智能家居 + 生活卡片 收拢总览。
+        // 不重复实现功能，状态总览 + 直达入口：点卡片 → 面板关闭 → 再弹对应设置页。
+        Button {
+            Haptics.tap()
+            activeSheet = .connectorPanel
+        } label: {
+            HStack(spacing: Spacing.md) {
+                Image(systemName: "rectangle.connected.to.line.2")
+                    .font(.system(size: Typography.title))
+                    .foregroundStyle(.teal)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("连接器动态")
+                        .font(.system(size: Typography.subhead, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text("工具服务 · 智能家居 · 生活卡片")
+                        .font(.system(size: Typography.body, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text("AI 已接入的数字生活总览与入口")
+                        .font(.system(size: Typography.caption))
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: Typography.caption))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(Spacing.xl)
+        }
+        .buttonStyle(.plain)
+        .dashboardCard()
+        .accessibilityLabel("连接器动态，点击查看工具服务总览")
+    }
+
+    /// 用量一行（原 usageBlock + tokenUsageBlock 合并；长按重置 token 统计的能力保留）
+    @ViewBuilder
+    private var usageRowBlock: some View {
+        HStack(spacing: Spacing.md) {
+            Image(systemName: "chart.pie.fill")
+                .font(.system(size: Typography.title))
+                .foregroundStyle(.blue)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("用量")
+                    .font(.system(size: Typography.subhead, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text(usageSummaryText)
+                    .font(.system(size: Typography.body, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Spacing.xl)
+        .dashboardCard()
+        // v3.9.85：长按重置 token 统计（能力从 TokenUsageCard 搬过来，入口不丢）
+        .onLongPressGesture(minimumDuration: 0.5) {
+            guard tokenUsage != nil else { return }
+            Haptics.medium()
+            showUsageResetConfirm = true
+        }
+        .confirmationDialog("重置 token 用量统计？\n从现在起重新累计，今日/本月旧账清零。",
+                            isPresented: $showUsageResetConfirm, titleVisibility: .visible) {
+            Button("重置统计", role: .destructive) { Task { await resetTokenUsage() } }
+            Button("取消", role: .cancel) {}
+        }
+        .accessibilityLabel("用量。\(usageSummaryText)。长按可重置统计")
+    }
+
+    /// 用量一行文案：Token 今日/本月 + 模型服务个数；加载失败说实话
+    private var usageSummaryText: String {
         if let u = tokenUsage {
-            TokenUsageCard(usage: u, onReset: { Task { await resetTokenUsage() } })
-        } else if !tokenUsageError.isEmpty {
-            Text(tokenUsageError)
-                .font(.system(size: Typography.subhead))
-                .foregroundStyle(.secondary)
-                .padding(.vertical, Spacing.sm)
-        } else {
-            Text("加载中…")
-                .font(.system(size: Typography.subhead))
-                .foregroundStyle(.secondary)
-                .padding(.vertical, Spacing.sm)
+            let base = "Token 今日 \(u.today.totalM) · 本月 \(u.month.totalM)"
+            if providerUsages.isEmpty { return base }
+            return base + " · \(providerUsages.count) 个模型服务"
         }
-    }
-
-    /// 设备体检
-    @ViewBuilder
-    private var diagnoseBlock: some View {
-        // v3.0.18：设备一键体检（六维诊断：服务/磁盘/容器/负载/内存/温度）
-        sectionTitle("设备体检", card: .diagnose)
-        DiagnoseCard(items: diagnoseItems, level: diagnoseLevel, summary: diagnoseSummary,
-                     error: diagnoseError, diagnosing: diagnosing) {
-            Task { await runDiagnose() }
-        }
-    }
-
-    /// 路由器
-    @ViewBuilder
-    private var routerBlock: some View {
-        sectionTitle("路由器", card: .router)
-        // v4.4.x item5④：栏目级 onAppear 单独拉取已合并进 dashboardTask 的聚合 refresh()
-        //（含 loadRouter；首刷/30s 轮询/下拉刷新全覆盖）——滚动进视野不再触发额外请求
-        RouterPanel(router: router,
-                    busy: clashBusy,
-                    onStart: { clashAction("start") },
-                    onStop: { clashAction("stop") },
-                    onRefresh: { Task { await loadRouter() } })
-    }
-
-    /// 钉一钉
-    @ViewBuilder
-    private var pinBlock: some View {
-        // v3.0.74：钉一钉（聊天消息钉到看板）——始终显示
-        sectionTitle("钉一钉", card: .pin)
-        if pinStore.pins.isEmpty {
-            Text("长按聊天消息 → 钉一钉")
-                .font(.system(size: Typography.subhead))
-                .foregroundStyle(.tertiary)
-                .padding(.vertical, Spacing.md)
-        } else {
-            ForEach(pinStore.pins) { pin in
-                PinCard(pin: pin) {
-                    pinStore.delete(pin)
-                }
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        pinStore.delete(pin)
-                    } label: {
-                        Label("删除", systemImage: "trash")
-                    }
-                }
-            }
-        }
+        if !tokenUsageError.isEmpty { return tokenUsageError }
+        if !usageError.isEmpty { return usageError }
+        return "加载中…"
     }
 
     // MARK: - 数据
@@ -708,7 +945,7 @@ struct DashboardView: View {
         }
     }
 
-    /// v3.9.85：长按 token 卡 → 重置统计（后端记重置起点，今日/本月旧账不再计入）
+    /// v3.9.85：长按用量行 → 重置统计（后端记重置起点，今日/本月旧账不再计入）
     private func resetTokenUsage() async {
         do {
             let (data, resp) = try await auth.request("/api/nas/token-usage-reset", method: "POST", body: [:])
@@ -751,28 +988,11 @@ struct DashboardView: View {
         }
     }
 
-    /// v3.0.18：设备一键体检——GET /api/nas/diagnose 六维诊断（服务/磁盘/容器/负载/内存/温度）
+    /// v3.0.18：设备一键体检 —— w5：删独立卡，refresh 时自动拉取，只取 level/summary 进 Hero 一句话
     private func runDiagnose() async {
-        guard !diagnosing else { return }
-        diagnosing = true
-        diagnoseError = ""
-        defer { diagnosing = false }
         if let j = await auth.jsonOrLog("/api/nas/diagnose") {
-            if let items = j["items"] as? [[String: Any]] {
-                diagnoseItems = items.map { d in
-                    DiagnoseItem(id: d["id"] as? String ?? UUID().uuidString,
-                                 name: d["name"] as? String ?? "?",
-                                 status: d["status"] as? String ?? "warn",
-                                 detail: d["detail"] as? String ?? "",
-                                 advice: d["advice"] as? String ?? "")
-                }
-                diagnoseLevel = j["level"] as? String ?? ""
-                diagnoseSummary = j["summary"] as? String ?? ""
-            } else if let err = j["error"] as? String {
-                diagnoseError = err
-            }
-        } else {
-            diagnoseError = "体检请求失败"
+            diagnoseLevel = j["level"] as? String ?? ""
+            diagnoseSummary = j["summary"] as? String ?? ""
         }
     }
 
@@ -809,7 +1029,10 @@ struct DashboardView: View {
         async let rulesTask: Void = loadRules()
         // v3.9.82：token 用量与其余 8 路并发（同一个在途闸门覆盖）
         async let tokenTask: Void = loadTokenUsage()
-        _ = await (nasTask, haTask, scenesTask, autosTask, sugTask, routerTask, usageTask, rulesTask, tokenTask)
+        // w5：体检并入 Hero 一句话 → refresh 时自动拉取（原先是用户手动点按钮才跑）
+        async let diagTask: Void = runDiagnose()
+        _ = await (nasTask, haTask, scenesTask, autosTask, sugTask, routerTask,
+                   usageTask, rulesTask, tokenTask, diagTask)
     }
 
     /// NAS 状态
@@ -1105,6 +1328,7 @@ struct DashboardView: View {
     }
 
     /// v3.9.74 P1.5 连接器面板：可用实体总数（与 isAvailable 同口径，只读已轮询数据零新请求）
+    /// w5：同时是 Hero「在线设备」与设备文件夹计数的口径
     private var haAvailableCount: Int {
         haEntities.filter(isAvailable).count
     }
@@ -1116,37 +1340,6 @@ struct DashboardView: View {
     enum AfterPanelSheet: String, Identifiable {
         case mcp, lifeCards, mail, cloudDrive
         var id: String { rawValue }
-    }
-
-    /// v3.9.74 P1.5 连接器面板（Muse 借鉴）：MCP 工具 + 智能家居 + 生活卡片 收拢总览。
-    /// 不重复实现功能，状态总览 + 直达入口：点卡片 → 面板关闭 → 再弹对应设置页。
-    @ViewBuilder
-    private var connectorsBlock: some View {
-        sectionTitle("连接器", card: .connectors)
-        // 与钉一钉同款「始终显示 + 低调提示」形态
-        Button {
-            activeSheet = .connectorPanel
-        } label: {
-            HStack(spacing: Spacing.md) {
-                Image(systemName: "rectangle.connected.to.line.2")
-                    .font(.system(size: Typography.title))
-                    .foregroundStyle(.teal)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("工具服务 · 智能家居 · 生活卡片")
-                        .font(.system(size: Typography.body, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Text("AI 已接入的数字生活总览与入口")
-                        .font(.system(size: Typography.caption))
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: Typography.caption))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.vertical, Spacing.md)
-        }
-        .buttonStyle(.plain)
     }
 
     /// 门锁相关实体：门锁本体（bacn01）+ lock 域 + 门磁一类含 door_lock 的实体。
@@ -1204,138 +1397,7 @@ struct DashboardView: View {
         return haAlarmArmed ? "布防中 · 点击撤防" : "已撤防 · 点击布防"
     }
 
-    /// v4.0.20：栏目头 = 标题 + 尾部「拖动把手」图标，并挂**长按拖动排序**手势。
-    /// ⚠️ 手势只落在栏目头这一行（纯 Text/Image，没有别的交互子视图）——
-    ///    看板里不少栏目内容自带长按（UsageCard / 场景卡 / 自动化卡的 contextMenu、
-    ///    TokenUsageCard 的「重置」长按），若把拖动挂在整块栏目上，那些既有长按会被拖动会话吃掉。
-    private func sectionTitle(_ s: String, card: BoardCard) -> some View {
-        HStack(spacing: Spacing.sm) {
-            Text(s)
-                .font(.system(size: Typography.body, weight: .bold))
-            Spacer(minLength: 0)
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: Typography.caption, weight: .semibold))
-                .foregroundStyle(dragCard == card ? Color.accentColor : Color.secondary.opacity(0.5))
-        }
-        .padding(.top, Spacing.sm)
-        .contentShape(Rectangle())   // 整行都可长按（不只盯着那两个字）
-        .accessibilityLabel("\(s)，长按可拖动调整顺序")
-        .simultaneousGesture(boardDragGesture(card))
-    }
-
-    /// v4.0.20：长按栏目头进入拖动 → 松手按落位几何换位并落盘。
-    /// 手法与首页卡片一致（Core/HomeCardOrder.swift 那套）：长按 + 拖动序列手势。
-    /// 栏目头没有 Button，理论上 `.gesture` 也够，但沿用 simultaneousGesture 以防将来栏目头加按钮时被抢。
-    private func boardDragGesture(_ card: BoardCard) -> some Gesture {
-        LongPressGesture(minimumDuration: BoardCardOrder.longPressSeconds)
-            .sequenced(before: DragGesture(minimumDistance: 2))
-            .onChanged { value in
-                guard case .second(true, let drag) = value else { return }
-                if dragCard != card {
-                    withAnimation(Motion.snap) { dragCard = card; dragOffsetY = 0 }
-                    Haptics.tap()
-                }
-                dragOffsetY = drag?.translation.height ?? 0
-            }
-            .onEnded { value in
-                guard dragCard == card else { dragCard = nil; dragOffsetY = 0; return }
-                var dy: CGFloat = 0
-                if case .second(true, let drag?) = value { dy = drag.translation.height }
-                dragCard = nil
-                dragOffsetY = 0
-                // 手指按住没动（位移 < 阈值）→ 不算拖动，松手不换位
-                guard BoardCardOrder.isRealDrag(dx: 0, dy: Double(dy)),
-                      let from = visibleCards.firstIndex(of: card) else { return }
-                let heights = visibleCards.map { Double(sectionHeights[$0] ?? 0) }
-                let target = BoardCardOrder.dragTarget(from: from, dy: Double(dy),
-                                                       heights: heights,
-                                                       spacing: Double(BoardCardOrder.sectionSpacing))
-                guard target != from else { return }
-                withAnimation(Motion.settle) { applyBoardMove(card, to: target) }
-                Haptics.success()
-            }
-    }
-
-    /// v4.0.20：换位后写回**完整**顺序（被隐藏的栏目留在原槽）+ 落盘到既有键。
-    /// 落位/写回几何全在 BoardCardOrder（UI 只负责量尺寸与调它，不自拼顺序）。
-    private func applyBoardMove(_ card: BoardCard, to target: Int) {
-        let moved = BoardCardOrder.move(visibleCards, kind: card, to: target)
-        let full = BoardCardOrder.mergeVisible(oldFull: orderedCards,
-                                               newVisible: moved,
-                                               hidden: hiddenCards)
-        cardOrderRaw = BoardCardOrder.encode(full)
-    }
-
-    /// v3.4.2b：已隐藏用量卡恢复行（点击弹菜单逐张恢复/全部恢复）——独立方法
-    /// 防 confirmationDialog 动态按钮在 body 大表达式内 type-check 超时
-    private func usageRestoreRow() -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "eye.slash")
-                .font(.system(size: Typography.caption))
-                .foregroundStyle(.tertiary)
-            Text("已隐藏 \(hiddenUsageProviders.count) 个模型服务 · 点击恢复")
-                .font(.system(size: Typography.subhead))
-                .foregroundStyle(.tertiary)
-            Spacer()
-        }
-        .padding(.horizontal, Spacing.xl)
-        .padding(.vertical, Spacing.md)
-        .dashboardCard()   // v3.8.1：空态提示条统一 16
-        .contentShape(Rectangle())
-        .tapButton { showUsageRestore = true }
-        .confirmationDialog("恢复已隐藏的模型服务", isPresented: $showUsageRestore, titleVisibility: .visible) {
-            ForEach(Array(hiddenUsageProviders).sorted(), id: \.self) { p in
-                Button(p) { unhideUsageProvider(p) }
-            }
-            Button("恢复全部") { hiddenUsageRaw = "" }
-            Button("取消", role: .cancel) {}
-        }
-    }
-
-    /// v3.9.40（#15）：栏目 → 视图。
-    /// ⚠️ 刻意返回 AnyView：10 个各异的 opaque 类型挤进同一个 @ViewBuilder switch，
-    /// 表达式类型推导会超时（本仓 ChatView / ChatMessageBubble 的 body 拆分注释都是这条坑）。
-    private func boardBlock(_ card: BoardCard) -> AnyView {
-        switch card {
-        case .suggestion:  return AnyView(smartSuggestionBlock)
-        case .home:        return AnyView(homeDevicesBlock)
-        case .scenes:      return AnyView(scenesBlock)
-        case .automations: return AnyView(automationsBlock)
-        case .rules:       return AnyView(rulesBlock)
-        case .nas:         return AnyView(nasPanelBlock)
-        case .usage:       return AnyView(usageBlock)
-        case .tokens:      return AnyView(tokenUsageBlock)
-        case .diagnose:    return AnyView(diagnoseBlock)
-        case .router:      return AnyView(routerBlock)
-        case .pin:         return AnyView(pinBlock)
-        case .connectors:  return AnyView(connectorsBlock)
-        }
-    }
-
-    /// v3.9.40（#15）：底部「自定义卡片」入口（与用量恢复行同款低调样式）
-    private var cardEditorEntry: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "square.and.pencil")
-                .font(.system(size: Typography.caption))
-                .foregroundStyle(.tertiary)
-            Text(hiddenCards.isEmpty ? "自定义卡片（排序 / 隐藏）"
-                                     : "自定义卡片 · 已隐藏 \(hiddenCards.count) 个栏目")
-                .font(.system(size: Typography.subhead))
-                .foregroundStyle(.tertiary)
-            Spacer()
-        }
-        .padding(.horizontal, Spacing.xl)
-        .padding(.vertical, Spacing.md)
-        .dashboardCard()
-        .contentShape(Rectangle())
-        .tapButton { showCardEditor = true }
-    }
-    // MARK: - v3.9.100+ 弹窗与刷新逻辑（巨型 body 拆分）
-    //
-    // 由头：L118..L344 的 227 行 body 是本仓已踩过两次的「Unable to type-check this
-    // expression in reasonable time」高危形态（一次漏检 = 20 分钟 CI 循环）。
-    // sheet 的 switch 尤其致命：13 个 case 各带 detent + zoom 转场，合成一个大表达式。
-    // 这里原样搬成下面三个成员 —— 视图顺序、层级、闭包、修饰符逐字未变。
+    // MARK: - v3.9.100+ 弹窗与刷新逻辑
 
     /// activeSheet 弹窗内容（原 body 内 `.sheet(item:onDismiss:)` 的 switch）
     @ViewBuilder
@@ -1419,6 +1481,57 @@ struct DashboardView: View {
                 ruleCount: rules.count)
                 .presentationDetents([.medium, .large])
                 .navigationTransition(.zoom(sourceID: DashboardSheet.connectorPanel.id, in: sheetZoomNS))
+        // w5：文件夹式入口弹窗（内容复用原栏目 block，不新造管理界面）
+        case .sceneSheet:
+            VStack(spacing: 0) {
+                BoardSheetHeader(title: "智慧场景", detail: "\(scenes.count) 个")
+                ScrollView {
+                    scenesContent
+                        .padding(.horizontal, Spacing.sheetInset)
+                        .padding(.bottom, Spacing.section)
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .navigationTransition(.zoom(sourceID: DashboardSheet.sceneSheet.id, in: sheetZoomNS))
+        case .deviceSheet:
+            VStack(spacing: 0) {
+                BoardSheetHeader(title: "智能家居", detail: "\(haAvailableCount) 台在线")
+                ScrollView {
+                    homeDevicesContent
+                        .padding(.horizontal, Spacing.sheetInset)
+                        .padding(.bottom, Spacing.section)
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .navigationTransition(.zoom(sourceID: DashboardSheet.deviceSheet.id, in: sheetZoomNS))
+        case .automationSheet:
+            VStack(spacing: 0) {
+                BoardSheetHeader(title: "自动化", detail: "\(automations.count) 个")
+                ScrollView {
+                    automationsContent
+                        .padding(.horizontal, Spacing.sheetInset)
+                        .padding(.bottom, Spacing.section)
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .navigationTransition(.zoom(sourceID: DashboardSheet.automationSheet.id, in: sheetZoomNS))
+        case .routerSheet:
+            // w5：原 routerBlock 栏目收敛为服务状态区一行；完整启停面板搬进本弹窗（功能不丢）
+            VStack(spacing: 0) {
+                BoardSheetHeader(title: "路由器")
+                RouterPanel(router: router,
+                            busy: clashBusy,
+                            onStart: { clashAction("start") },
+                            onStop: { clashAction("stop") },
+                            onRefresh: { Task { await loadRouter() } })
+                    .padding(.horizontal, Spacing.sheetInset)
+                    .padding(.bottom, Spacing.section)
+            }
+            .presentationDetents([.medium])
+            .navigationTransition(.zoom(sourceID: DashboardSheet.routerSheet.id, in: sheetZoomNS))
+        case .todoSheet:
+            // w5：今日待办 = 既有速记弹窗（DockTabView 长按菜单「今日待办」同款），不新造页
+            QuickCaptureSheet(mode: .todo)
         }
     }
 
@@ -1452,8 +1565,6 @@ struct DashboardView: View {
         if batchStale {
             // v2.0.86：硬件温度（CPU / NVMe）首屏加载
             await loadHw()
-            // v3.0.74：从 NAS 加载钉一钉数据
-            await pinStore.loadFromServer()
             // 首刷全套（首次进入 / 距上次全量超 30s 的切回——等效原 onAppear + Refresh 通知）
             await refresh()
             await loadDockerCount()
@@ -1486,7 +1597,8 @@ struct DashboardView: View {
 //    body —— 改链请改这里的 applyXxx，别动调用点。
 extension DashboardView {
 
-    /// 折叠组 1（5 条修饰器）：滚动定位 / 下拉刷新 / 三张 sheet 通道
+    /// 折叠组 1（4 条修饰器）：滚动定位 / 下拉刷新 / 两张 sheet 通道
+    /// w5：卡片编辑器 sheet 已随固定结构移除
     @MainActor
     private func applyDashboardScrollChrome<C: View>(to content: C) -> some View {
         content
@@ -1497,16 +1609,6 @@ extension DashboardView {
             }
             .sheet(item: $activeSheet, onDismiss: dashboardSheetDismiss) { s in
                 sheetContent(for: s)
-            }
-            // v3.9.40（#15）：卡片编辑器（排序 / 隐藏）
-            .sheet(isPresented: $showCardEditor) {
-                // SR13：`all` 必须传**可见**卡片。原来传 orderedCards（含隐藏项），
-                // 而 init 把 all 整个塞进 `shown` → 隐藏卡片同时出现在「显示中」和「已隐藏」两栏；
-                // 在「显示中」再点一次隐藏，hiddenList 就多一份重复，persist 写出的
-                // orderRaw = shown + hiddenList 也带重复键 → orderedCards 返回重复元素 →
-                // 看板同一张卡片渲染两遍，且 ForEach(id: \.element) 重复 id（SwiftUI 直接告警/错位）。
-                BoardCardEditorSheet(all: visibleCards,
-                                     hidden: orderedCards.filter { hiddenCards.contains($0) })
             }
             // v3.9.74 P1.5：连接器面板里点「MCP 工具服务」「生活卡片」→ 面板关闭后再弹对应设置页
             // （呈现由上面 onDismiss 消费 pendingSheetAfterPanel 驱动；sheet(item:) 随置 nil 关闭）
@@ -1587,21 +1689,6 @@ extension DashboardView {
             }
     }
 
-    /// 折叠组 3（5 条修饰器）：栏目卡片拖动反馈链（量高 → 位移 → 放大 → 阴影 → 层级）
-    @MainActor
-    private func applyDashboardCardChrome<C: View>(to content: C, card: BoardCard) -> some View {
-        content
-            // ⚠️ onGeometryChange 必须排在 .offset 之前 —— 它量的是栏目**自然高度**，
-            //    拖动位移不该污染高度（否则落位会拿自己算自己）。
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
-                sectionHeights[card] = h
-            }
-            .offset(y: dragCard == card ? dragOffsetY : 0)
-            .scaleEffect(dragCard == card ? 1.01 : 1)
-            .shadow(color: .black.opacity(dragCard == card ? 0.16 : 0), radius: 14, y: 6)
-            .zIndex(dragCard == card ? 1 : 0)
-    }
-
     @MainActor
     private struct DashboardScrollChrome: ViewModifier {
         let host: DashboardView
@@ -1614,13 +1701,5 @@ extension DashboardView {
         let host: DashboardView
 
         func body(content: Content) -> some View { host.applyDashboardDialogChrome(to: content) }
-    }
-
-    @MainActor
-    private struct DashboardCardChrome: ViewModifier {
-        let host: DashboardView
-        let card: BoardCard
-
-        func body(content: Content) -> some View { host.applyDashboardCardChrome(to: content, card: card) }
     }
 }
