@@ -47,11 +47,7 @@ struct GrayCapsuleTabBar: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
-        )
+        .a11yGlass(.regular, in: Capsule(), stroke: Color.primary.opacity(0.06))
         .shadow(color: Color.black.opacity(0.08), radius: 14, x: 0, y: 5)
         .padding(.horizontal, 18)
     }

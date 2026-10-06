@@ -72,14 +72,14 @@ struct IdeasTabView: View {
                             .foregroundStyle(.primary)
                         Spacer(minLength: 0)
                         Button {
+                            Haptics.tap()
                             onAskAI("请帮我创建一个新的任务")
                         } label: {
                             Image(systemName: "plus")
                                 .font(.system(size: 20, weight: .medium))
                                 .foregroundStyle(.primary)
                                 .frame(width: 44, height: 44)
-                                .background(.ultraThinMaterial, in: Circle())
-                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
+                                .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("让 AI 自由创建任务")

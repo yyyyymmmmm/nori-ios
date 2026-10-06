@@ -1505,13 +1505,14 @@ struct ChatView: View {
         // 保留：侧边栏按钮（左）/ 搜索 + 更多（右，悬浮圆形）；离线弱化为小字（不断连逻辑不变）。
         HStack(spacing: 12) {
             Button {
+                Haptics.tap()
                 NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
             } label: {
                 Image(systemName: "sidebar.left")
                     .font(.system(size: 18))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
+                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
@@ -1528,6 +1529,7 @@ struct ChatView: View {
             Spacer()
 
             Button {
+                Haptics.tap()
                 // 搜索：切到会话搜索（与侧边栏搜索同口径）
                 NotificationCenter.default.post(name: .qingliaoOpenChatSearch, object: nil)
             } label: {
@@ -1535,19 +1537,20 @@ struct ChatView: View {
                     .font(.system(size: 18))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
+                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("搜索")
 
             Button {
+                Haptics.tap()
                 showMoreMenu = true
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 18))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
+                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("更多")

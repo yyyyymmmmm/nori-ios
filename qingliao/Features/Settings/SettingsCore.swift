@@ -136,13 +136,14 @@ struct SettingsView: View {
             // 左上圆形返回键 + 居中标题「设置」；原 PageHeader 大标题已干掉。
             HStack {
                 Button {
+                    Haptics.tap()
                     dismissSettings()
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 44, height: 44)
-                        .background(.regularMaterial, in: Circle())
+                        .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("返回")

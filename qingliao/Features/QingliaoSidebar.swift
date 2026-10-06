@@ -100,6 +100,7 @@ struct QingliaoSidebar: View {
                     .foregroundStyle(.primary)
                 Spacer()
                 Button {
+                    Haptics.tap()
                     close()
                     onOpenSettings()
                 } label: {
@@ -107,7 +108,7 @@ struct QingliaoSidebar: View {
                         .font(.system(size: 18))
                         .foregroundStyle(.primary)
                         .frame(width: 44, height: 44)
-                        .background(.regularMaterial, in: Circle())
+                        .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
                 }
                 .buttonStyle(.plain)
             }
@@ -204,6 +205,7 @@ struct QingliaoSidebar: View {
             // 底部：搜索框 + 新建按钮
             HStack(spacing: 12) {
                 Button {
+                    Haptics.tap()
                     close()
                     onSearch()
                 } label: {
@@ -215,10 +217,11 @@ struct QingliaoSidebar: View {
                     }
                     .padding(.horizontal, 18)
                     .frame(height: 52)
-                    .background(.regularMaterial, in: Capsule())
+                    .a11yGlass(.regular, in: Capsule(), stroke: Color.primary.opacity(0.08))
                 }
                 .buttonStyle(.plain)
                 Button {
+                    Haptics.tap()
                     close()
                     onNewChat()
                 } label: {
@@ -226,7 +229,7 @@ struct QingliaoSidebar: View {
                         .font(.system(size: 20))
                         .foregroundStyle(.primary)
                         .frame(width: 52, height: 52)
-                        .background(.regularMaterial, in: Circle())
+                        .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
                 }
                 .buttonStyle(.plain)
             }

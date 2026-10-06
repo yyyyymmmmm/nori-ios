@@ -109,14 +109,14 @@ struct FeedTabView: View {
     private var topBar: some View {
         HStack {
             Button {
+                Haptics.tap()
                 NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
             } label: {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 20))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
+                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
@@ -139,18 +139,16 @@ struct FeedTabView: View {
             .padding(.leading, 6)
             .padding(.trailing, 14)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
+            .a11yGlass(.regular, in: Capsule(), stroke: Color.primary.opacity(0.08))
 
             Spacer()
 
-            Button { showPrompt = true } label: {
+            Button { Haptics.tap(); showPrompt = true } label: {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 20))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
+                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("编辑动态版块提示词")
