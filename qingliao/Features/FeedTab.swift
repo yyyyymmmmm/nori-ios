@@ -69,9 +69,11 @@ final class FeedStore {
 
 struct FeedTabView: View {
     let onAskAI: (String) -> Void
+    let onFillInput: (String) -> Void
     @State private var store = FeedStore()
     @State private var showPrompt = false
     @State private var draftPrompt = ""
+    @State private var reasonUnit: FeedUnit?
 
     var body: some View {
         NavigationStack {
@@ -94,7 +96,8 @@ struct FeedTabView: View {
                                     unit: u,
                                     liked: store.isLiked(u.id),
                                     onLike: { store.toggleLike(u.id) },
-                                    onDiscuss: { onAskAI("我们来讨论一下这条动态：「\(u.title)」") }
+                                    onDiscuss: { onFillInput("我们来讨论一下这条动态：「\(u.title)」") },
+                                    onShowReason: { reasonUnit = u }
                                 )
                                 Divider()
                             }
@@ -107,7 +110,20 @@ struct FeedTabView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .task { await store.load() }
+            .refreshable { await store.load() }
             .sheet(isPresented: $showPrompt) { promptSheet }
+            .sheet(item: $reasonUnit) { u in
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("为什么推荐这条")
+                        .font(.system(size: 20, weight: .semibold))
+                    Text("根据你的兴趣设置「\(store.prompt)」为你推荐。")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(24)
+                .presentationDetents([.medium])
+            }
         }
     }
 
@@ -266,6 +282,7 @@ private struct FeedUnitCard: View {
     let liked: Bool
     let onLike: () -> Void
     let onDiscuss: () -> Void
+    let onShowReason: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -299,7 +316,7 @@ private struct FeedUnitCard: View {
                     Button(action: onLike) {
                         Image(systemName: liked ? "heart.fill" : "heart")
                             .font(.system(size: Typography.headline))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(liked ? .red : .primary)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(liked ? "取消点赞" : "点赞")
@@ -316,9 +333,12 @@ private struct FeedUnitCard: View {
                     Text(RelativeTime.string(since: unit.publishedAt.timeIntervalSince1970))
                         .font(.system(size: Typography.subhead))
                         .foregroundStyle(.secondary)
-                    Image(systemName: "info.circle")
-                        .font(.system(size: Typography.title))
-                        .foregroundStyle(.secondary)
+                    Button(action: onShowReason) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: Typography.title))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.top, Spacing.xs)
             }

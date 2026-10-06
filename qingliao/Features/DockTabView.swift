@@ -118,7 +118,7 @@ struct DockTabView: View {
                 // iOS 26 系统 tab bar 原生就是悬浮液态玻璃胶囊（见 sarunw iOS 26 适配），直接用系统。
                 chatTab
                 // 资讯：动态 feed 页（信息流，对标 Muse「动态」）
-                FeedTabView(onAskAI: askAI)
+                FeedTabView(onAskAI: askAI, onFillInput: fillChatInput)
                     .tag(DockTab.feed)
                     .tabTransition(for: .feed, selected: $selected)
                 // 点子：备忘录（灵感记录）
@@ -238,12 +238,11 @@ struct DockTabView: View {
                 ChatView()
             }
             .tag(DockTab.chat)
-            .tabItem { Label(DockTab.chat.title, systemImage: DockTab.chat.icon) }
+            .tabTransition(for: .chat, selected: $selected)
         } else {
             ChatView()
                 .tag(DockTab.chat)
-                // F线：系统 tab bar 直接显示，对话格给真正的 label（原来置空是配合藏 tab bar）
-                .tabItem { Label(DockTab.chat.title, systemImage: DockTab.chat.icon) }
+                .tabTransition(for: .chat, selected: $selected)
         }
     }
 
