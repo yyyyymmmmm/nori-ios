@@ -232,9 +232,10 @@ struct TodaySuggestionCard: View {
         df.dateFormat = "M月d日 EEEE"
 
         let prompt = """
-        你是Nori的生活助手。现在是\(df.string(from: Date()))\(timeDesc)。请给出3条今日建议，每条都是你现在就能帮用户做的具体事项。
-        每条包含：title（简短标题，10字内）、reason（为什么现在建议这个，1句话，说明依据）、prompt（用户点击后填入对话框的完整提示词）。
+        你是Nori的生活助手。现在是\(df.string(from: Date()))\(timeDesc)。请给出3条今日建议，每条都是具体的建议陈述句，不是提问。
+        要求：title（建议标题，10字内，如"下午带伞"）；reason（依据，1句话，如"天气预报下午有雨"）；prompt（用户点击后填入对话框的完整提示词，要具体可执行）。
         只返回JSON数组：[{"title":"...","reason":"...","prompt":"..."}]
+        示例：{"title":"今晚早点休息","reason":"你连续3天睡眠不足7小时","prompt":"帮我制定一个今晚的作息计划，保证23点前入睡"}
         """
         let raw = try await QingliaoIntentClient.oneShot(prompt, auth: auth, timeout: 30)
         guard let s = raw.firstIndex(of: "["),

@@ -31,28 +31,22 @@ struct HealthBoardView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.primary)
-                            .frame(width: 44, height: 44)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
                     }
                     .accessibilityLabel("返回")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    ZStack(alignment: .bottomTrailing) {
+                    HStack(spacing: 4) {
                         Image(systemName: "cloud")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(.primary)
-                            .frame(width: 44, height: 44)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
                         Circle()
                             .fill(Color.green)
-                            .frame(width: 12, height: 12)
-                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                            .offset(x: -4, y: -4)
+                            .frame(width: 8, height: 8)
                     }
+                    .accessibilityLabel("同步正常")
+                }
                     .accessibilityLabel("健康数据已同步")
                 }
             }
