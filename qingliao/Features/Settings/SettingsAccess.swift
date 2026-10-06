@@ -1538,17 +1538,52 @@ private struct PasteKBSheet: View {
 }
 
 // MARK: - J 线 2026-10-06：Hermes 模型选择器（原「模型管理」独立页迁入「连接设置」）
-// GET /api/hermes/models → 列表；POST /api/hermes/model {model_id} → 切换。
-// 切换成功后同步写 UserDefaults qingliao_model（App 内兼容口径）。
+// v4.4.x 多服务商：GET /api/hermes/models → {providers: [{id,name,models,error}]}；
+// POST /api/hermes/model {provider, model_id} → 切换；POST /hermes/models/hide → 隐藏。
 
 struct HermesModelOption: Identifiable {
     let id: String
+    let name: String
     let selected: Bool
 
     init?(json: [String: Any]) {
         guard let id = json["id"] as? String, !id.isEmpty else { return nil }
         self.id = id
+        self.name = (json["name"] as? String) ?? id
         self.selected = (json["selected"] as? Bool) ?? false
+    }
+}
+
+struct HermesProviderGroup: Identifiable {
+    let id: String
+    let name: String
+    var models: [HermesModelOption]
+    let error: String?
+
+    init?(json: [String: Any]) {
+        guard let id = json["id"] as? String, !id.isEmpty else { return nil }
+        self.id = id
+        self.name = (json["name"] as? String) ?? id
+        self.models = ((json["models"] as? [[String: Any]]) ?? [])
+            .compactMap(HermesModelOption.init(json:))
+        self.error = json["error"] as? String
+    }
+}
+
+struct HermesProviderInfo: Identifiable {
+    let id: String
+    let name: String
+    let hasKey: Bool
+    let isDefault: Bool
+    let editable: Bool
+
+    init?(json: [String: Any]) {
+        guard let id = json["id"] as? String, !id.isEmpty else { return nil }
+        self.id = id
+        self.name = (json["name"] as? String) ?? id
+        self.hasKey = (json["has_key"] as? Bool) ?? false
+        self.isDefault = (json["is_default"] as? Bool) ?? false
+        self.editable = (json["editable"] as? Bool) ?? false
     }
 }
 
@@ -1556,10 +1591,12 @@ struct HermesModelPickerSheet: View {
     @Environment(AuthStore.self) private var auth
     @Environment(\.dismiss) private var dismiss
 
-    @State private var models: [HermesModelOption] = []
+    @State private var groups: [HermesProviderGroup] = []
     @State private var loading = true
     @State private var loadError = false
     @State private var busyID: String? = nil
+    @State private var showProviderManage = false
+    @State private var hideConfirm: (provider: String, model: HermesModelOption)? = nil
 
     var body: some View {
         NavigationStack {
@@ -1585,27 +1622,52 @@ struct HermesModelPickerSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        ForEach(models) { m in
-                            Button {
-                                Haptics.tap()
-                                Task { await select(m) }
-                            } label: {
-                                HStack {
-                                    Text(m.id)
-                                        .font(.system(size: 17))
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    if busyID == m.id {
-                                        ProgressView().controlSize(.small)
-                                    } else if m.selected {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundStyle(.primary)
+                        ForEach(groups) { g in
+                            Section {
+                                if let err = g.error {
+                                    Text(err)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.orange)
+                                }
+                                ForEach(g.models) { m in
+                                    Button {
+                                        Haptics.tap()
+                                        Task { await select(provider: g.id, m) }
+                                    } label: {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(m.name)
+                                                    .font(.system(size: 17))
+                                                    .foregroundStyle(.primary)
+                                                if m.name != m.id {
+                                                    Text(m.id)
+                                                        .font(.system(size: 12))
+                                                        .foregroundStyle(.tertiary)
+                                                }
+                                            }
+                                            Spacer()
+                                            if busyID == "\(g.id)|\(m.id)" {
+                                                ProgressView().controlSize(.small)
+                                            } else if m.selected {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundStyle(.primary)
+                                            }
+                                        }
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button(role: .destructive) {
+                                            hideConfirm = (g.id, m)
+                                        } label: {
+                                            Label("隐藏此模型", systemImage: "eye.slash")
+                                        }
                                     }
                                 }
-                                .contentShape(Rectangle())
+                            } header: {
+                                Text(g.name)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .listStyle(.insetGrouped)
@@ -1620,8 +1682,36 @@ struct HermesModelPickerSheet: View {
                         dismiss()
                     }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        Haptics.tap()
+                        showProviderManage = true
+                    } label: {
+                        Image(systemName: "server.rack")
+                    }
+                }
             }
             .task { await load() }
+            .sheet(isPresented: $showProviderManage) {
+                HermesProviderManageView()
+            }
+            .confirmationDialog(
+                "隐藏模型", isPresented: Binding(
+                    get: { hideConfirm != nil },
+                    set: { if !$0 { hideConfirm = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("隐藏", role: .destructive) {
+                    if let hc = hideConfirm {
+                        Task { await hideModel(provider: hc.provider, hc.model) }
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                if let hc = hideConfirm {
+                    Text("以后可在服务商管理里恢复「\(hc.model.name)」")
+                }
+            }
         }
     }
 
@@ -1630,22 +1720,215 @@ struct HermesModelPickerSheet: View {
         loadError = false
         defer { loading = false }
         guard let j = try? await auth.json("/api/agent/hermes/models"),
-              let arr = j["models"] as? [[String: Any]] else {
+              let arr = j["providers"] as? [[String: Any]] else {
+            // 兼容老格式 {models: [...]}
+            if let j = try? await auth.json("/api/agent/hermes/models"),
+               let arr = j["models"] as? [[String: Any]] {
+                let opts = arr.compactMap(HermesModelOption.init(json:))
+                groups = [HermesProviderGroup(json: ["id": "default", "name": "默认",
+                    "models": arr])].compactMap { $0 }
+                _ = opts
+                return
+            }
             loadError = true
             return
         }
-        models = arr.compactMap(HermesModelOption.init(json:))
+        groups = arr.compactMap(HermesProviderGroup.init(json:))
     }
 
-    private func select(_ m: HermesModelOption) async {
+    private func select(provider pid: String, _ m: HermesModelOption) async {
+        let key = "\(pid)|\(m.id)"
         guard busyID == nil else { return }
-        busyID = m.id
+        busyID = key
         defer { busyID = nil }
         guard let j = try? await auth.json("/api/agent/hermes/model", method: "POST",
-                                           body: ["model_id": m.id]),
+                                           body: ["provider": pid, "model_id": m.id]),
               (j["ok"] as? Bool) == true else { return }
-        // App 内兼容口径：本地也存一份（聊天页兜底读 UserDefaults）
         UserDefaults.standard.set(m.id, forKey: "qingliao_model")
         await load()
+    }
+
+    private func hideModel(provider pid: String, _ m: HermesModelOption) async {
+        hideConfirm = nil
+        // 黑名单本地累积后整体上报（后端 save_hidden_models 为整体替换语义）
+        var hidden = Set(UserDefaults.standard.stringArray(forKey: "ql_hidden_\(pid)") ?? [])
+        hidden.insert(m.id)
+        let arr = Array(hidden)
+        UserDefaults.standard.set(arr, forKey: "ql_hidden_\(pid)")
+        _ = try? await auth.json("/api/agent/hermes/models/hide", method: "POST",
+                                 body: ["provider": pid, "model_ids": arr])
+        await load()
+    }
+}
+
+// MARK: - 服务商管理
+
+struct HermesProviderManageView: View {
+    @Environment(AuthStore.self) private var auth
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var providers: [HermesProviderInfo] = []
+    @State private var loading = true
+    @State private var showAdd = false
+    @State private var deleteTarget: HermesProviderInfo? = nil
+    @State private var message = ""
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if loading {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        ForEach(providers) { p in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(p.name)
+                                        .font(.system(size: 17))
+                                        .foregroundStyle(.primary)
+                                    Text(p.isDefault ? "默认服务商" : (p.hasKey ? "已配置密钥" : "未配置密钥"))
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                Spacer()
+                                if !p.editable {
+                                    Text("只读")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                if p.editable {
+                                    Button(role: .destructive) {
+                                        deleteTarget = p
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        }
+                        if !message.isEmpty {
+                            Text(message)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                }
+            }
+            .navigationTitle("服务商")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("完成") { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showAdd = true } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .task { await load() }
+            .sheet(isPresented: $showAdd) {
+                HermesProviderAddView(onDone: { Task { await load() } })
+            }
+            .confirmationDialog("删除服务商", isPresented: Binding(
+                get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
+                titleVisibility: .visible) {
+                Button("删除", role: .destructive) {
+                    if let t = deleteTarget { Task { await remove(t) } }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("该服务商的模型选择与隐藏名单将一并清除")
+            }
+        }
+    }
+
+    private func load() async {
+        loading = true
+        defer { loading = false }
+        guard let j = try? await auth.json("/api/agent/hermes/providers"),
+              let arr = j["providers"] as? [[String: Any]] else { return }
+        providers = arr.compactMap(HermesProviderInfo.init(json:))
+    }
+
+    private func remove(_ p: HermesProviderInfo) async {
+        deleteTarget = nil
+        guard let j = try? await auth.json("/api/agent/hermes/providers/\(p.id)",
+                                           method: "DELETE"),
+              (j["ok"] as? Bool) == true else {
+            message = "删除失败"
+            return
+        }
+        await load()
+    }
+}
+
+struct HermesProviderAddView: View {
+    @Environment(AuthStore.self) private var auth
+    @Environment(\.dismiss) private var dismiss
+    var onDone: () -> Void = {}
+
+    @State private var name = ""
+    @State private var url = ""
+    @State private var key = ""
+    @State private var saving = false
+    @State private var message = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("名称（如 DeepSeek）", text: $name)
+                    TextField("地址（如 http://192.168.1.5:8642）", text: $url)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                    SecureField("API Key", text: $key)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                } footer: {
+                    Text("保存前会自动测试连通性，连不通不会保存。")
+                }
+                if !message.isEmpty {
+                    Section {
+                        Text(message)
+                            .font(.system(size: 14))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .navigationTitle("新增服务商")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "保存中…" : "保存") {
+                        Task { await save() }
+                    }
+                    .disabled(saving || url.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        saving = true
+        defer { saving = false }
+        message = ""
+        guard let j = try? await auth.json("/api/agent/hermes/providers", method: "POST",
+                                           body: ["name": name, "url": url, "key": key]),
+              let ok = j["ok"] as? Bool else {
+            message = "网络错误"
+            return
+        }
+        if ok {
+            onDone()
+            dismiss()
+        } else {
+            message = (j["error"] as? String) ?? "保存失败"
+        }
     }
 }

@@ -49,6 +49,11 @@ final class BackendUpdateModel {
     var currentVersion = ""      // 后端报的版本（可能为空=未注入）
     var logTail = ""
     var manualCommand = "cd qingliao-backend && ./update.sh"
+    // v4.4.x 加固：四步状态（后端 /api/selfupdate 返回）
+    var backedUp = false
+    var healthCheck = false
+    var rolledBack = false
+    var backupTag = ""
 
     private var auth: AuthStore?
     private var pollTask: Task<Void, Never>?
@@ -141,10 +146,42 @@ final class BackendUpdateModel {
                     return
                 }
                 await setPhase(.restarting)
-                // 轮询：后端会重启失联 1~3 分钟；失联=继续等，回来后看版本
+                // 轮询：后端会重启失联 1~3 分钟；失联=继续等，回来后看版本 + 四步状态
                 let deadline = Date().addingTimeInterval(8 * 60)
                 while Date() < deadline, !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 8_000_000_000)
+                    // v4.4.x：先读 selfupdate 状态拿四步（backed_up/health_check/rolled_back）
+                    if let sj = try? await auth.json("/api/selfupdate"),
+                       let s = sj as? [String: Any] {
+                        await MainActor.run {
+                            self.backedUp = (s["backed_up"] as? Bool) ?? false
+                            self.healthCheck = (s["health_check"] as? Bool) ?? false
+                            self.rolledBack = (s["rolled_back"] as? Bool) ?? false
+                            self.backupTag = (s["backup_tag"] as? String) ?? ""
+                            if let lt = s["log_tail"] as? String, !lt.isEmpty {
+                                self.logTail = lt
+                            }
+                        }
+                        let st = (s["status"] as? String) ?? ""
+                        if st == "done" {
+                            await MainActor.run {
+                                guard case .restarting = self.phase else { return }
+                                self.phase = .done
+                            }
+                            // 顺手刷新版本号
+                            if let vj = try? await auth.json("/api/version") {
+                                await MainActor.run {
+                                    self.currentVersion = (vj["version"] as? String) ?? ""
+                                }
+                            }
+                            return
+                        }
+                        if st == "failed" {
+                            let msg = (s["error"] as? String) ?? "更新失败"
+                            await setPhase(.failed(msg))
+                            return
+                        }
+                    }
                     do {
                         let j2 = try await auth.json("/api/version")
                         let ver = (j2["version"] as? String) ?? ""
@@ -185,6 +222,10 @@ struct BackendUpdateSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     statusCard
+                    if case .updating = model.phase { updateStepsCard }
+                    if case .restarting = model.phase { updateStepsCard }
+                    if case .done = model.phase { updateStepsCard }
+                    if case .failed = model.phase { updateStepsCard }
                     if case .available(let behind) = model.phase {
                         updateButton(behind: behind)
                     }
@@ -227,6 +268,47 @@ struct BackendUpdateSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .glassListCard()
+    }
+
+    // v4.4.x：四步状态（备份→更新→健康检查→完成/回滚）
+    @ViewBuilder private var updateStepsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            updateStepRow(done: model.backedUp, active: true,
+                          title: "备份代码",
+                          detail: model.backupTag.isEmpty ? nil : model.backupTag)
+            updateStepRow(done: true, active: true, title: "拉取更新", detail: nil)
+            updateStepRow(done: model.healthCheck, active: model.backedUp,
+                          title: "健康检查", detail: nil)
+            if model.rolledBack {
+                updateStepRow(done: true, active: true, title: "已自动回滚",
+                              detail: "更新后检查未通过", destructive: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .glassListCard()
+    }
+
+    @ViewBuilder private func updateStepRow(done: Bool, active: Bool, title: String,
+                                           detail: String?, destructive: Bool = false) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: done ? "checkmark.circle.fill"
+                  : (active ? "arrow.triangle.2.circlepath" : "circle"))
+                .font(.system(size: 18))
+                .foregroundStyle(done ? (destructive ? .orange : .green)
+                                 : (active ? .primary : .tertiary))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(destructive && done ? .orange : .primary)
+                if let detail {
+                    Text(detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            Spacer()
+        }
     }
 
     private var statusTitle: String {
