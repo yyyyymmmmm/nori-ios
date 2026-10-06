@@ -36,12 +36,12 @@ struct AboutView: View {
             VStack(alignment: .leading, spacing: 10) {
                 // v3.0.8：项目版本说明（iOS 客户端版本）
                 aboutRow("项目版本", "Nori · iOS 客户端 v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
-                // v3.0.3：统一介绍框架 —— 云端直连已于 v3.9.28 整体移除，本页只剩本地 AI 一种形态
-                aboutRow("产品", "Nori —— 面向家庭的 AI 智能助手，SwiftUI 原生客户端，连接自家 NAS 上的 Hermes Agent，数据本地保存。")
+                // 2026-10-07：产品定位更新（对标 Muse，更强大的自部署 AI 助手）
+                aboutRow("产品", "Nori —— 你的 AI 助手。SwiftUI 原生客户端，连接 Hermes Agent，数据自主可控。")
                 appModeRow()
-                aboutRow("功能", "流式对话 · 语音对话 · 图片理解 · 知识库检索 · 会话同步 · NAS 面板 · Docker 管理 · 智能家居 · 定时任务")
-                aboutRow("模型", "DeepSeek V4 / Kimi / StepFun 多模型聚合（OpenCode Go + 官方 API）")
-                aboutRow("架构", "SwiftUI 原生 · Hermes Agent · 自建 NAS 后端（连接自家 NAS）")
+                aboutRow("功能", "流式对话 · 语音对话 · 图片理解 · 知识库检索 · 技能扩展 · 定时任务 · 智能家居 · 记忆管理")
+                aboutRow("模型", "Hermes Agent 统一调度（多服务商/多模型）")
+                aboutRow("架构", "SwiftUI 原生 · Hermes Agent 引擎 · Nori 后端（代理与控制面）")
                 // v3.0.8：Hermes Agent 版本号固定放在介绍最后一行（本地模式读容器实时版本）
                 HStack(alignment: .top) {
                     Text("Hermes Agent")
