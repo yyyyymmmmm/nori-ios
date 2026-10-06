@@ -36,6 +36,9 @@ final class FeedStore {
         }
     }
     var units: [FeedUnit] = []
+    // 2026-10-07：分页
+    var hasMore = true
+    private var loadingMore = false
     private var likedIDs: Set<String> = []
     private let auth = AuthStore()
 
@@ -60,12 +63,14 @@ final class FeedStore {
     /// 约定接口 GET /api/feed/units；后端暂无 → 任何失败都静默留空（诚实空态）
     /// 2026-10-07：把资讯 prompt 传给后端（?prompt=…&limit=6），后端按提示词生成 units；
     /// 无 prompt 时后端走默认，不会坏。
+    /// 2026-10-07：分页（paged=1 返回 {units, has_more}）
     func load() async {
         let auth = AuthStore()
         var comps = URLComponents(string: auth.serverURL + "/api/feed/units")
         comps?.queryItems = [
             URLQueryItem(name: "prompt", value: prompt),
-            URLQueryItem(name: "limit", value: "6"),
+            URLQueryItem(name: "limit", value: "10"),
+            URLQueryItem(name: "paged", value: "1"),
         ]
         guard let url = comps?.url else { return }
         var req = URLRequest(url: url)
@@ -77,9 +82,55 @@ final class FeedStore {
               (resp as? HTTPURLResponse)?.statusCode == 200 else { return }
         let dec = JSONDecoder()
         dec.dateDecodingStrategy = .iso8601
+        // 新格式 {units, has_more}
+        if let paged = try? dec.decode(PagedFeed.self, from: data) {
+            units = paged.units.sorted { $0.publishedAt > $1.publishedAt }
+            hasMore = paged.has_more
+            return
+        }
+        // 兼容老格式 [FeedUnit]
         guard let list = try? dec.decode([FeedUnit].self, from: data) else { return }
         units = list.sorted { $0.publishedAt > $1.publishedAt }
+        hasMore = false
     }
+
+    /// 加载更多（分页）
+    func loadMore() async {
+        guard hasMore, !loadingMore else { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        let auth = AuthStore()
+        var comps = URLComponents(string: auth.serverURL + "/api/feed/units")
+        comps?.queryItems = [
+            URLQueryItem(name: "prompt", value: prompt),
+            URLQueryItem(name: "limit", value: "10"),
+            URLQueryItem(name: "offset", value: "\(units.count)"),
+            URLQueryItem(name: "paged", value: "1"),
+        ]
+        guard let url = comps?.url else { return }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 8
+        if !auth.token.isEmpty {
+            req.setValue("Bearer \(auth.token)", forHTTPHeaderField: "Authorization")
+        }
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200 else { return }
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        guard let paged = try? dec.decode(PagedFeed.self, from: data) else { return }
+        let newUnits = paged.units.sorted { $0.publishedAt > $1.publishedAt }
+        // 去重追加
+        let existingIDs = Set(units.map { $0.id })
+        units.append(contentsOf: newUnits.filter { !existingIDs.contains($0.id) })
+        hasMore = paged.has_more
+    }
+}
+
+// 2026-10-07：分页响应
+private struct PagedFeed: Decodable {
+    let units: [FeedUnit]
+    let has_more: Bool
+}
 }
 
 struct FeedTabView: View {
@@ -115,6 +166,19 @@ struct FeedTabView: View {
                                     onShowReason: { reasonUnit = u }
                                 )
                                 Divider()
+                            }
+                            // 2026-10-07：加载更多（分页）
+                            if store.hasMore {
+                                Button {
+                                    Task { await store.loadMore() }
+                                } label: {
+                                    Text("加载更多")
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 16)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .padding(.top, Spacing.xs)
