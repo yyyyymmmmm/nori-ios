@@ -98,9 +98,17 @@ struct HealthHeroCard: View {
 
 struct TodaySuggestionCard: View {
     @Environment(AuthStore.self) private var auth
-    @State private var suggestions: [String] = []
+    @State private var suggestions: [Suggestion] = []
     @State private var loading = false
     @State private var loaded = false
+    @State private var isFallback = false
+
+    struct Suggestion: Identifiable {
+        let id = UUID()
+        let title: String
+        let reason: String
+        let prompt: String
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -113,8 +121,17 @@ struct TodaySuggestionCard: View {
                     .foregroundStyle(.primary)
                 Spacer(minLength: 0)
                 if loading {
-                    ProgressView()
-                        .scaleEffect(0.8)
+                    ProgressView().scaleEffect(0.8)
+                } else {
+                    Button {
+                        Haptics.tap()
+                        Task { await load(force: true) }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -123,18 +140,37 @@ struct TodaySuggestionCard: View {
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(suggestions.prefix(2), id: \.self) { s in
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                            .padding(.top, 3)
-                        Text(s)
-                            .font(.system(size: 14))
-                            .foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
+                ForEach(suggestions.prefix(3)) { s in
+                    Button {
+                        Haptics.tap()
+                        NotificationCenter.default.post(name: .qingliaoFillInput, object: s.prompt)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.top, 3)
+                                Text(s.title)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(.primary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Text(s.reason)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.tertiary)
+                                .padding(.leading, 20)
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                 }
+            }
+
+            if isFallback {
+                Text("AI 暂不可用，显示为通用建议")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
             }
         }
         .padding(18)
@@ -148,18 +184,82 @@ struct TodaySuggestionCard: View {
         }
     }
 
-    private func load() async {
+    private func load(force: Bool = false) async {
+        // 每日缓存：同一天不重复生成
+        let dateKey = "nori_suggestion_date"
+        let cacheKey = "nori_suggestion_cache"
+        let today = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none)
+
+        if !force, UserDefaults.standard.string(forKey: dateKey) == today,
+           let data = UserDefaults.standard.data(forKey: cacheKey),
+           let cached = try? JSONDecoder().decode([CachedSuggestion].self, from: data),
+           !cached.isEmpty {
+            suggestions = cached.map { Suggestion(title: $0.t, reason: $0.r, prompt: $0.p) }
+            isFallback = false
+            return
+        }
+
         loading = true
         defer { loading = false }
         do {
-            // 后端智能建议接口（/api/agent/suggestion），失败静默
-            let (data, _) = try await auth.request("/api/agent/suggestion", method: "GET")
-            if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let list = obj["suggestions"] as? [String] {
-                suggestions = list
+            let list = try await generate()
+            suggestions = list
+            isFallback = false
+            let cached = list.map { CachedSuggestion(t: $0.title, r: $0.reason, p: $0.prompt) }
+            if let data = try? JSONEncoder().encode(cached) {
+                UserDefaults.standard.set(data, forKey: cacheKey)
+                UserDefaults.standard.set(today, forKey: dateKey)
             }
         } catch {
-            // 静默失败，显示"暂无建议"
+            suggestions = fallbackSuggestions()
+            isFallback = true
         }
     }
+
+    private func generate() async throws -> [Suggestion] {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let timeDesc: String
+        switch hour {
+        case 5..<9: timeDesc = "清晨"
+        case 9..<12: timeDesc = "上午"
+        case 12..<14: timeDesc = "中午"
+        case 14..<18: timeDesc = "下午"
+        case 18..<23: timeDesc = "晚上"
+        default: timeDesc = "深夜"
+        }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "zh_CN")
+        df.dateFormat = "M月d日 EEEE"
+
+        let prompt = """
+        你是Nori的生活助手。现在是\(df.string(from: Date()))\(timeDesc)。请给出3条今日建议，每条都是你现在就能帮用户做的具体事项。
+        每条包含：title（简短标题，10字内）、reason（为什么现在建议这个，1句话，说明依据）、prompt（用户点击后填入对话框的完整提示词）。
+        只返回JSON数组：[{"title":"...","reason":"...","prompt":"..."}]
+        """
+        let raw = try await QingliaoIntentClient.oneShot(prompt, auth: auth, timeout: 30)
+        guard let s = raw.firstIndex(of: "["),
+              let e = raw.lastIndex(of: "]"), s < e,
+              let data = Data(raw[s...e].utf8) as Data?,
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: String]] else {
+            throw SuggestionError.badJSON
+        }
+        return arr.compactMap { d in
+            guard let t = d["title"], !t.isEmpty,
+                  let p = d["prompt"], !p.isEmpty else { return nil }
+            return Suggestion(title: t, reason: d["reason"] ?? "", prompt: p)
+        }
+    }
+
+    private func fallbackSuggestions() -> [Suggestion] {
+        [
+            Suggestion(title: "规划今天", reason: "通用建议", prompt: "帮我规划一下今天的日程"),
+            Suggestion(title: "健康提醒", reason: "通用建议", prompt: "提醒我今天的健康目标"),
+        ]
+    }
+
+    private struct CachedSuggestion: Codable {
+        let t: String; let r: String; let p: String
+    }
+
+    private enum SuggestionError: Error { case badJSON }
 }
