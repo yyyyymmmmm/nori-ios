@@ -134,7 +134,7 @@ struct SkillsView: View {
                         .truncationMode(.tail)
                 }
 
-                // 底部标签行：官方 ｜ 未授权
+                // 底部标签行：官方 ｜ 未授权 ｜ 启用开关
                 HStack(spacing: 8) {
                     Text(skill.category == "mine" ? "我的" : "官方")
                         .font(.system(size: 13))
@@ -144,11 +144,25 @@ struct SkillsView: View {
                         Text("未授权")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.red)
-                    } else if skill.enabled == true {
-                        Text("已启用")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.green)
                     }
+                    
+                    Spacer()
+                    
+                    // 2026-10-07：写闭环 —— 点击切换启用/禁用
+                    Button {
+                        Task { await toggleSkill(skill) }
+                    } label: {
+                        Text((skill.enabled == true) ? "已启用" : "启用")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle((skill.enabled == true) ? .green : .blue)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                ((skill.enabled == true) ? Color.green : Color.blue).opacity(0.1),
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.top, 2)
             }
@@ -177,6 +191,15 @@ struct SkillsView: View {
             }
         } catch {
             self.error = "加载失败，请检查连接"
+        }
+    }
+
+    // 2026-10-07：写闭环 —— 切换技能启用/禁用
+    private func toggleSkill(_ skill: SkillItem) async {
+        let newEnabled = !(skill.enabled == true)
+        if let _ = try? await auth.json("/api/agent/skills", method: "POST",
+                                         body: ["skill_id": skill.name, "enabled": newEnabled]) {
+            await load()
         }
     }
 }
