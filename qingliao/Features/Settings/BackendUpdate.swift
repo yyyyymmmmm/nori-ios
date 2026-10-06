@@ -296,7 +296,7 @@ struct BackendUpdateSheet: View {
                   : (active ? "arrow.triangle.2.circlepath" : "circle"))
                 .font(.system(size: 18))
                 .foregroundStyle(done ? (destructive ? Color.orange : Color.green)
-                                 : (active ? Color.primary : Color(.tertiary)))
+                                 : (active ? Color.primary : Color(uiColor: .tertiaryLabel)))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 15, weight: .medium))
