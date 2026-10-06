@@ -1,4 +1,5 @@
-// 2026-10-07：技能管理页（后端 /api/agent/skills）
+// 2026-10-07：技能管理页（对标 Muse 技能页设计）
+// 后端 /api/agent/skills
 
 import SwiftUI
 
@@ -7,9 +8,12 @@ struct SkillItem: Identifiable, Decodable {
     let name: String
     let description: String?
     let enabled: Bool?
+    // 2026-10-07：Muse 式展示字段（后端可选返回）
+    let category: String?      // official=官方，mine=我的
+    let authorized: Bool?       // 是否已授权
 
     enum CodingKeys: String, CodingKey {
-        case name, description, enabled
+        case name, description, enabled, category, authorized
     }
 }
 
@@ -21,76 +25,141 @@ struct SkillsView: View {
     @State private var error: String?
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if loading {
-                    ProgressView("加载中…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error {
-                    VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.secondary)
-                        Text(error)
-                            .font(.system(size: 15))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                        Button("重试") { Task { await load() } }
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if skills.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "puzzlepiece.extension")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.tertiary)
-                        Text("暂无技能")
-                            .font(.system(size: 17, weight: .medium))
-                        Text("技能给 AI 提供领域知识和工作流\n可在 Hermes 侧安装 agentskills.io 标准技能")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    List(skills) { skill in
-                        HStack(spacing: 12) {
+        VStack(spacing: 0) {
+            // 顶部栏：返回 + 添加
+            HStack {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .background(Color.primary.opacity(0.06), in: Circle())
+                }
+                Spacer()
+                Button {
+                    // TODO: 添加技能
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .background(Color.primary.opacity(0.06), in: Circle())
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // 标题区（对标 Muse）
+                    Text("技能")
+                        .font(.system(size: 32, weight: .bold))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                    Text("给你的助理提供特定领域知识和工作流")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 4)
+                        .padding(.bottom, 16)
+
+                    if loading {
+                        ProgressView("加载中…")
+                            .frame(maxWidth: .infinity, minHeight: 200)
+                    } else if let error {
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 40))
+                                .foregroundStyle(.secondary)
+                            Text(error)
+                                .font(.system(size: 15))
+                                .foregroundStyle(.secondary)
+                            Button("重试") { Task { await load() } }
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                    } else if skills.isEmpty {
+                        VStack(spacing: 12) {
                             Image(systemName: "puzzlepiece.extension")
-                                .font(.system(size: 20))
-                                .foregroundStyle(.blue)
-                                .frame(width: 36, height: 36)
-                                .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(skill.name)
-                                    .font(.system(size: 16, weight: .medium))
-                                if let desc = skill.description, !desc.isEmpty {
-                                    Text(desc)
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
+                                .font(.system(size: 40))
+                                .foregroundStyle(.secondary)
+                            Text("暂无技能")
+                                .font(.system(size: 17, weight: .medium))
+                            Text("技能给 AI 提供领域知识和工作流")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                    } else {
+                        // 技能列表（对标 Muse 行样式）
+                        VStack(spacing: 0) {
+                            ForEach(skills) { skill in
+                                skillRow(skill)
+                                if skill.id != skills.last?.id {
+                                    Divider()
+                                        .padding(.leading, 68)
                                 }
                             }
-                            Spacer()
-                            if let enabled = skill.enabled {
-                                Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(enabled ? .green : Color.secondary)
-                            }
                         }
-                        .padding(.vertical, 4)
                     }
-                    .listStyle(.insetGrouped)
                 }
             }
-            .navigationTitle("技能")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("完成") { dismiss() }
+        }
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    // Muse 式技能行：图标｜名称｜描述｜官方/未授权
+    private func skillRow(_ skill: SkillItem) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            // 图标
+            Image(systemName: "doc.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(.blue)
+                .frame(width: 48, height: 48)
+                .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(skill.name)
+                    .font(.system(size: 17, weight: .semibold))
+
+                if let desc = skill.description, !desc.isEmpty {
+                    Text(desc)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
                 }
+
+                // 底部标签行：官方 ｜ 未授权
+                HStack(spacing: 8) {
+                    Text(skill.category == "mine" ? "我的" : "官方")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+
+                    if skill.authorized == false {
+                        Text("未授权")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.red)
+                    } else if skill.enabled == true {
+                        Text("已启用")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.green)
+                    }
+                }
+                .padding(.top, 2)
             }
-            .task { await load() }
-            .refreshable { await load() }
+
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // TODO: 跳转技能详情/授权页
         }
     }
 
@@ -104,12 +173,7 @@ struct SkillsView: View {
                 let data = try JSONSerialization.data(withJSONObject: list)
                 skills = (try? JSONDecoder().decode([SkillItem].self, from: data)) ?? []
             } else {
-                // 兼容直接返回数组的格式
-                if let j = try? await auth.json("/api/agent/skills", method: "GET"),
-                   let arr = j["data"] as? [[String: Any]] {
-                    let data = try JSONSerialization.data(withJSONObject: arr)
-                    skills = (try? JSONDecoder().decode([SkillItem].self, from: data)) ?? []
-                }
+                self.error = "加载失败，请检查连接"
             }
         } catch {
             self.error = "加载失败，请检查连接"
