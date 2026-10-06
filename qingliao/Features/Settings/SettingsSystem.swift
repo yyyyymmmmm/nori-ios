@@ -112,7 +112,6 @@ struct DiagnosticsView: View {
             }
             .sheet(isPresented: $showCrashSheet) {
                 CrashAlertSheet(logText: CrashReporter.latestLogText(), allowDismiss: false)
-                    .presentationDetents([.medium, .large])
             }
             .alert("清除全部诊断记录？", isPresented: $showClearAlert) {
                 Button("取消", role: .cancel) { }

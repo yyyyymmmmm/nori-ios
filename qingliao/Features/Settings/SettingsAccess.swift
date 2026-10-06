@@ -223,16 +223,13 @@ struct ConnSettingsView: View {
             }
             .sheet(isPresented: $showServerSheet) {
                 ServerSheet()
-                    .presentationDetents([.medium])
             }
             .sheet(isPresented: $showSessionLocSheet) {
                 SessionLocSheet(currentPath: sessionLoc)
-                    .presentationDetents([.medium])
             }
             // v4.0.61：钉一钉存储路径（自带的统一底部 sheet，形态与原主设置页一致）
             .sheet(isPresented: $showPinPath) {
                 PinPathSheet()
-                    .presentationDetents([.medium, .large])
             }
             // v2.0.85：文件上传位置修改
             .sheet(isPresented: $showUploadDirSheet) {
@@ -240,12 +237,10 @@ struct ConnSettingsView: View {
                     showUploadDirSheet = false
                     uploadDir = newDir
                 }
-                .presentationDetents([.medium])
             }
             // J 线 2026-10-06：模型选择（原「模型管理」独立页迁入）
             .sheet(isPresented: $showModelPicker) {
                 HermesModelPickerSheet()
-                    .presentationDetents([.medium, .large])
             }
             .onAppear {
                 // v4.0.61：搜索「钉一钉存储」直达（只认呈现时那一次，关掉不复发）
@@ -530,7 +525,6 @@ struct SecretsView: View {
             SecretEditSheet(entry: editing, onSave: { newEntry in
                 Task { await save(newEntry) }
             })
-            .presentationDetents([.medium])
         }
         .overlay(alignment: .bottom) {
             if !toast.isEmpty {
@@ -933,7 +927,6 @@ struct MCPSettingsSheet: View {
                 MCPAddSheet(templates: templates) { template, k, url in
                     await save(template: template, key: k, url: url)
                 }
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
             }
             .confirmationDialog("删除 \(pendingDelete?.id ?? "")？将触发 Hermes 重启（约 30 秒）",
@@ -1371,7 +1364,6 @@ struct KBView: View {
                     showPasteSheet = false
                     Task { await uploadContent(name, content) }
                 }
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
             }
             .fileImporter(isPresented: $showImporter,

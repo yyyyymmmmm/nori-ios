@@ -102,21 +102,17 @@ struct ConnectAppsView: View {
             .task { await refresh() }
             .sheet(isPresented: $showThirdParty) {
                 ThirdPartyView()
-                    .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $showMail) {
                 MailSettingsSheet()
-                    .presentationDetents([.medium, .large])
                     .scrollContentBackground(.hidden)
             }
             .sheet(isPresented: $showCloudDrive) {
                 CloudDriveSettingsSheet()
-                    .presentationDetents([.medium, .large])
                     .scrollContentBackground(.hidden)
             }
             .sheet(isPresented: $showHA) {
                 HASettingsSheet()
-                    .presentationDetents([.medium])
             }
         }
     }

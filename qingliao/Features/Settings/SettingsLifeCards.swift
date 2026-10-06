@@ -149,7 +149,6 @@ struct LifeCardsSettingsView: View {
                 showStockSearch = false
                 addStock(pick)
             }
-            .presentationDetents([.medium, .large])
         }
     }
 
@@ -1085,7 +1084,6 @@ struct QuickReminderSheet: View {
                 createError = nil
             }
         }
-        .presentationDetents([.medium, .large])
     }
 
     // MARK: - 新建

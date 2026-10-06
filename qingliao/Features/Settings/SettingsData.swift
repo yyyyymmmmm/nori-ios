@@ -100,7 +100,6 @@ struct FilesManagerSheet: View {
         .quickLookPreview($quickLookURL)
         .sheet(item: $renameTarget) { e in
             FileRenameSheet(entry: e, existingNames: siblingNames)
-                .presentationDetents([.height(320)])
         }
         // 重命名弹窗关闭后刷新（成功改名 / 取消都刷一次，代价只是一次 list）
         .onChange(of: renameTarget) { _, newValue in
@@ -846,7 +845,6 @@ struct HistorySheet: View {
                 Text(deleteError ?? "")
             }
         }
-        .presentationDetents([.large])
     }
 
     private func load() async {
@@ -963,7 +961,6 @@ struct HomeShortcutSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } }
             }
         }
-        .presentationDetents([.medium, .large])
         // 打开弹窗时把系统菜单按当前设置重建一次：万一上一次同步发生在设置写坏之后，
         // 这里能自愈（用户看不到「设置里选了但桌面菜单没变」这种不一致）。
         .task { HomeShortcutManager.sync() }

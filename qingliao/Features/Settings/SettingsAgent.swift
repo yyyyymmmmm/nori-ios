@@ -98,7 +98,6 @@ struct AgentKeywordsSheet: View {
             }
             .task { await load() }
         }
-        .presentationDetents([.medium, .large])
     }
 
     private func load() async {
@@ -260,7 +259,6 @@ struct AgentMemorySheet: View {
                 Text("命中「\(editText)」的请求将强制走 Agent 处理")
             }
         }
-        .presentationDetents([.medium, .large])
         // v3.9.41（SR24）：错误出口（挂在最外层，与 #19 的编辑 alert 不同层级不互斥）
         .alert("操作失败", isPresented: Binding(get: { errorMsg != nil },
                                                 set: { if !$0 { errorMsg = nil } })) {

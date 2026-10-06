@@ -261,23 +261,19 @@ struct SettingsView: View {
         Color.clear
         .sheet(isPresented: $showPasswordSheet) {
             PasswordSheet()
-                .presentationDetents([.medium])
         }
         .sheet(isPresented: $showAppearance) {
             // v3.0.4：外观弹窗（与云端共用同一组件，样式统一）
             AppearanceSheet()
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         .sheet(isPresented: $showPetStudio) {
             // v4.0.6：卡通宠物自定义（形象 / 表情 / 行为动作 / 动画档；改完聊天页联动）
             PetStudioSheet()
-                .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showHomeShortcuts) {
             // v3.9.82：桌面快捷方式选择（动态 shortcutItems，最多 4 项）
             HomeShortcutSheet()
-                .presentationDetents([.medium, .large])
         }
     }
 
@@ -286,11 +282,9 @@ struct SettingsView: View {
         Color.clear
         .sheet(isPresented: $showTasks) {
             TasksView()
-                .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showLogs) {
             LogsView()
-                .presentationDetents([.medium, .large])
         }
         // v4.0.61：弹窗关闭时清掉「搜索直达」标记。
         // ⚠️ `onDismiss` 是 `sheet(isPresented:onDismiss:content:)` 的**参数**，不是 View 修饰符 ——
@@ -298,7 +292,6 @@ struct SettingsView: View {
         //    本机 `-parse` 全绿、只有 Archive 抓得到（CI run #694 实踩）。
         .sheet(isPresented: $showConnSettings, onDismiss: { connOpenPinPath = false }) {
             ConnSettingsView(initiallyShowPinPath: connOpenPinPath)
-                .presentationDetents([.medium, .large])
         }
         // J 线 2026-10-06：模型管理独立页已删（模型切换并入连接设置页内）
     }
@@ -309,16 +302,13 @@ struct SettingsView: View {
         // J 线 2026-10-06：微信通道模型页已删（微信走「对接第三方」platforms 统一管理）
         .sheet(isPresented: $showAbout) {
             AboutView()
-                .presentationDetents([.medium])
         }
         .sheet(isPresented: $showSecrets) {
             SecretsView()
-                .presentationDetents([.medium, .large])
         }
         // v2.0.81：知识库
         .sheet(isPresented: $showKB) {
             KBView()
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // 2026-10-07：技能管理（整页，对标 Muse）
@@ -339,22 +329,18 @@ struct SettingsView: View {
         Color.clear
         .sheet(isPresented: $showMemory) {
             MemoryView()
-                .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showHASettings) {
             HASettingsSheet()
-                .presentationDetents([.medium])
         }
         // v3.5.0：MCP 工具服务管理
         .sheet(isPresented: $showMCPSettings) {
             MCPSettingsSheet()
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // v4.0.x：邮件接入
         .sheet(isPresented: $showMailSettings) {
             MailSettingsSheet()
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // v4.0.x：网盘接入
@@ -365,7 +351,6 @@ struct SettingsView: View {
         Color.clear
         .sheet(isPresented: $showCloudDrive) {
             CloudDriveSettingsSheet()
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // v3.9.95：权限与 AI 操控已拆散 —— 本机权限逐项进「连接应用」页（AppPermissionKit 逐项授权）
@@ -375,12 +360,10 @@ struct SettingsView: View {
         // v3.5.x：生活卡片设置页（股票 / 资讯 / 快递）
         .sheet(isPresented: $showLifeCards) {
             LifeCardsSettingsView()
-                .presentationDetents([.medium, .large])
         }
         // v3.9.32：定时提醒（纯本地 UNCalendarNotificationTrigger，无后端依赖）
         .sheet(isPresented: $showQuickReminder) {
             QuickReminderSheet()
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // v3.9.32：文件管理（上传目录浏览：预览 / 分享 / 重命名 / 删除）
@@ -391,14 +374,12 @@ struct SettingsView: View {
         Color.clear
         .sheet(isPresented: $showFilesManager) {
             FilesManagerSheet()
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // v4.0.11：主动 Agent（后端 proactive_agent 的唯一 UI 面）
         .sheet(isPresented: $showProactive) {
             ProactiveAgentSheet()
                 // v4.0.x：原为 [.large]（锁死全屏），与全站半屏弹窗不一致 → 统一为 [.medium, .large]
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // v2.0.105：Agent 关键词管理
@@ -415,12 +396,10 @@ struct SettingsView: View {
         // J 线 2026-10-06：对接第三方（消息渠道平台列表，OAuth 点按授权）
         .sheet(isPresented: $showThirdParty) {
             ThirdPartyView()
-                .presentationDetents([.medium, .large])
         }
         // J 线 2026-10-06：朗读声音（TTS 音色设置）
         .sheet(isPresented: $showReadAloud) {
             ReadAloudSheet()
-                .presentationDetents([.medium, .large])
         }
     }
 
@@ -432,29 +411,24 @@ struct SettingsView: View {
         // 与全站弹窗「默认半屏 medium、可上拉 large」不一致）
         .sheet(isPresented: $showHistory) {
             HistorySheet()
-                .presentationDetents([.medium, .large])
         }
         // v3.6.0：原「崩溃日志」行整合为「诊断」页（App 自身诊断：版本/设备/网络/后端连通性/
         // 崩溃与卡顿记录/一键复制导出/手动上报），崩溃日志查看导出在该页内，入口不再重复。
         .sheet(isPresented: $showDiagnostics) {
             DiagnosticsView()
-                .presentationDetents([.medium, .large])
         }
         // K 线 2026-10-06：本地模型管理弹窗已删。
         // K 线 2026-10-06：智能路由/上下文压缩/使用说明二级页（行内展开收进二级页）
         .sheet(isPresented: $showRoutingSettings) {
             routingSettingsPage
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         .sheet(isPresented: $showContextCompress) {
             contextCompressPage
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         .sheet(isPresented: $showAgentHelp) {
             agentHelpPage
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // v3.9.26：能力示例（5 种卡片形态展示，零后端、纯 App 内样例数据）

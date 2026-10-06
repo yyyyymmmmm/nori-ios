@@ -601,12 +601,10 @@ struct TasksView: View {
         // 关闭后重载：新建/编辑原先都要手动下拉刷新才看得到结果
         .sheet(isPresented: $showNewTask, onDismiss: { Task { await load() } }) {
             NewTaskSheet()
-                .presentationDetents([.medium])
         }
         // v3.9.40（#17）：编辑既有任务
         .sheet(item: $editingTask, onDismiss: { Task { await load() } }) { t in
             NewTaskSheet(editing: t)
-                .presentationDetents([.medium])
         }
         }
     }
