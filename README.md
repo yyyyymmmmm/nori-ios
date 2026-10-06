@@ -1,582 +1,78 @@
-# Nori（原轻聊 3.0）— 原生 iOS AI 助手
+# Nori — 你的自部署 AI 助手
 
-家庭 NAS 上的 AI 助手客户端，SwiftUI 原生（非 HTML 套壳）。App 是 **Hermes 服务的控制平面**：只对接一个 Hermes 服务（一个服务器地址、一个 API 面），不感知服务端内部的应用层/Hermes 引擎分层。
+像 Muse 一样好用，但跑在你自己的服务器上。
 
-iOS 26 原生液态玻璃 + 中性系统灰度。iOS 17+，SideStore 侧载分发。
+Nori 是一个原生 iOS 个人 AI 助手：聊天、记忆、健康、智能家居、语音朗读——所有数据都在你自己的服务上，不经过第三方云。想要 Muse 的体验，又想要数据的完全控制，Nori 就是答案。
 
-> 🔗 **后端**：配套后端服务在 [`github.com/yyyyymmmmm/nori-backend`](https://github.com/yyyyymmmmm/nori-backend)，Docker 部署，含 `docker-compose` + `.env.example` + 部署文档。
+## 为什么是 Nori
 
-> 本文档面向**接手开发/发版的 AI 代理**：读完可独立完成「改功能 → 自查 → 发版 → 交付」全流程。
+| | Muse / ChatGPT | Nori |
+|---|---|---|
+| 聊天、记忆 | ✅ | ✅ |
+| 健康数据整合 | 部分 | ✅（Apple Health / 华为运动） |
+| 智能家居控制 | ❌ | ✅（Home Assistant） |
+| 语音朗读（自选音色） | ❌ | ✅（小米/智谱/阶跃） |
+| 模型自由切换 | 固定 | ✅（多服务商、多模型） |
+| 数据归属 | 第三方云 | **你自己的服务器** |
+| 部署 | SaaS only | **自部署（NAS/服务器/Docker）** |
 
----
+**AI 不止聊天**：Nori 能操作——开关灯、设提醒、查设备、记笔记。你在对话框说一句，它调工具办了，不用给每个功能造页面。
 
-## 🚀 快速上手（开发环境）
+## 架构
 
-- 仓库默认分支：**`main`**（当前开发线）。`feature/redo-gray` 是 2026-10 重做期的分支，已合并入 main
-- 工程由 **XcodeGen** 生成（`project.yml`），源文件目录 `qingliao/` 整体 glob，**新增 .swift 文件无需改 project.yml**
-- `check_swift.sh`：Linux 下的 **swiftc -parse 纯语法检查**（全工程）。**⚠️ 只查语法不查类型/作用域/并发**——类型错误、方法插错 struct、@MainActor 违规只有 CI 编译才暴露（v2.0.90 实踩：方法误入 PasswordSheet struct，语法全过、CI 报 cannot find in scope）
-
-```bash
-./check_swift.sh        # 提交前必跑（输出"全部通过"）
+```
+┌─────────────┐      ┌──────────────────────────────┐
+│  Nori App   │─────▶│        Hermes 服务           │
+│ (控制平面)   │      │  ┌────────┐   ┌───────────┐  │
+└─────────────┘      │  │ Python │   │  Hermes  │  │
+                     │  │ 应用层  │   │  引擎    │  │
+                     │  └────────┘   └───────────┘  │
+                     └──────────────────────────────┘
 ```
 
-## 🔧 发版流程（唯一 CI 触发方式）
+- **App**：Hermes 服务的控制平面。一个服务器地址、一个 API 面。
+- **Python 应用层**：会话、记忆、任务、文件、TTS、看板等。
+- **Hermes 引擎**（`nousresearch/hermes-agent`）：跑模型和 agent loop，OpenAI 兼容。
 
-CI 只在 **`v*` tag 推送**时触发（分支 push 不触发；版本线现为 `v3.9.x`），产出 unsigned IPA artifact，并覆盖上传到 release `qingliao-ipa-2`（NAS/Hermes 从这里取包）。
+用户能配的东西（TTS 密钥、模型、Home Assistant）全在 App 里，**零 SSH**。
+
+## 功能
+
+- 💬 **对话**：流式 AI 聊天，语音输入/朗读
+- 🧠 **记忆**：文件夹式记忆管理，AI 自动沉淀
+- ❤️ **健康**：睡眠/心率/HRV/步数，Apple Health 同步
+- 🏠 **智能家居**：Home Assistant 设备控制、场景
+- 🎙️ **朗读**：神经语音，多厂商多音色，App 内配 key
+- 🔄 **模型**：多服务商（DeepSeek/OpenAI/…），App 内切换、隐藏
+
+## 🚀 快速上手
+
+- 默认分支：**`main`**
+- XcodeGen 工程（`project.yml`），`qingliao/` 整体 glob，**新增 .swift 文件无需改 project.yml**
+- iOS 17+，iOS 26 原生液态玻璃
 
 ```bash
-# 1) 版本号：project.yml **12 处**必须一致——3 个 target（主 App / QingliaoWidget / QingliaoShare）
-#    各 4 处（CFBundleShortVersionString / CFBundleVersion / MARKETING_VERSION / CURRENT_PROJECT_VERSION）
-#    grep -nE 'CFBundleShortVersionString:|MARKETING_VERSION:|^ *CFBundleVersion:|CURRENT_PROJECT_VERSION:' project.yml
-#    —— 12 行必须全是最新版本，否则崩溃日志版本误导定位（v2.0.53 教训）；CI 的 Check version literals 步骤
-#    会在 Archive 前用同一口径再判一次，并把 tag 名与 project.yml 版本对比
-#    ⚠️ 只改 CFBundle* 那一组、漏掉 MARKETING_VERSION/CURRENT_PROJECT_VERSION 是最常见的翻车姿势
-#      （两组键在文件里各 3 处，肉眼扫一遍容易只看前 3 处）—— bump 完**先跑 `bash bump_version_check.sh`**，
-#      它就是 CI 同款口径的本地自查，1 秒出结果，别用一次 15 分钟的 CI 去试错（v4.0.11 教训）
-#    新增 target（widget/extension）必须写它自己的 Info.plist 版本号，否则 XcodeGen 默认落 1.0/1（v3.8.0 教训）
-# 2) 自查（见下）+ ./check_swift.sh + commit
+# 1) 改完自查 + commit
+# 2) push 到 main
 git push origin main
+# 3) 手动触发 CI 出测试包（Actions → build-ios.yml → Run workflow）
 ```
 
-- **⚠️ 同 tag force push 不触发 CI**（GitHub 只认新建 tag）——失败重试必须**删远端 tag 重建**（`git push origin :refs/tags/vX`）或升新版本号
-- **⚠️ 发版前必须问用户**：本仓库是 **public**，Actions 的 macOS 分钟不占账号额度（旧纪录里写的「private 2000 分钟/月、10 倍扣费」已不适用），但一次构建仍要 15-20 分钟 runner 时间 —— **攒 2-3 个改动发一版**，别一个改动一次 tag
-- CI 失败排查：`GET /actions/runs/{id}/jobs` → job_id → `GET /actions/jobs/{id}/logs` → `grep -n 'error:'`（编译错误全在日志里）。**0 steps 失败 = 额度耗尽/基础设施**，有具体 error: 行 = 真编译错误
-- 构建成功 → 下载 workflow **artifact**（release asset 会停旧版，v2.0.85 教训）→ **解包校验 Info.plist 的 CFBundleShortVersionString == tag 版本**（双保险 + md5）→ 转存交付目录
-- 版本号未随 tag 升 = 用户装了新版但崩溃日志显示旧版（v2.0.53 教训）
-
-## 📋 编译前自查清单（每个改动必过）
-
-1. **新增/移动方法或属性 → 核对 struct 边界**：`grep -n "^struct \|^}"` 确认落点；方法插进别的 struct 语法合法但 CI 必挂（v2.0.90 实踩）
-2. **组件加参数 → grep 全部调用处**（v2.0.85 MeterCard 加 icon 漏 RouterPanel → CI 失败）
-3. **@AppStorage 同一 key 多处读取 → 默认值必须逐处一致**（不一致 = 显示状态≠实际状态，v2.0.45 教训；Siri 发光参数在 LiquidGlass + SettingsView 两处，默认值 1.0/2.2/0.18/22.0 必须同步）
-4. **复杂 ViewBuilder 表达式（字典索引+插值+嵌套+闭包）→ 拆独立子视图**，否则 "unable to type-check in reasonable time"（KBView/DockerSheet 教训）；ForEach 行内避免 `d["key"] as? X`
-5. **删除/重构用精确 patch，禁用正则批量删**（v2.0.83 误删 140 行教训）
-6. **改 UserDefaults 驱动的显示 → 用 @AppStorage 不用 computed property 直读**（否则设置改了界面不刷新，v2.0.48 教训）
-7. **Swift 6 并发坑速查**：
-   - PreferenceKey.defaultValue 必须 `static let`（v2.0.49）
-   - 全局可变缓存/单例（NSCache 等）→ `@MainActor` 隔离（v2.0.87f）
-   - 系统 delegate 协议（CLLocation/UNUserNotification）配 @MainActor 类 → conformance 交叉报错，改 `@unchecked Sendable` 非隔离类（v2.0.87w2）
-   - `.foregroundStyle` 三元两个分支必须是同一具体类型（.tertiary 与 Color 混用必编译错，v2.0.78）
-8. **新增 target / App 扩展（widget、extension）→ 三件事必做**：① 给它写 `info.properties` 的 `CFBundleShortVersionString`/`CFBundleVersion`（不写 XcodeGen 落 1.0/1）；② 主 App 要声明 `dependencies: [{target: X, embed: true}]`，`.appex` 才会编进 `Payload/*.app/PlugIns/`；③ CI 的 Verify 步骤会校验 `.appex` 精确路径 + `NSExtensionPointIdentifier` + 主 App `NSSupportsLiveActivities`（v3.8.0 建立）
-
-## 🏗 架构地图
-
-```
-QingliaoApp.swift        入口：登录门禁（auth.isLoggedIn ? DockTabView : LoginView）+ 崩溃上报 + Siri 发光根层
-Core/
-├── AuthStore.swift      登录/统一请求入口（网络分流）+ Face ID 凭据保存
-├── StreamClient.swift   流式轮询（0.15s 高频/0.4s 空轮询自适应，taskId+offset）
-├── ChatStore.swift      会话/消息（append/upsertAssistant/historyPayload）
-├── NetworkMonitor.swift 蜂窝判定（有 WiFi/有线接口绝不判蜂窝）
-├── SafariRelay.swift    蜂窝兜底（iOS 27 管控）
-├── KeychainHelper.swift Face ID 登录凭据（Keychain）
-├── Models.swift         ChatMessage（含 queued 排队标记）/ ChatSession / HAEntity
-├── CrashReporter.swift  signal-safe 崩溃上报（handler 内只用 POSIX + C 字面量；NSException→crash_pending.json，信号→crash_pending_sig.json + crash_stack.txt）
-├── ImageCache.swift     dataURL → UIImage（@MainActor NSCache）
-├── LiveActivityManager.swift    灵动岛/锁屏实时活动（本地 request/update/end；不持有 Activity 本体——Swift 6 sending 限制）
-└── LiveActivityAttributes.swift 实时活动共享属性（主 App 与挂件同编一份，改一处等于改两侧）
-Features/
-├── Chat/ChatView.swift  聊天页（发送/排队/分享/引用/图片查看/搜索定位）
-├── Chat/ChatComponents.swift  气泡/输入栏/组件
-├── Sessions/            会话列表
-├── Dashboard/           看板（智能家居 HA / NAS / 路由器 / Docker / 天气）
-├── Settings/            设置（连接/模型/外观/密码管理/知识库/AI 记忆/HA）
-└── Auth/LoginView.swift 登录页（Face ID 快捷登录）
-Theme/LiquidGlass.swift  玻璃主题 + SiriGlowOverlay（参数化发光）
-Theme/StateView.swift    首屏三态组件：LoadingStateView（骨架/转圈两档）+ ErrorStateView（空态仍用 EmptyStateView）
-QingliaoWidget/          挂件 Extension target（.appex）：灵动岛/锁屏实时活动 UI（ActivityConfiguration）
-```
-
-### 关键设计决策（改动前必读）
-
-- **iOS 27 蜂窝管控**：蜂窝下直连 POST 被系统拦截 → CFStream 直连优先、失败降级 Safari Relay（ASWAS 弹窗可接受，蜂窝可用优先）；**WiFi 绝不判蜂窝**（hasLAN 保护）。自动触发类请求（scenePhase 恢复重连）只走静默直连试探，**绝不走 relay**（否则每次回前台弹授权窗，v2.0.87ar）
-- **流式**：后端 stream_api 按 taskId 存内存+落盘，App 轮询；首 token 10-20s 属正常（上游 agent loop 思考），等待期必须有 TypingIndicator
-- **连续发消息（v2.0.88）**：AI 回答中发送 → 消息上屏标记 `queued` + 入 `pendingQueue` → 回答完成回调自动发下一条（复用已上屏消息，不重复插入）；停止按钮清队列；切换会话清队列。**禁止直接清空 messages 数组**（列表从有到无同帧 SIGTRAP 铁律：flag + ChatView onChange 两步走，v2.0.58）
-- **微信分享（v2.0.88）**：微信分享扩展不支持纯文本 → 图片消息分享原图 / 纯链接分享 URL / 文本渲染白底文字图片；iPad 必须有 popover 锚点
-- **Face ID 登录（v2.0.88-90）**：登录成功存 {server,username,password} 到 Keychain；登录页按钮开关开即显示（无凭据点击提示先登录）；设置开关打开时**立即申请系统权限**（失败回滚+提示）；`deviceOwnerAuthentication`（带密码回退）
-- **Siri 发光（v2.0.87bb→bn 定稿 + v2.0.91 参数化）**：RootView ZStack 顶层 zIndex(20)，只 `ignoresSafeArea(.top)`（全边会破坏底部 safe area 致 dock 偏位，v2.0.87bl 教训），GeometryReader 容器 + 顶部补偿；4 参数 @AppStorage：`qingliao_siri_glow_brightness`(1.0)/`_freq`(2.2)/`_amp`(0.18)/`_width`(22.0)，设置页滑条实时生效
-- **崩溃上报**：signal handler 只允许 POSIX open/write/close/getenv/strcpy + C 字符串字面量直写（任何 Swift String 构造都非 signal-safe）；完整栈走 NSException handler；崩溃信息下次启动 flush 上传
-- **列表崩溃三连排查**：①从有到无同帧 → VStack+分帧两步走；②TabView 隐藏页清空 → 换掉 .scrollPosition（PreferenceKey 方案）；③数组就地 removeAll + ForEach diff → 后端驱动 + load() 整体替换
-- **灵动岛 / 实时活动（v3.8.0）**：只做本地驱动（侧载免费签名拿不到 Push 能力，不做 APNs/push-to-start）；`LiveActivityManager` **不持有 `Activity` 本体**——存进 `@MainActor` 存储再 `await update/end` 会报 Swift 6 `sending 'activity' risks causing data races`，改为只存 Sendable 状态、每次从 `Activity.activities` 现取（且该列表最终一致，收尾空列表时等 600ms 再收一次）；计时用 `Text(_:style:.timer)` 交系统走（App 被挂起后文案不再刷新，这是设计内降级）；挂件与主 App 共用 `qingliao/Core/LiveActivityAttributes.swift`（同编一份，改一处等于改两侧）；开关 key `qingliao_live_activity`（默认开）
-- **实时活动收尾口径（v3.9.42）**：判「这条活动还在不在」一律走 `LiveActivityManager.isCollectible(_:)` = `active | stale | pending`，**严禁再写 `== .active`**。理由：`ActivityState` 共五档（Apple 文档核过，无 `.inactive`），而 `.stale`（本仓 `staleDate` +15min，App 挂起/强杀期间推手停摆必转此档）**画面仍挂在锁屏与灵动岛上**，只认 `.active` 会让 `finish()`/启动收敛/推手全部对它失明 → 僵尸活动永久留屏，且 `hasLiveActivity` 认不出它还会 `request` 出第二条（锁屏同时两行）；`.ended`/`.dismissed` 才是真没了（前者再 end 一次会打断既定收起时机，后者是最终一致窗口的闪现残留）。**收尾驱动必须有 App 级接收者**：`finish()` 原唯一驱动是 `ChatView.onChange(of: aiBusy)`，v3.9.41 把 aiBusy 按会话收窄后「切走那个 ChatView」就再也收不到它的完成信号 → 现由 RootView（常驻不销毁）观察 `stream.finishSeq` 调 `finishOrphanedRound(...)` 兜底，并在每次 `scenePhase == .active` 调 `convergeOrphanActivities()` 扫孤儿（靠不变量「`currentSessionId == nil` ⇒ 系统里那条一定是孤儿」，流式中回前台会被内部守卫直接 return，不会误杀）
-- **首屏三态（v3.9.42）**：新增页面的"这一屏还没内容"一律用 `Theme/StateView.swift` 的 `LoadingStateView`（列表结构可预测→`.rows(n)` 骨架；网格/分组→`.spinner(text:)`，别硬编假骨架）与 `ErrorStateView`（图标+标题+详情+重试），空态用既有 `EmptyStateView`。**不要**再手抄 `ProgressView()` 或"加载失败+重试"那 20 行。**行内"操作进行中"的小转圈（保存按钮、ping、刷新）不在此列**——那类要原地 14pt，换骨架会撑跑布局
-- **减弱动态效果（accessibilityReduceMotion）**：任何循环/帧源动画必须有静态档——`repeatForever` 走 `reduceMotion ? nil : …`，`TimelineView` 呼吸层（Siri 边框光 / 灵动岛光）走"不建帧源、按正弦中值定稿一帧"，Metal 头像（`LiquidOrbAvatar`）走 `freezesMotion`（播完状态过渡即 `isPaused` 冻成静态图）。关键帧反馈（发送键 `sendPulse`）用 `trigger: reduceMotion ? 0 : tick` 关掉
-- **聊天附件只发引用、不发全文（v3.9.44）**：`sendFile` 上传成功后消息正文只写 `[文件: 名字]（已上传 NAS：doc=<服务器 saved 名>）`，**不再**在客户端提取正文（原 txt/md 直读、PDF 走 PDFKit，各截 12000 字拼进消息）。根因：拼进正文的全文会随历史落库，之后**每一轮都重发给模型**（token 每轮重付 + 上下文被挤爆），而 docx/xlsx/pptx 客户端不提取、AI 反而读不到。现在正文由后端 `doc_ref.py` 在组装 prompt 时按需读原件（最新 user 轮全文、更早轮节选），App 端 `extractPDFText` 已删。⚠️ **上线顺序**：后端必须先于本 App 版本部署，否则 AI 只看得到文件名；`saved` 缺省（老后端不回该字段）时退回无 `doc=` 的旧标记
-
-- **登录成功「卡片飞成首页」的交接窗口（v3.9.45）**：`RootView` 的门禁**不能**写成 `if isLoggedIn { Dock } else { Login }` —— 登录页自己的退场演出（0.2s 延迟 + 0.45s 上浮淡出）会在 `isLoggedIn` 翻真的那一帧被整块摘掉，用户只看到硬切。现在是 `if loggedIn { Dock }` + `if !loggedIn || loginHandoff { LoginView(revealed: !showSplash) }`：登录成功后 `loginHandoff` 让本页**多挂 0.95s** 演完再撤，`zIndex(loggedIn ? 2 : 0)` 保证它压在 DockTabView 之上但**在 AppLockView(5) 之下**（登录页永远不许盖住锁屏），并 `.allowsHitTesting(!loggedIn)` 让半透明的旧卡片那 0.95s 不吃点击。三个坑：① 递延倒计时由 `revealed: !showSplash` 驱动而不是 `onAppear`，否则整段进场被 0.6s Splash 盖住；② `reduceMotion` 下 `loginHandoff` 恒 false，走改动前的瞬间切换；③ 登录页的失败抖动是 `keyframeAnimator(trigger:)`，`errorMessage` 变化才 +1，静态档传 0 常量
-
-- **iOS 26 系统玻璃的三条口径（v3.9.46 立，v3.9.47 补，v3.9.48 判终）**：① **空的 `ToolbarItem` 照样会拿到一层玻璃底**——条件按钮必须把 `if` 写在 `ToolbarItem` **外面**（一个 ToolbarItem 包两个 `if` 的写法，两个条件都不成立时残留一枚无文字空胶囊，即任务中心那个 bug）；② tab bar 的玻璃是系统自绘的（v3.0.64 起无自绘 DockBar），**`.toolbarBackground(.hidden, for: .tabBar)` 真机实测无效**（v3.9.46 上的方案 A，用户 2026-09-21 判「玻璃还在」）——iOS 26 只褪背景色、玻璃层照旧，别再当开关用；③ **UIKit 那条路也走过了，同样真机判无效**（v3.9.47 方案 B：`TabBarGlassProbe` 把真实 `UITabBar` 的 `standardAppearance/scrollEdgeAppearance` 换成 `configureWithTransparentBackground()` 副本）→ v3.9.48 用户判「回滚」，`Features/TabBarGlass.swift` 整块删除。**这就是终点：不再有第三条方案**，A/B 都不要复活。**两条红线不变**：不在 TabView 下层铺不透明色（掐死所有页的滚动边缘折射，v3.4.29）、弹窗背景不覆盖系统材质（v3.9.23）
-- **弹窗内的卡片不用实色底（v3.9.47）**：`.dashboardCard()` 的 `secondarySystemGroupedBackground` 铺在**弹窗**那层系统材质上等于盖白板 → 弹窗里一律 `.frostedCard()`（`ultraThinMaterial` + 16 圆角 + 0.8pt 描边 + 两层柔影，卡形与 `dashboardCard()` 同参）。**注意与 `GlassListCard` 的浅色档区分**：那是 `Color.white.opacity(0.85)`，用户明确不要白底。看板/生活页的**网格卡不受本条约束**，仍走 `dashboardCard()`
-- **滚动性能口径：`onScrollGeometryChange` 的投影必须"夹成常量"**（v3.9.48 立）：这条 API **只在投影值变化时**才调 `action`。所以投影表达式里凡是"正常滚动期间逐帧都在变"的量（典型：`contentOffset.y - bottomMax`，未过拉时是负数且每帧不同）**必须在投影里就夹成常量**（`<= 0 ? 0` 再取整），否则等于每帧回调 + 每帧写 `@Observable`——**Observation 不做等值比较，写同值一样标脏读它的视图**。聊天页那颗 `ultraThinMaterial` 上拉胶囊就这么被整场滚动期标脏过（v3.9.48 修）。判定用的 Bool 投影天然边沿触发，不受本条约束。**同一族的第二刀**：常驻视图（dock 智慧球 5 个 tab 全程可见）里"每帧变化的内容 + `.shadow`"= 每帧重算阴影。**但这一刀先过观感再动手**——v3.9.48 把智慧球阴影静态化，真机判"气色掉了"，v3.9.49 回滚：那层脉动投影是资产，不是免费的性能预算（v3.2.3 输入框那条讲的是"每帧变化的渐变+阴影"卡死，代价口径不同）
-- **装饰链上的 `.animation(value:)` 必须放在最后一个会随它变化的图层之后**（v3.9.49 立，真机「输入框有两层重叠在一起」）：`.animation` 只对它**上游**的图层生效，写在中间就等于让后面的图层"瞬时跳变"——同一形状被两层 overlay 各画一遍时，一层插值一层不插值，观感就是两圈错开的轮廓。**v3.9.53 修正**：当时配套的"一个容器只画一圈边"是**过度收敛**（把 v3.4.20 那两层各画各的白边/蓝边合并掉），输入栏定版仍是 v3.9.46 的两层写法，因为真正错开的是**形状**（方角 vs 胶囊）而不是层数；`.animation(value: focused)` 依旧排在蓝边之后、阴影之前。**仍然有效**：玻璃里不再套玻璃（内层小胶囊要底色 + 细边，不要再 `glassEffect`）
-- **`barShape.glassEffect()` 是错的用法：玻璃形状只认 `in:` 参数**（v3.9.51 定稿，Apple 文档实证签名 `glassEffect(_ glass: Glass = .regular, in shape: some Shape = DefaultGlassEffectShape())`）。这条纠正了 v3.9.50 记的那句"glassEffect 不跟圆角插值"——**真实成因不是动画**：把修饰符挂在形状视图上时，`in:` 走默认值 `DefaultGlassEffectShape`，玻璃按系统默认形状画，`barShape` 只贡献了 bounds、那 22pt 根本没进渲染；再叠上容器自身那圈 `.shadow`（沿布局边界投影），就是"内圈大圆角 + 外圈方角"两圈。**正确写法：玻璃直接挂在内容上，形状显式传进去** —— `.padding(...).glassEffect(.regular, in: barShape)`，描边/流光 overlay 复用同一个 `barShape`，两圈不可能再错开。全仓可用先例：`Pill.swift` 的 `.padding(...).glassEffect(.regular.interactive())`（那些胶囊从没出过两圈）。⚠️ 当时顺手记的"玻璃容器外面不再另画 `.shadow`"**已被 v3.9.53 撤回**：输入栏回到 v3.9.46 的 `Capsule` 玻璃 + 容器 `.shadow(0.3/14/5)`，真机没有再报两圈 —— 说明外圈轮廓只在**玻璃形状与容器边界不一致**时才会露出来，阴影本身无罪（但"阴影必须排在流光 overlay 之前"这条 v3.2.3 红线照旧）
-- **多行 `TextField` 的最小行数只能是 1，别用 `lineLimit(2...6)` 撑"更大的输入框"**（v3.9.52 立，本仓踩过两次）：`axis: .vertical` 的字段里**占位符按整块高度居中、光标坐在第一行**，最小行数 > 1 就必然错开半行（真机原话「光标不居中了」）。v2.0.35 已为此把 `2...6` 改回 `1...6`，v3.9.48 为"点输入框时变大"又改回去，v3.9.52 再改回来。要输入框长高就走**内容驱动**（`1...N` + `fixedSize(horizontal: false, vertical: true)`），不要预留空行
-- **两态换布局容器（HStack ↔ VStack）会重建 `TextField` → 键盘"弹一下又收回"**（v3.9.50 立，v3.9.51 真机判死并回退）：SwiftUI 的视图身份按结构路径算，把 TextField 从 HStack 的第二个子挪到 VStack 的第一个子 = 换父级 = 重建，重建瞬间掉 first responder。**⚠️ 换门控救不了**：v3.9.50 把 `expanded` 从 `focused` 换成 `kbEnv.isVisible`（系统通知驱动，理论上没有反馈回路），真机 495 报障照旧——因为回路不在 `focused` 上，在**键盘自身**：视图重建 → 承载 TextField 的 UIKit 视图被换掉 → 键盘跟着收。**唯一有效的口径是容器不换**：两态共用同一个 `HStack`，展开态只改属性（高度随内容走）；要插条件子视图就插在 TextField **之后**（TupleView 里 TextField 的 index 不变，身份稳定）。同一族的历史坑：v2.0.98 发送键"两个手势叠着改视图树"实测 SIGTRAP
-- **聊天输入栏的定版样式 = v3.9.46 那条 Capsule 链**（v3.9.53 用户拍板：「输入框样式还是改回 3.9.46 版本的样式吧，现在的不行，在 3.9.46 基础上加上模型切换就行」）：`.padding(...) → .background { Capsule().glassEffect() } → .overlay { Capsule().strokeBorder(blue, focused ? 0.45 : 0) } → .animation(value: focused) → .shadow(0.3/14/5) → .overlay { 流光 / 常态白边 } → .padding(.horizontal, 18)`。**v3.9.48~52 那五轮全部作废、不要复活**：展开态换布局、`Radius.hero`(22) 方角 `barShape`、`rimLight` 内缘高光、`.clear` 玻璃档、合并成单圈描边。**上面三条 API/身份口径依然成立**（`in:` 参数、最小 1 行、不换容器），只是它们各自引出的**那版视觉**被否了——"两圈"的真因是方角 `barShape` 与系统默认胶囊玻璃**形状不一致**，回到全 Capsule 就没有第二圈，容器那圈 `.shadow` 也就可以留（v3.2.3 的"阴影必须在流光之前"仍照守）。**改输入栏只允许改属性，不许换形状/容器/图层拓扑**
-- **详情弹窗里的卡片一律用 `DiskTile` 那一族排布**（v3.9.54 用户三次点名"卡片形态抄磁盘分区卡片"）：`HStack { 名称(13 secondary) + Spacer + 右上类型(13 bold primary) } → 大数值(20 bold, minimumScaleFactor 0.7) → 4pt 进度条（只在数值本身是百分数时画）→ tiny(10) 说明一行 lineLimit(1) .middle`，外层 `.padding(Spacing.xl) + .frame(maxWidth: .infinity, alignment: .leading)`。**表面仍用 `.frostedCard()`**（v3.9.47 那条压过"抄形"的字面要求：圆角/描边/阴影与 `dashboardCard()` 同参，只差底色；要换成实色只改 `HADeviceTile` 这一处）。温度这类"有数值但没有天然分母"的量**不作假进度条**（不按 0–100℃ 硬算 ratio），改由颜色分档
-- **看板卡片点不弹窗是产品决定，不是遗漏**（v3.9.54：CPU / 内存卡取消弹窗）：整机资源这类"看一眼就够"的指标不做二级页，弹窗留给有明细可展开的对象（容器、服务、设备实体）。新增/删除二级页时 `DashboardSheet` 枚举与 `.sheet(item:)` 的 switch **两处必须一起改**，穷尽性由编译期兜住
-- **实时活动的 `staleDate` 不是"容忍度"，是"最长假进度时长"**（v3.9.54 立）：免费签名无 APNs ⇒ 进程冻结后没有任何人替我们 update，画面会停在最后一拍。所以「多久转 `.stale`（→ 系统可收起）」就是「僵尸活动最多还能骗用户多久」。活着时推手每 1.2~2.0s 一拍、每拍都带新 staleDate 重新 update，因此把它从 15 分钟压到 4 分钟对正常显示毫无影响，只砍掉挂机的 11 分钟
-- **流式协议加字段一律"可选 + 缺省退化"，不 bump 版本**（v3.9.57 立，NAS 侧 `1c8fbaf` 的实现口径）：`AuthStore.streamPoll` 的返回元组直接扩参（`+toolSpans +lastToolAt`），后端没这两个字段时前端退化成"显示已等 Ns、不显示实测耗时"，而不是报错或空屏。iOS 与后端**分开发版**（NAS 镜像重建有先后），这条是两侧唯一的安全垫；新增字段照此办理，别引入要求"后端必须先于 App"的硬依赖
-
-## 🆕 近期变更（v3.9.77，2026-09-25）
-
-> 用户装机后逐条报的界面问题（语音对话页 4 条 + 大爆炸底部条 1 条）。基线 = `df45801`（3.9.76 / 521）。
-
-**语音对话页**
-- **跟随系统深浅色**：原来按深色稿写死了深色底、并强制整个页面用暗色环境，浅色模式下这页仍是全黑。现在底色走系统
-  语义色 + 一层主题色柔光（深色 / 浅色分别调强度），文字全部改用语义色，两套主题下对比度都成立。
-- **球体视觉居中**：三圈涟漪与球本来就是同心的（同一容器中心对齐），看着偏是因为球的白色高光画在左上角 ——
-  人眼会把最亮处当成球心。高光点挪到接近中心后视觉重心回正。
-- **波形跟随人声起伏**：波形原来是「不管说没说话都一样的固定高度数组」，现在改成一条随时间流动的渐变波浪线 ——
-  振幅接识别引擎的真实麦克风电平（安静时留一点呼吸、说话时按音量起伏），并且只在收音阶段响应，念回复时安静。
-- **AI 文字逐字跟随朗读**：系统语音走引擎的精确逐字回调；云端语音播的是音频文件、没有逐字回调，按播放位置估算推进
-  （标点停顿处会有轻微偏差，属于该方案的固有限制）。屏幕上只显示已经念到的字，与听到的保持一致。
-
-**大爆炸（文本炸开）**
-- **底部胶囊统一尺寸**：原先「复制」用的是另一套更大的胶囊尺寸（v3.9.72 为强调主操作而设计），在同一排里高出一截。
-  现在 5 颗胶囊统一尺寸口径，主次改用颜色区分。
-
-**长按智慧球菜单**
-- **背景改全屏半透明模糊**：原来的遮罩只有一层很淡的黑纱，且没有铺到安全区 —— 上下露出原页面的白、中间发灰。
-  现在整屏铺一层超薄材质模糊，深浅色自适应，点空白收起照旧。
-- **6 颗胶囊大小统一**：宽度此前随「图标 + 文字」自适应，六颗宽窄各异；现在按统一的胶囊尺寸口径渲染。
-
-**护栏**
-- 真值表断言钉住上述口径（「球高光必须接近球心」「波形不得回退成固定高度数组」「底部条不得再混用另一套尺寸」
-  「菜单遮罩必须走材质模糊」等），并对每条口径做了反向自证：逐条改回旧形态时对应断言必须点名报红、还原后回绿。
-
-## 🆕 近期变更（v3.9.76，2026-09-25）
-
-> 用户逐个报的 App 问题（6 条）+ 长按智慧球新增两个功能胶囊。基线 = `5162f54`（3.9.75 / 520）。
-
-- **长按智慧球：4 颗胶囊 → 6 颗，新增「AI 识别」「语音对话」**（`Features/OrbQuickMenu.swift` 几何重排 + 新文件 `Features/OrbIdentifyOverlay.swift`、`Features/VoiceDialogView.swift`、`Core/VoiceDialogEngine.swift`、`Features/DockTabView.swift` 接线）。
-  布局改为**两排各 3 颗**（`columnDX` 64→118）：下排 新建会话 / AI 速记 / 今日待办，上排 AI 识别 / 语音对话 / 语音输入；
-  `OrbQuickMenuLayout.center` 改 6 位公式（`i % 3` 取列、`i >= 3` 为上排）。`id` 是语义标识（`handleOrbAction` 按它分发），与数组顺序解耦。
-- **「AI 识别」= 球上悬浮结果卡 + 球心扫描环 + 背景虚化**（用户从方案稿选定的变体 2）。点胶囊 → 拍照/相册 → **直接识别**，
-  不再需要「先选图、再点识别」两步。刻意**不新造第二套**：认内容走 `IntentExtractor.extract(image:auth:)`（与聊天页同一条管道）、
-  结果与动作直接嵌 `IntentActionBar`（类型徽标 / 动作胶囊 / 点即写 / 5 秒撤销 / 低置信只给问 AI·复制）、
-  「问 AI」复用既有 `.qingliaoTaskSend` 通道（与任务中心、备忘录「发给 AI」同一条路）。相机两道闸沿用：
-  `isSourceTypeAvailable(.camera)` 先查可用性、内容 `ignoresSafeArea()`；无相机设备自动走相册。**没认出内容 ≠ 失败**（给「重拍 / 换一张」，不报红）。
-- **「语音对话」= 全屏涟漪页 · 深色科幻**（`VoiceDialogView` + `VoiceDialogEngine`）：闭环 = 说 → **停顿 2 秒自动发**（也可点「发送」，两种模式顶栏可切）
-  → AI 回 → 自动朗读（**念全文**）→ 念完自动续听。三条复用：判断全在 `VoiceDialogEngine`（纯逻辑、可本机真值表）、
-  发送走 `.qingliaoTaskSend` → `ChatView.sendCore`、朗读**借用聊天页的自动朗读**（进页临时打开 `qingliao_auto_read_reply`、**退出还原原值**，不偷改用户设置）。
-  **半双工**：念的时候停麦（本仓录音走 `.record`、朗读走 `.playback` 是切换式的，全双工需 `.playAndRecord` + `.voiceChat` 做回声消除，
-  不改音频会话硬上全双工会把自己的朗读录进去 → 自问自答）；想打断点「打断」（停朗读 → `speakingID` 归 nil → 引擎自动续听）。
-  兜底：等待回复 25 秒未开始念 → 回收音（防麦克风永久锁死）；同一段文本重复回调**不刷新判停**（否则永远攒不满）。
-- **点「轻聊投递」会话回归普通会话**（`SessionsView.open(_:)`）：v3.9.75 的「按标题分流进任务中心」被用户实测否决，
-  已移除 `showTaskCenter` + `TaskCenterView` 呈现 + `open(_:)` 标题特判；`open(_:)` 恒为 `markRead` → `chat.load(s)` → `onOpenSession()` 三步。
-  **类级：入口落点以用户预期为准，别拿「收件箱归宿是 X」覆盖用户的直接诉求；判定用稳定 id 不用标题。**
-- **投递壳不再混入 AI 推送气泡**（`ChatStore.DELIVERY_SESSION_ID` + `InboxStore.consumeOne` 闸门）：分层定责结论 = 后端
-  `inbox_api.push` 只把 `task_type in (cron, system)` 写进固定投递会话（刻意排除 reply/progress），**漏点在 App**——
-  `consumeOne` 把 progress/reply 无条件注入「当前会话」。修法：按 **id**（`qingliao_delivery`，与后端 `sessions_api.DELIVERY_SESSION_ID` 同源）
-  识别投递会话并拦注入，reply 仍弹通知、cron/system 不受影响。
-- **进度推送保序**（新 `Core/InboxProgressOrder.swift` + `InboxStore` 接线）：后端进度快照本身单调，乱序来自**投递层重投**
-  （App 拉到未确认的旧快照被后端当「僵尸」重置回队列）。App 侧加**严格前进**判据（步数变大或同步数字数更多），
-  迟到旧快照丢弃但**必须确认**（否则后端持续重投）；比对**按来源任务分组**（`toolSeq` 每任务独立计数，跨任务比会误丢新任务第一条）；
-  重启后分组表为空时用会话里**15 分钟内**最后一条进度气泡兜底。
-- **剪贴板识别口径放开**（`ClipboardIntentDetector` 8 类 detection pattern：链接/地址/联系方式/金额/快递单号/时间等，**刻意不含纯数字**）+
-  **两个探测器解耦**（原来 guard-let 串联，位置探测失败会吞掉整链 → 「连第一次都不弹」），点「识别」读不到剪贴板时**出声**（震动 + 2.4 秒提示）。
-  硬边界：**只扩 pattern、绝不主动读剪贴板内容**（主动读会弹系统「允许粘贴」授权窗——正是该功能要避免的打扰）。
-- **长按智慧球的胶囊「点好几次才跳转」**（`OrbQuickMenu.swift`）：根因 = 点击手势与**入场位移动画挂在同一个视图**上，
-  SwiftUI 的命中测试跟着布局动画走，弹射/错峰入场那几百毫秒里点到的是「途中的位置」。改为**视觉层与命中层分离**：
-  动画层 `allowsHitTesting(false)` 不吃事件，点击交给位置固定在终点、不参与任何动画的透明层；并加首次点击锁定防连点。
-- **护栏**：智慧球菜单表 **138 条**（含 6 颗几何 + 两个新页面的形态断言）、新增「语音对话轮次」表 **24 条**（`check_swift.sh` 第 19 步）、
-  入口行为表 27 条、进度顺序表 21 条、剪贴板表 32 条。六维反向自证全过（几何取模改回 %4 / 判停缩到 0.5 秒 / 删重复回调判重 /
-  删兜底超时 / 放开发音阶段 / 虚化改纯色，各自精准报红）——自证中抓到一条**假护栏**（表内几何是镜像计算，只绑常量字面量时源码公式改了不报红），已补公式级绑定断言。
-- **🔍 CI 前双路只读审查的修正（3 个编译级 + 8 个真缺口，全部已修）**：
-  - **剪贴板 detection API 是按「类目名」猜错的（编译必挂）**：`UIPasteboard.DetectionPattern` 只有
-    `.number` / `.probableWebSearch` / `.probableWebURL` **三个**成员；`detectedValues(for:)` 收的是
-    **key-path 集合**（`Set<PartialKeyPath<UIPasteboard.DetectedValues>>`），字段是**复数数组**
-    （`postalAddresses` / `phoneNumbers` / `emailAddresses` / `moneyAmounts` / `shipmentTrackingNumbers` /
-    `calendarEvents` / `links`），**没有** `dateTime`。改成 key-path 形态 + `!values.xxx.isEmpty` 判命中。
-    类级教训：**别按语义猜 Apple API 的成员名**，先翻文档页的 Topics 列表。
-  - **`guard let result = await IntentExtractor.extract(text:auth:)` 编不过**：文本重载返回**非可选**
-    `RecognizedIntent`（可选的是 image 重载），那个 guard 是死分支，已删。
-  - **语音页发送依赖 ChatView 在视图树**：`.qingliaoTaskSend` 的唯一接收方是 `ChatView.sendCore`，
-    「全念」的触发点在 ChatView 的 `assistantLandedToken` —— 球在任意 tab 都在，不先切聊天页就
-    **消息静默消失 + 一句也不念**。已照 case 2/4 补切页闸。（类级：**跨页通知通道必须同时保证接收方在树**。）
-  - **`Action.sendNow` 语义补全为「发出 + 停麦」**：原来只在 `speechStarted` 才停麦，发送到开口那段
-    最长 25 秒仍在收音，且停麦的音频会话收尾 `setActive(false)` 会与朗读起播抢时序**把刚开口的念读掐掉**。
-  - **超时兜底之后仍要能停麦**：等回复 25 秒超时会退回 `.listening` 重新开麦，而 AI 可能**这时才开始念**
-    → 麦克风与扬声器同开、录到自己的朗读 = 自问自答。用 `awaitingSpeech` 记住「这轮还没念过」。
-  - **退出停麦判据含 `isPreparing` 且改用 `cancel()`**：`isRunning` 直到起麦那刻才 true，准备期
-    （首次权限框 / 下语音模型）点退出会直接 return，随后 `start()` 跑完在**页面消失后**开麦 → 残余收音；
-    而这一页是全仓唯一停麦调用点。退出另外补 `SpeechManager.shared.stop()`（否则「关了自动朗读还在响」）。
-  - **进度闸门只信同任务的内存快照**：原实现 `sourceTaskId ?? "unknown"` 让两个无 id 的任务共用桶
-    （A 的 20 步之后 B 的第一条被判迟到→丢弃+markDone，**进度永久丢失**），重启兜底拿「会话里最后一条
-    进度气泡」当基准同样跨任务。改为**拿不到 source_task_id 就整段放行**——宁可偶尔乱序，绝不丢数据。
-  - **语音页两处编译隐患**：补 `import Combine`（`Timer.publish` 属于 Combine）；`ticker` 收进 `@State`
-    （View 重建会换 publisher → 0.25s 判停定时器被反复重启 = 「说完不自动发」）。降级文案带
-    `liveSpeech.lastError`，准备期显示「正在准备语音模型…」（那段时间麦克风其实还没开）。
-  - **护栏自身的两个毛病**：`test_clipboard_gate` 原来把**编不过的假 API 名**钉成正确形态（护栏成了事故源，
-    已按真实 API 重钉 + 正则负向前瞻防 `\.postalAddresses` 被子串喂饱）；「识别失败出声出口」是**计数代理**
-    断言（已注明下限语义）；`ql_entry` 四条排除式断言从「声明形态串」改成**裸标识串 + 剥注释**（改个名躲不掉），
-    「问 AI」「扫描环」等断言全部**切片**到具体闭包/函数体内。
-- **⚠️ 需真机验收**：涟漪节奏与收音启停时机、结果卡离球距离、6 颗胶囊是否挤、自动发送会不会被环境音打断、剪贴板提示条实际观感、进度推送顺序。
-- **⚠️ CI 风险**：新增两个页面用到 UIKit（相机浮层）与新 SF Symbol（`text.viewfinder` / `waveform.circle.fill`），本机无 Xcode 编不了，只能靠 CI Archive 兜底。
-
-## 🆕 近期变更（v3.9.75，2026-09-25）
-
-> 用户一轮报的五个 App 问题，一次修完发版。⚠️ 编号口径：v3.9.59~v3.9.74 由 NAS 侧自行发出，**本仓 README 没有对应变更段**，
-> 本段是 v3.9.58 / 503 之后的第一段。基线 = `ca6a181`（3.9.74 / 519）。
-
-- **会话列表红点不再"每次重开 App 全亮"**（`ChatStore.syncUnread`）：原实现把"已读时间"存在内存里（`seenTimes` 是普通字典，冷启动即空），
-  于是冷启动第一轮 `syncUnread` 拿 `lastTime > (seenTimes[id] ?? 0)` 比对，**所有会话都判未读**。修法：
-  ① `seenTimes` 落 `UserDefaults`（键 `qingliao_seen_times`），`loadSeenTimesIfNeeded()` 惰性读一次；
-  ② **首轮只建基线不点灯**——`hasSeenBaseline` 为假时把现有会话的 `lastTime` 直接写进 `seenTimes` 并清 `unread` 后返回，
-  红点只在"基线之后真的来了更新的会话"时才亮；③ `markRead` 里 `loadSeenTimesIfNeeded()` **必须在写入 `seenTimes[id]` 之前**
-  调用，否则会用空字典覆盖掉刚写入的那条（实现时踩过一次，已纠正并留注释）。
-- **输入框展开态附件/相机图标 22 → 26**（`ChatInputBar.attachButtons`）：字号走 `Typography.body`、视觉面 `frame(width: 26, height: 26)`、
-  外扩仍 `.hitArea44(h: 9, v: 9)`（26+9×2=44，HIG 最小可点尺寸不变）。容器配套常量：第二层 `toolRowMinHeight` 38（=26+6×2）、
-  展开态 `containerMinHeight` 88（42+8+38）。第一层（发送键 32×32、行高 42、间距 `Spacing.md`）**未动**。
-  `scripts/ql_inputbar/truth_table_inputbar.swift` 已按新几何重写；⚠️ 两处"计数型"断言改为**只在 `attachButtons` 段内计数**——
-  转写取消那颗 xmark 早就是 26×26 + `hitArea44(h: 9, v: 9)`，全文件计数会误判。`toolRowVisualMirror = 22` 与
-  `brokenCollapsedMirror = 72` 两条**故意冻结**，是 v3.9.68 事故的证据，不要"顺手对齐"。
-- **AI 聊天里的待办自动进生活页清单**（`TodoItem.extractCardItems` + `TodoStore.addAuto`）：原 `extractChecklist` 只认
-  Markdown 的 `- [ ]` / `- [x]` 文本，而 AI 的结构化结果自 v3.9.31 起走 ` ```ql-card ` 围栏（后端 `QCARD_PROMPT` 明确
-  "多步骤任务收尾用 `type=plan`"），于是卡片里的步骤一条都进不去。新增 `extractCardItems(from:)`：`kind == .plan` 直接取全部
-  `Item`，`kind == .list` 要求 title+subtitle 命中"待办/任务/todo/计划/安排/清单"才收（防把设备列表当待办），
-  done 判定 = `tone == .ok` 或 status 含"完成"。v4.0.25 确认制：提取结果不再静默落库——`TodoStore.stageCandidates`
-  只挂候选账，气泡下的确认卡（`TodoConfirmCard`）等用户勾选点「加入」才经 `confirmCandidates` 进清单（「忽略」则不再弹）。
-  `extractChecklist` **原样不动**（NAS 侧有真值表守着它）。
-- **拍照界面顶部黑边 → 改全屏呈现**（`ChatView.swift:1056`）：`CameraPicker` 的 `.sheet` 换 `.fullScreenCover`。
-  UIKit `UIImagePickerController` 放在 sheet 卡里时顶部留出一条不属于它的容器间隙；`CameraPicker.swift` 的
-  Coordinator 自己 dismiss，故只改呈现容器，回调逻辑不动。
-  ⚠️ **v3.9.76 修正**：只换呈现容器不够——`fullScreenCover` 的内容视图默认被约束在安全区内，取景层只铺满这个内缩矩形，
-  顶部状态栏高度（≈59pt）露出的仍是宿主黑底，用户复报「系统相机顶部有黑边」。已给相机内容补 `.ignoresSafeArea()`。
-- **点"轻聊投递"会话不再跳进 AI 聊天的推送消息**（`SessionsView.open(_:)`）：该会话是推送投递的落地壳，`chat.load(s)` 后
-  进 `ChatView` 会把 `InboxStore` 的 push 混在对话里。改为标题命中时 `showTaskCenter = true`（`.fullScreenCover` 呈现 `TaskCenterView`），
-  并照常 `markRead` + `Haptics.tap()`。⚠️ **命中口径是 `s.title.contains("投递")`**：三仓里不存在"轻聊投递"字面量，后端会话条目也没有
-  channel/source 字段（只有 `id/title/messages/updatedAt`），所以只能按标题路由——**服务端改名会失配**，届时改这一处判定即可。
-  ⚠️ **v3.9.76 已回退**：用户实测否决（「从轻聊投递会话点进去应该跳到会话内容看到投递信息详情，而不是跳到任务中心」）——
-  投递会话回归普通会话路径（`open(_:)` 不再按标题分流；`chat.load` 后那 7 条投递消息就是用户要看的内容）；
-  任务中心仍有常驻入口（聊天页 header）。
-- **⚠️ 需真机验收**：2（展开态图标观感与第一层是否被挤）、4（相机是否真全屏）、5（投递会话点击落点）。
-  1 与 3 有逻辑口径可自查，但红点基线依赖"升级后第一次冷启动"这一次性动作，**删 App 重装才算干净验证**。
-  本机无 Xcode：全工程 `swiftc -parse` 通过（150 个源文件），真值表**本机跑不了**（脚本要 NAS 的 `/opt/data` 环境，
-  本机 scoop swiftc 编译 Foundation 脚本必然 `stdlib.h not found`），需 NAS 侧执行。
-
-## 🆕 近期变更（v3.9.58，2026-09-22）
-
-> **这一版才是 v3.9.57 那两笔 NAS 提交（`1c8fbaf` + `343dac4`）真正落到手机上的版本。**
-> `v3.9.57` 的 tag 推上去后 CI 在第 7 步 **Archive (unsigned)** 失败（14:20:57Z → 14:23:26Z），
-> **没有产出任何 IPA、也没覆盖 release 资产** —— 所以 `qingliao-ipa-2` 上挂着的仍是 3.9.56 / 501 的包。
-> 本机没有 Actions 日志读取权限（匿名 API 拿不到 log，仓库无 token），失败点靠读这两笔 diff 定位。
-> ⚠️ 编号口径：NAS 侧注释自标 `v3.9.58`，这一版**恰好对上**（3.9.57 那个号被一次没出包的构建占掉，不再回收）。
-
-- **修掉 Archive 编译失败：定时任务卡的数据加载回到卡片自身**（`10e42f4`）：
-  - **成因**：`343dac4` 把 `loadAutomations()` 写成 `extension LifeView`，但函数体读的是 `AutomationsSection` 的
-    `@State items / loadError`（LifeView 上没有这两个属性），而且 `LifeView` 的 `auth` 是 `private`——
-    **`private` 只对同一文件内的 extension 可见**，跨文件这段必然 `cannot find in scope`。
-  - **改法（保持原设计意图，最小改动）**：卡片自己持有加载逻辑与状态，`body` 外层套 `Group` 后挂
-    `.task(id: isActive)`；`isActive` 由 `LifeView` 直传（`AutomationsSection(isActive: isActive)`），
-    `LifeView.task` 里那两行 `await loadAutomations()` 删掉。**刷新节奏仍 30s、切走 tab 仍立刻停轮询**
-    （「隐藏页零轮询」那条红线没动，见 LifeView 文件头注释）。
-  - **教训**：`extension 另一个类型的文件` 是 NAS 侧提交的第一类真编译错误（本机 `swiftc -parse` 只查语法、
-    看不见作用域与访问级）。以后接手跨页取数的 UI 提交，先问一句「这个 `func` 读的 `@State` 在谁身上」。
-- **同批第二处 Archive 阻塞：`MessageBubble` 的闭包声明序**（读 `7afaa23` 时预判、未等 CI 报）：
-  `7afaa23` 把 `var onQuoteTap` 声明在 `onAIImageTap` 之后，而 `ChatView.chatMessageBubble` 的调用点按
-  `onQuote → onQuoteTap → onDelete …` 传参。**Swift 要求带标签的尾随闭包严格按声明序**，这一对错位就是
-  `closure 'onQuoteTap' must precede…` 级别的编译失败。修法：把声明挪到 `onQuote` 之后（2 行），调用点不动，
-  并在声明上方留一条「位置 = 调用点闭包序，别挪」的注释。另一处调用点 `StreamingBubbleView` 用普通带标签实参
-  （`onAIImageTap / onFileTap / streamingAvatar / streamingText`），相对次序不变，不受影响。
-- **本版顺带带上 NAS 侧 `7afaa23`（配套三）**：① 气泡内引用块可点 → `indexOfMessage(role:contentPrefix:)`
-  匹配原消息 + `scrollProxyRef?.scrollTo` 定位 + 高亮 2s（`ScrollViewReader` 的 proxy 在 `.onAppear` 一次性写回
-  `@State`，供非 `onChange` 路径滚动）；② 「上次任务没跑完（N 分钟前）」横幅——`StreamClient.persistedTaskInfo()`
-  只读标记（过期规则与 `restoreIfNeeded` 一致：>30 分钟顺手清），标记归属**别的**会话时才显示，
-  「继续」= `chat.loadById(sid, auth:)` 切会话让自动恢复接上，「放弃」= `discardPersistedTask()`。
-  ⚠️ 真机加看：点引用块能不能停在对准的那条上（列表长时 `scrollTo` 落在 LazyVStack 上会估算位置）、
-  横幅在冷启动后是否正确出现/消失、切会话后在途回复有没有接回。
-- 其余内容 = v3.9.57 段列的那些（工具步骤耗时、流式健康度三相位、工具失败「重试」、`type=plan` 计划卡、
-  Markdown 引用竖线与嵌套缩进、生活页定时任务卡、股票 30 日 sparkline），**验收清单照 v3.9.57 段那五条走**。
-
-## 🆕 近期变更（v3.9.57，2026-09-22）
-
-> 本轮打包 NAS 侧（`qingliao-sync`）两笔提交 `1c8fbaf`（配套一）+ `343dac4`（配套二），本机只做集成、发包与验收登记。
-> ⚠️ **编号第三次错位**：两笔的说明与代码注释全写 `v3.9.58` / `v3.9.58b`，实际首发是 **3.9.57 / build 502**
-> （口径同 v3.9.55、v3.9.56 两段：本仓版本号连续递增、不留空档，看注释里的版本号以 README 为准）。
-> **功能要配后端 `62ecc25` + `5f1f24d`**（NAS 镜像未重建时：工具耗时走前端"已等 Ns"估算、股票 sparkline 拿不到日 K）。
-
-- **工具步骤卡行尾补耗时**（`1c8fbaf`）：completed 行「✓ xx · 1.2s」（`stream.stepDuration(at:)`），进行中行「已等 Ns」每秒走秒（`stream.runningElapsed()`）。`StreamClient` 新增 `toolSpans/toolStartedAt`；**`TimelineView(.periodic 1s)` 只包展开明细那一段**，不套整条消息列表（v3.9.48 性能口径：常驻视图里每秒变化的内容 + 阴影 = 每帧重算）。
-- **流式健康度相位 `StreamClient.Phase`**（`343dac4`）：`normal` / `retrying`（连续网络失败 `failCount ≥ 2`，指数退避封顶 8s、15 次判死）/ `waitingNetwork`（系统路径 unsatisfied，最长等 120s）。弱网退避与断网等恢复不再静默得像卡死，聊天页 banner 显式提示「网络不稳·自动重试中」「网络断开·恢复后继续」。**相位只在流存活期间有意义**：`start()` 与 `finish()` 都复位为 `.normal`，成功轮询也会从 `.retrying` 拉回。
-- **工具失败行加「重试」按钮**：仅 `unresolved && isLast && !errorMessage.isEmpty` 时传入 `onRetry` → `retryLastGeneration()`，复用 regenerate 的"截断 + 锚点 + 落库"整条链路（不新起一条发送路径）。
-- **`ql-card` 协议扩 `type=plan`（任务计划卡）**：`AgentCardParser` 的 `Kind` 加 `.plan` + 专用图标，渲染复用 `items` 段；卡片画廊加样例；`scripts/test_agent_card.swift` 真值表 +7 项 plan 用例。协议文档同步在 `docs/agent-card-protocol.md`。
-- **MarkdownRenderer 两处排版**：引用块行首加「▎」竖线；无序列表补嵌套缩进（2 空格 = 1 层）。
-- **生活页新增 `AutomationsSection`**：聚合 AI 建的定时提醒（列表 + 倒计时 + 取消），**空列表整卡隐藏**，随生活页 30s 节奏刷新。
-- **`LifeCardsSection` 股票卡加 30 日收盘 sparkline**：Canvas 折线、红涨绿跌，数据来自后端新接口 `/api/life/stock/history`。
-- `check_swift.sh` 相应补真值表步骤；本机 `swiftc -parse` 全量过（类型检查只能等 CI Archive，这两笔第一次过真编译）。
-- ⚠️ **需真机验收**：① banner 在三相位的文案与出现/消失时机（尤其恢复网络后是否立刻撤掉）；② 「重试」按钮按下后的行为是否等同整条回复重新生成（工具步骤卡是消息内的，别让人误以为只重跑那一步）；③ 每秒走秒的行在长列表里滚动是否掉帧；④ 生活页定时任务卡与 sparkline 的实际数据；⑤ 引用块竖线与嵌套列表缩进观感。
-
-## 🆕 近期变更（v3.9.56，2026-09-21）
-
-> 本轮打包 NAS 侧提交 `a810dc6`（本机只做集成、发包、验收登记）。
-> ⚠️ **编号又错位一次**：该提交的说明与代码注释全写 `v3.9.57`，实际首发版本是 **3.9.56 / build 501**
-> （上一轮已把这条口径记在 v3.9.55 段：本仓版本号连续递增、不留空档）。看注释里的版本号时按这里为准。
-
-- **欢迎页大 logo 升级为「特征智能球」**（用户：「聊天页这个大 logo 做成炫酷的动态球 / app 本身一个特征智能体」，采纳方向 1 常驻流动 + 方向 3 入口交互化，**需真机验收**）：
-  - `LiquidOrbAvatar.swift`：渲染链五层（Avatar / View / Surface / Coordinator / Renderer）统一加 `live` 开关，**默认 false**。冻结判定从 `state == .idle || freezesMotion` 改为 `(state == .idle && !live) || freezesMotion`——**`freezesMotion`（系统「减弱动态效果」）优先于 `live`**，辅助功能开着时仍冻成静态图。`live = true` 时 idle 态也不冻结，Metal 视图按 `preferredFramesPerSecond = 30` 持续出帧。
-  - `ChatView.swift` 欢迎页：96pt 球改 `LiquidOrbAvatar(size: 96, thinking: aiBusy, live: true)`（AI 忙时自动切活跃态），**移除球上那枚白色气泡图标与渐变底圆**（球本身就是 logo），补 `contentShape` 命中域 + `accessibilityLabel`。交互：轻点聚焦输入框、长按 0.45s 进语音转写（复用 `toggleVoiceMode`，与输入框/发送键同一路径）。
-  - 两处关键取舍（改这块前必读）：① 点/长按必须挂在**同一个 `ExclusiveGesture`** 上——分挂两个手势时，长按触发后抬手仍会补一次 tap，把语音模式刚收回的键盘又聚焦起来（破 v2.0.107 口径）；② 长按里的 `keyboardWasUp` 取 `kb.isVisible`，**不能用 `inputFocus`**（触摸聚焦的瞬间 `inputFocus` 已经是 true）。
-  - `live` 默认 false 的原因：消息头像（30pt）与思考头像（38pt）要保持「静止态零 GPU 开销」的原设计——这一版只让欢迎页那一枚常驻流动。
-  - `check_swift.sh` 第 11 步 + `scripts/ql_orb/truth_table_orb.swift`（25 项，含源护栏）。
-  - ⚠️ 真机要顺带看的：欢迎页现在持续 30fps 出帧，**留意发热/掉电与页面滚动是否受影响**（v3.9.48 那颗智慧球阴影的教训是"性能刀别砍到观感资产上"，反过来这次是观感刀别把性能吃掉却没人报）。
-
-## 🆕 近期变更（v3.9.55，2026-09-21）
-
-> 本轮**打包的是 NAS 侧（`qingliao-sync`）推来的两笔提交**，本机只做集成、发包与真机验收登记。
-> ⚠️ **编号对不上，看代码注释时注意**：`6bd7593` 的注释写 `v3.9.54`（那时 499 已经出包、没带上它），
-> `bd96abe` 的注释写 `v3.9.56`（预估编号）。两笔**首个真实发布版本都是 3.9.55 / build 500**。
-> 本仓版本号一律连续递增、不留空档，所以这里不发 3.9.56；改代码注释里的版本号请单独一轮。
-
-- **模型用量卡片：StepFun 主文本改「订阅制」**（`6bd7593`，需真机验收）：Step Plan 订阅账号的按量余额恒为 0，后端聚合返回 `unsupported` → 前端主文本原本落到「控制台查看」，与副文本「额度见控制台」两句重复。现在 `Models.swift` 的 `unsupported` 分支**只对 stepfun** 改判「订阅制」，其余各家（硅基流动 / 小米 / 商汤 / AMD / 自定义 key）照旧「控制台查看」，不误伤。配套 `scripts/test_provider_usage.swift` 19 项文案真值表 + `check_swift.sh` 第 9 步——**镜像的是 `balanceText`/`detailText` 两条判断链，改判断链必须同步改镜像，否则表变假绿**。后端半边在 `qingliao-backend@81bdbd0`（`query_stepfun()` 直接返回 `unsupported + mode=plan`，不再读 `/v1/accounts`），**NAS 侧要重建镜像才是完整效果**。
-- **设置页「智能路由」开关 + 就地展开参数**（`bd96abe`，需真机验收，**本仓首次过 CI 编译**）：新增 `Core/TypesafeRouting.swift`（纯 Foundation 模型 + 文案，**后端是唯一真源，本地不留一份**，所以用 5 个 `@State` 影子状态而不是 `@AppStorage`——后者会和后端脱钩）。开关行插在「上下文自动压缩」与「微信推送」之间，开启后就地展开判定模式胶囊 / 阈值 Stepper（0.30…0.95 步 0.05）/ 判定超时 / 熔断状态行 / 立即复位熔断 / 说明小字，沿用「压缩阈值」那条既有展开形态（`Divider` + 行，不新增 sheet）。读写收口在 `SettingsViewHelpers`：**POST 失败就拉回后端现状 + 红字，绝不留下假状态**。熔断期间 `.task(id:)` 每 5s 跟一次后端，状态翻回来即停。配套 42 项真值表（`check_swift.sh` 第 10 步）。
-
-## 🆕 近期变更（v3.9.54，2026-09-21）
-
-- **灵动岛：后台跑完任务也要收尾**（用户：「app在后台跑任务时，就算任务跑完灵动岛也不会提示完成，一直显示直到我点进app才会跳出通知」，**需真机验收**）：
-  - **根因**：收尾的驱动源**全在前台**——`finish()` 只有 `ChatView.onChange(of: aiBusy)` 与 `RootView.onChange(of: stream.finishSeq)` 两个入口，两者都要求本进程活着且在推流；App 挂起后轮询早已停（`beginBackgroundTask` 只续 ~30s），服务器那侧跑完时**这个进程里没有任何人**会调 finish → 活动停在「AI 正在回复」，直到回前台才被 `restartPolling → recover → finishSeq` 兜住（＝用户看到的"点进 app 才跳出通知"）。
-  - **接法**：全仓唯一已经在后台得知"任务结束"的代码是 background-fetch 回调（`QingliaoAppDelegate.performFetchWithCompletionHandler`，它查到 done 只发本地通知、**从不碰实时活动**）⇒ 新增 `LiveActivityManager.reconcileAfterBackgroundCheck(sessionId:failed:)`，把 done/error 分支接进来（闭包在任意线程回调，只能送 Sendable 的 sid/failed，故走 `Task { @MainActor in … }`）。**不新增唤醒时机**。
-  - **磁盘快照**（`qingliao_live_activity_round` = sessionId/title/model/startedAt）：`sync()` 每次广播时写、`finish()`/`clearState()` 清。因为这条路径可能在**被系统新拉起的进程**里跑，那时 `currentSessionId`/`lastTitle` 全空，没快照就只能用兜底文案渲染完成态。挂件读不到它（免费签名无 app group），它只是主 App 自己的跨进程记忆。
-  - **三分支口径**：跟的就是这一轮 → 正常 `finish()`（真标题/真模型 + 2s 收起）；跟的是**别的会话** → 不插手（它有自己的驱动链，否则就是替 B 收掉 A 的活动）；进程冷（`currentSessionId == nil`）→ 用快照渲染 done/failed 并 `end(content, .after(+2s))`，**快照归属会话与本次查到的不一致就不动**。
-  - **兜底收口**：`staleDate` 15 分钟 → **4 分钟**（见设计决策同名词条）——系统不唤醒我们时，僵尸活动最多再挂 4 分钟。
-  - ⚠️ **能力边界（别当已根治）**：`Activity.request(pushType: nil)`，免费签名拿不到 APNs ⇒ 系统不会远程替我们更新画面；background-fetch 的唤醒时机**完全由系统决定**（可能几分钟、也可能一直不叫）。本次改动是"**有机会就提前收起**"，不是"保证收起"。若真机复测仍只在回前台时才收起，那就是系统没唤醒，属框架边界。
-- **看板弹窗四连（用户 #2~#5，均**需真机验收**）**：
-  - `DeviceDetailSheets.swift`：`HADeviceDetailSheet` 改成两列 `LazyVGrid` + 新 `HADeviceTile`（排布抄 `DiskTile`，表面 `.frostedCard()`，见设计决策）；删除 `HADeviceRow`（连带"查看原始属性"展开器）、`NASMetricSheet`、`SheetSection`、`SheetKVRow`、`HAAttrRow`（后四个在本次改造后已无消费者，grep 确认后一并删）。`BoardSheetHeader` / `HAStateText` 原样保留。
-  - 数据切片收口在 `DashboardView`：新增 `isAvailable(_:)`（`state` 非空且不含 `unavailable`、不是 `offline`/`unknown`）→ 门锁/猫眼/温度三个切片**只留可用实体**；猫眼再排除创米**插座**（`isDoorbellPlug`：`switch.` 前缀 / `_m3_` / `on_p_2_` / `_plug`）——原来那颗插座就是混进猫眼弹窗的东西。
-  - `DashboardSheet` 枚举删 `.cpu`/`.memory`，`.sheet(item:)` 同步去掉两个分支；NAS 面板两张 `MeterCard` 去掉 `.tapButton` 与 `.matchedTransitionSource`，副标题改回静态文案（"整机占用" / "/ 总内存"）。
-  - ⚠️ **门锁弹窗内容受后端裁剪限制**：`backend/ha_proxy.py` 的 `_keep_entity` 只透 `light/climate`、两颗指定 switch、`(bacn01|chuangmi)` 电量、`alarmstatus|guard_mode`、`sensor.*temperature*` —— **`lock.*` 与 `camera.*` 从来到不了 App**。所以门锁弹窗通常只有一两颗电量/状态卡，猫眼也没有画面快照。要多显示必须改后端白名单（NAS 重建镜像），本次**没做**。
-  - 弹窗标题/空态文案随之改口径：门锁空态「门锁现在没有可用实体」、猫眼标题「猫眼」+ 空态说明"只列小白智能猫眼自己的实体（创米插座已排除）；画面快照后端未透出，离线实体也不列"。
-
-## 🆕 近期变更（v3.9.53，2026-09-21）
-
-- **聊天输入栏样式整条回退到 v3.9.46，只保留模型切换**（用户：「输入框样式还是改回3.9.46版本的样式吧，现在的不行，在3.9.46基础上加上模型切换就行」，需真机验收）：`ChatInputBar.fullInputBar` 的容器链逐字还原 v3.9.46（`Capsule` 玻璃 + `focused ? 0.45 : 0` 蓝细边 + `.animation(Motion.snap, value: focused)` + `.shadow(0.3/14/5)` + 其后的 streaming 15fps 旋转流光 overlay + 常态白边，最后 `.padding(.horizontal, 18)`）。删除：`expanded` 门控、`barShape`（22pt 方角）、`edgeOverlay`/`edgeColor`/`rimLight`、`.clear` 玻璃档。**保留的唯一新增件**：`modelLabel` / `onPickModel` 两个参数（声明在 `contextUsage` **之后**，成员初始化器按序传参不能插中间）+ `modelButton`（纯灰文字，排在 `textArea` 之后）
-- `attachButtons` / `textArea` / `trailingButtons` 三个私有子视图**继续存在**（纯函数式拆分，与 v3.9.46 单行 HStack 的产出逐字等价），比一坨 200 行的 body 好维护；真正判死的是"两态换容器"，不是"拆函数"
-- `lineLimit(1...6)` 与 `padding(.vertical, Spacing.xl)` 维持 v3.9.52 的修正结果（这两条与样式无关，是光标居中的修复，不回退）
-
-## 🆕 近期变更（v3.9.52，2026-09-21）
-
-- **输入框光标回到垂直居中**（真机 496：「光标不居中了」，需真机验收）：v3.9.48 那档 `lineLimit(expanded ? 2...6 : 1...6)`（为了"点一下就变大"）是元凶——两行块里**占位符整块居中、光标坐在第一行**，两者错开半行。现改回**恒 `1...6`**，栏高由内容驱动（打字/换行 + `fixedSize` 撑）。**这条坑本仓踩过两次**：v2.0.35 的原话就是"2...6 最小2行高→单行光标/文字偏上不居中"，v3.9.48 又请回来了。副作用：`expanded` 现在只管"模型名出不出现"，聚焦本身不再改变栏高
-- **玻璃再加质感：`.clear` 档 + 内缘受光高光**（用户：「输入框再加点玻璃质感可以吗」，选做 3+1，需真机验收）：① `.glassEffect(.regular, in:)` → **`.clear`** —— ⚠️ `Glass` 只有 `clear` / `regular` / `identity` 三档（Apple 文档实证），**没有 `.thin`/`.heavy`**，"更透"这一头就是 `.clear`（材质本体近乎不遮，折射与边缘受光仍在）。② `edgeOverlay` 的常态分支加一圈 `barShape.inset(by: 1.4).strokeBorder(rimLight, 1.2)`（顶 `white 0.35` → 中 `white 0.04` → 底 `black 0.10`）——真玻璃的观感在边缘受光，且它走的是**内缩 1.4pt 的同心路径**，与聚焦环不重叠、不越出玻璃边界，所以不会重演"两圈"。**回退口径**：`.clear` 若在浅色页上"空得看不见框"，一行换回 `.regular`（或 `.regular.tint(.white.opacity(0.12))`），高光那圈保留
-- **多行 `TextField` 的最小行数只能是 1**（v2.0.35 踩过、v3.9.48 复发、v3.9.52 定死）：见上方关键设计决策同名词条
-- 真机 496 回报：v3.9.51 那两条（两圈 / 键盘弹一下又收回）**没有再被提起**，本轮只新报了「光标不居中」与「蓝环没了」两条，都已在本节修
-- **聚焦淡蓝光圈加回来**（真机 496：「输入时，输入框外框的淡蓝光圈也没有了，加回来」，需真机验收）：`edgeColor` 里 v3.9.49 那档 `if expanded { return .clear }` 是当时的**误诊止损**（以为描边会浮在玻璃外成第二圈），v3.9.51 找到真因（玻璃形状没走 `in:`）后它已无必要——现在描边与玻璃同用 `barShape`，同一条边界。恢复 v3.4.20 的两档配色，蓝档条件放宽成 `focused || expanded`（键盘在 = 焦点在本框，避开 focus 与键盘通知之间那一帧错帧导致的环闪）。streaming 时仍让位给流光（`edgeOverlay` 的 if 分支不变）
-
-## 🆕 近期变更（v3.9.51，2026-09-21）
-
-- **第三轮修"两圈"：病根是 `glassEffect` 的形状参数没传，不是圆角动画**（真机 495：「还是有两圈」，需真机验收）：Apple 文档实证签名为 `glassEffect(_ glass: Glass = .regular, in shape: some Shape = DefaultGlassEffectShape())`，而 v2.0.87e 起输入栏写的是 `.background { barShape.glassEffect() }` —— 形状走默认档，玻璃按 `DefaultGlassEffectShape` 画，`barShape` 的 22pt 只贡献 bounds；外面那圈是容器自身 `.shadow(radius: 14)` 沿布局边界投出来的。现在改成玻璃**直接挂内容 + 形状显式传参**：`.padding(...).glassEffect(.regular, in: barShape)`，并把那圈 `.shadow` 整条删除（玻璃自带投影）。描边 overlay 与流光复用同一个 `barShape`，与玻璃边界同参 → 结构上不可能再错开。v3.9.50 那条"glassEffect 不跟圆角插值"的结论已在设计决策里改写
-- **展开态布局回退单行**（真机 495：「点输入框弹一下又收回了」，需真机验收）：v3.9.50 的「文字在上、工具行在下」两行 = HStack ↔ VStack 换容器 = TextField 换父级重建，**换门控（`focused` → `kbEnv.isVisible`）没能切断它**，因为回路不在 `focused` 上而在键盘本身（承载视图被换掉 → 系统收键盘）。现在 `fullInputBar` 只有一套 `HStack { attachButtons; textArea; if expanded, !modelLabel.isEmpty { modelButton }; trailingButtons }`——条件块排在 textArea 之后，TextField 在 TupleView 里的 index 恒定不重建。展开态的"变大"只由 `lineLimit(2...6)` 与高度插值给出，文本区 `.padding(.vertical)` 两态都回到 `Spacing.xl`（v3.9.50 那档 `Spacing.xs` 的理由是"行距由 VStack 给"，VStack 没了它也就没了）。**代价：参考图那个"两行"结构做不了**，要它就得让 TextField 换父级。**→ 其中"展开态 `lineLimit(2...6)`"已被 v3.9.52 撤掉（让光标偏上），栏高改由内容驱动**
-
-## 🆕 近期变更（v3.9.50，2026-09-21）
-
-- **输入栏容器只留玻璃这一层**（真机第二轮：「还是内有大圆角、外有方形圆角」，需真机验收）：v3.9.49 那一轮把两笔描边并成一条、把 `.animation` 挪到链末，**没治好**——真正的病根是 `glassEffect` 不跟圆角插值：聚焦展开后玻璃还按收起时的胶囊画（内圈大圆角），描边 overlay 已经走到 22pt 方角（外圈），于是两圈不同圆角的轮廓。这轮从源头收：① `barShape` 圆角**恒定** `Radius.hero`(22)，不再有 999↔22 的插值（代价：收起态由纯胶囊变成 22pt 圆角矩形，栏高约 62 → 胶囊半径 31，只差 9pt）；② `edgeColor` 在展开态直接 `.clear`，玻璃外面不再浮第二圈描边（收起态与语音/录音/转写三态照 v3.4.20 原样保留蓝/白边）。展开态不再靠蓝环表意，"长开 + 第二行"本身就是聚焦提示。**→ v3.9.51 真机 495 判：仍在两圈，且成因不是插值而是 `in:` 没传（见上一条），本轮的"恒定圆角 + 展开不画描边"作为兜底保留**
-- **模型胶囊：文字变灰**（用户：「输入框内模型用灰色字体」）：`Text(modelLabel).foregroundStyle(.secondary)`，图标留 accent。顺带记下那阵"图标和名字之间的空隙"从何而来：`frame(maxWidth: 120, alignment: .trailing)` 把短名推到了框右端——**这条已在下面的 #2 里连框带图标一起删掉，仅作踩坑记录**
-- **展开态换成「文字在上、工具行在下」两行布局**（用户给参考图，选做 #1，需真机验收）：`ChatInputBar` 拆成 `collapsedBar`（逐字沿用 v3.9.47 那一行）与 `expandedBar`（`VStack { textArea; HStack { attachButtons; Spacer; modelButton; trailingButtons } }`），三块 `attachButtons` / `textArea` / `trailingButtons` 两态共用一份，`trailingButtons` 内部 `HStack(spacing: 8)` 与外层行距同参 → 收起态视觉零差异。文本区在展开时把 `.padding(.vertical, Spacing.xl)` 收成 `Spacing.xs`（行距改由 VStack 给）。**⚠️ 本轮最大的风险点：两态是两套容器，TextField 换父级会重建**，重建瞬间可能掉 first responder → 键盘收回 → 布局再翻回去，形成反馈回路。所以 `expanded` 的门控从 `focused` 换成 **`kbEnv.isVisible`**（键盘可见性由系统通知驱动，不受视图树重建影响，没有那条回路）。真机若出现"点输入框键盘弹一下又收回/闪"，第一嫌疑就是这里，回退方向是把布局改回单行而不是换门控。**→ v3.9.51 真机 495 正是这条报障，已按"回退单行"执行；换门控无效，别再往门控上找**
-- **模型名连壳带图标一起撤掉，只留纯灰文字**（用户参考图，选做 #2）：v3.9.49 那枚非玻璃胶囊壳（`modelPill`）整块删除（连带 `extension View.modelPill`，已无调用点），`modelButton` = `Text(modelLabel)` + `Typography.subhead` + `.secondary` + 中部截断 + `hitArea44(h: 10, v: 13)` 撑到 44 命中高，排在工具行右半段（停止/发送左侧）。玻璃栏里再画一枚带底带边的壳，读起来仍然是"两层"，这次一并收
-
-## 🆕 近期变更（v3.9.49，2026-09-21）
-
-- **智慧球的投影回滚**（用户：「智慧球回滚」）：`ChatEffects.SiriBallView` 的球体阴影恢复成 `Color.indigo.opacity(0.45 * breathe)`，也就是**跟着呼吸一起脉动**。v3.9.48 为了省掉"每帧重算阴影"把它写成常量 0.22，真机结论是观感回退（球的气色掉了）——那层脉动投影是**资产不是预算**。回滚只动这一行，v3.9.48 另外两刀（聊天滚动投影、会话列表惰性）不受影响
-- **tab bar 玻璃彻底收手**（用户：「tab bar 也回滚」）：v3.9.47 的方案 B 整块撤除——删 `Features/TabBarGlass.swift`（`TabBarGlassClearer` / `TabBarGlassProbe` 探针），`DockTabView` 上那句 `.background(TabBarGlassClearer(clear: selected == .chat))` 一并摘掉，`DockOrbOverlay.findTabBar(in:)` 收回 `private`（现在只剩它自己两处调用）。**方案 A 不复活**（`.toolbarBackground(.hidden, for: .tabBar)` 真机已判只褪背景色、玻璃照旧）。结论进「iOS 26 系统玻璃的三条口径」：A、B 两条路都走过都无效，**这就是终点**，第三条不要提，铺不透明层更不行（v3.4.29 红线）
-- **输入栏容器只留一圈边**（真机：「输入框有两层重叠在一起」，需真机验收）：v3.9.48 把装饰整体上移到外层 VStack 后，容器同一条路径上其实画了**两笔描边**——`focusRing`（聚焦蓝 0.45）和 `glowOverlay` 的 else 分支（常态白 0.12），而 `.animation(Motion.snap, value: focused)` 夹在两者**中间**：白环拿不到这个 transaction，聚焦瞬间玻璃+蓝环在插值、白环已经跳到展开形状，两圈轮廓错开就是那"两层"。修法：删 `focusRing`，白/蓝两档配色并进唯一的 `edgeOverlay`（`focused ? 蓝 : 白`，streaming 时仍走流光），并把两句 `.animation` 挪到修饰符链**末尾**（阴影仍在 overlay 之前，v3.2.3 红线不动）。口径：**装饰链上任何 `.animation(value:)` 都必须放在最后一个会随它变化的图层之后**，否则后面的图层就是不动画的那一个
-- **模型胶囊：去 provider、去玻璃、不贴边**（真机：「模型胶囊不用显示provider，只显示模型即可，不要超出输入框」）：`ChatView.composerModelLabel` 从 `provider/model` 改成只取 `resolveModel(...).0`——胶囊本来就窄，带前缀只装得下 `opencode/d…eek-v4-flash` 这种读不出来的截断串。样式从 `chatHeaderPill()`（内含 `glassEffect(.regular.interactive())`）换成本文件新增的 `modelPill()`：**形状/字号/内边距逐字照抄 `chatHeaderPill`，只把玻璃换成 `accentColor` 淡底 + 同色 0.8pt 细边**——玻璃栏里再浮一块玻璃就是第二层"重叠"。宽度：文字 `maxWidth` 150 → 120，行右侧再让 `Spacing.sm`(6)（容器横向内边距只有 `Spacing.lg`(10)，而玻璃可见边缘比布局边界还要再缩一圈，胶囊贴边画就等于压在线上）
-
-## 🆕 近期变更（v3.9.48，2026-09-21）
-
-- **聊天输入栏改成展开式 composer + 模型快选（需真机验收）**（用户：「点击输入框时候输入框变大，右下角可以选模型」）：`ChatInputBar` 从「一条 HStack 带全部装饰」重构成 **外层 VStack（装饰层）+ `inputRow`（第一行）+ `modelRow`（第二行）**。`expanded = focused && !isRecording && !voiceMode && !transcribing`——录音/语音/转写三态各有自己的输入栏形态，不参与"变大"。展开时文字区起判行高从 1 行抬到 2 行（`lineLimit(expanded ? 2...6 : 1...6)`），右下角浮出模型胶囊（`chatHeaderPill()` 同档，模型名 `frame(maxWidth: 150)` 中部截断，不撑破栏宽）。**容器形状不换类型**：`barShape` 恒为 `RoundedRectangle(style: .continuous)`，收起时半径 999（被夹成半高 = 与原来的 `Capsule()` 同形）、展开时收成 `Radius.hero`(22) → 半径可插值，切换是"长开"不是跳形，也省掉 `AnyShape` 擦除；玻璃底/聚焦描边/流光/阴影四层装饰整体上移到 VStack，`Capsule()` 全部换成 `barShape`（流光形状跟着长开；**这四层里两笔描边叠在同一路径、且其中一层不参与展开动画 = 真机看到的"两层重叠"，v3.9.49 已并成一圈，见上**），阴影仍在流光 overlay **之前**（v3.2.3 卡死红线）。新参数 `modelLabel` / `onPickModel` **追加在 `contextUsage` 之后**（调用点走成员初始化器按声明序传参）
-- **`ComposerModelSheet`（`ChatSheets.swift`）= 短平快的切面板**：与设置里的 `ModelSheet` 分工——那边管 provider 增删/同步/TTS/视觉模型，这里只管"当场换一个接着聊"，选完即写 `qingliao_model`/`qingliao_provider`（与 `ModelSheet.setModel` 同一口径）+ `Haptics.success()` + 立即收起。**零网络**：列表直接读 `ModelProvidersCache.load()`（模型管理每次同步成功都落这份缓存），从没同步过才显示"去设置 › 模型管理 同步一次"。配了 Agent 模型时顶部挂 `ModelSheet.agentModelNotice` 同话术的提示（视觉 > Agent > 主模型，这里改主模型不生效）——**不静默骗人**。胶囊显示名走 `ChatView.composerModelLabel = resolveModel(hasImage: false)`（与灵动岛 `liveActivityModelName` 同口径），只读 `qingliao_model` 会在 Agent/视觉模型生效时报错模型（v3.8.0 实踩）
-- **天气弹窗右上角补「刷新」胶囊**：`Text("刷新").pill(.page)` 排在「换城市」左侧（口径照生活页「刷新」，含 `loading` 时前置的 `ProgressView().controlSize(.small)`）。点击 = `reloadForce = true; reloadToken += 1`，即**绕过 v3.9.46 的天气缓存**强制回源。病根：缓存上线后"想看此刻"的出口只剩加载失败那张空态里的「重试」，正常态没有入口
-- **登录页胶囊变窄**（用户："胶囊可以缩短"，追问确认为变窄不是变矮）：`LoginView.formH` 28 → 40，三枚输入框 / 登录 / Face ID / 两条状态横幅一并收进去，不再顶满屏宽（这个口径 v3.9.46 已收敛成一个常量，改一处即可）
-- **滑动流畅性三处减负（需真机验收）**（用户："优化 app 滑动流畅性"）：全仓滚动热区排查后落三刀，都在"每帧/整页白干活"这一类，不动任何观感设计。
-  ① **聊天页 `onScrollGeometryChange` 投影夹 0 + 取整**（`ChatView` 收件箱上拉那条）——这条回调**只在投影值变化时**才响，原先未过拉时返回逐帧变化的负 offset，等于**整个正常滚动过程每帧响一次、每帧写一次 `@Observable progress`**（`InboxPullState` 不做等值比较，写同值也标脏 `InboxPullLayer`，那层里还挂着一颗 `ultraThinMaterial` 胶囊）。改成 `overscroll <= 0 ? 0 : overscroll.rounded()`：正常滚动期投影恒 0 → 一次都不响；过拉本身只有 0~60pt 有意义，取整后拉满最多 60 次失效，指示器跟手位移看不出差别。`inboxPullHandleScroll` 另加一层"进度已归零且不在等回弹就早退"的兜底（`st.armed` 必须留在条件里，否则松手那一帧的触发动作被吃掉）
-  ② **dock 智慧球的投影静态化**（`ChatEffects.SiriBallView`）——`.shadow(color: .indigo.opacity(0.45 * breathe))` 挂在一颗"每帧换色的渐变球"上，而此球 **5 个 tab 常驻**（空闲 15fps / 思考 30fps），任何一页滑动都在与它抢帧。阴影色改写死中值 0.22，呼吸感仍由外圈 halo + 球体两颗渐变圆承担，差的只是"投影不再脉动"。这与 v3.2.3 输入框那条同源：**把每帧变化的阴影静态化**（仓内 `repeatForever`/`TimelineView` 帧源已逐一核过，全部有帧率锁与 reduceMotion 静态档，没有裸 `.animation` 全屏帧源）　←　**本条已回滚（v3.9.49）**：真机结论是观感回退（球的气色掉了），
-  阴影恢复 `0.45 * breathe` 脉动。这一刀的教训记下来：**这颗球的投影是观感的一部分，不是可牺牲的性能项**；
-  要再动它得先给"滑动确实变差"的证据，别拿静态化阴影当免费午餐
-  ③ **会话列表外层 `VStack` → `LazyVStack(alignment: .center)`**——内层 v2.0.133g 就为"会话多时全量渲染拖慢切页"改成了 LazyVStack，但它套在非懒 VStack 里等于白做：外层为定自己的尺寸向惰性子栈索取理想高，一问就把全部行实例化出来。**`alignment: .center` 不能省**（VStack 默认 center、LazyVStack 默认 leading，省了空态插画和 BotCard 会跑左边）。安全性依据 v2.0.56 那条老账：会话删除早已是"后端驱动 + `load()` 整体替换"，无就地 `removeAll` 的 ForEach diff 崩溃路径
-- **本轮明确没动的**（都是"要用户拍板"的视觉账，不是代码账）：`dashboardCard()` 每卡两层柔影（v3.9.35 对比稿定稿）、设置页 `GlassListCard` 深色档逐行 `ultraThinMaterial`、Siri 边框光/灵动岛光 30fps（v3.9.1 拍板）、看板自动化卡 1Hz `TimelineView` 包整张 `DeviceCard`（1 秒一次，非帧级）。**要再压一档就得先接受观感回退**，说一声即可
-
-## 🆕 近期变更（v3.9.47，2026-09-21）
-
-
-
-- **弹窗里的卡片一律半透明毛玻璃（需真机验收）**（用户：「所有卡片不要白色背景，用毛玻璃，16 圆角」）：新增 `SheetFrostCard` / `.frostedCard()`（`Theme/LiquidGlass.swift`）= `.ultraThinMaterial` 底 + 16 圆角 + 0.8pt `Tint.line` 描边 + 两层柔影，**卡形与 `.dashboardCard()` 逐字同参，只把实色卡底换成真半透明材质**。改动三处：v3.9.46 五张详情弹窗的分组卡 / 设备行 / CPU·内存 hero 块（`DeviceDetailSheets.swift`），以及**开关弹窗的灯卡**——它是用户点名要对齐的「开关卡片形式」基准，不改它就没对齐可言（点亮态原先那层 `accent.opacity(Tint.subtle)` 淡染保留，叠在毛玻璃之上）。看板与生活页的**网格卡没动**，仍是 `dashboardCard()`
-- **Dock 玻璃：方案 A 回退，改方案 B（需真机验收）**：v3.9.46 的 `.toolbarBackground(.hidden, for: .tabBar)` 真机只褪背景色、玻璃层照旧 → 两处调用删掉，`chatTab` 注释记下这个否定结论。新增 `Features/TabBarGlass.swift`：`TabBarGlassClearer(clear:)` 挂零尺寸探针 `TabBarGlassProbe` 在 **TabView 上（只挂一处）**，`selected == .chat` 时把真实 `UITabBar` 的 `standardAppearance`/`scrollEdgeAppearance` 换成 `configureWithTransparentBackground()` + `backgroundEffect = nil` 的副本，切走时**原样还原**（第一次改动前缓存系统原值；tab bar 被系统重建则重认重缓存）。`DockOrbOverlay.findTabBar(in:)` 由 `private` 开放为内部可见，不再各处抄一份递归
-- 方案 B 的诚实边界：iOS 26 没承诺系统玻璃走 `UITabBarAppearance`，真机若仍在 → **止步于此**，不退回去铺不透明层（v3.4.29 红线），也不再追加第二轮赌注
-
-## 🆕 近期变更（v3.9.46，2026-09-20）
-
-- **看板卡片详情弹窗五连 + 弹窗样式统一**（用户点名 8~12 项）：门锁 / 各房间温度 / 猫眼 / CPU / 内存五张卡从"只读"变成可点，新建 `Features/Dashboard/DeviceDetailSheets.swift`。**零新增接口**：三个设备弹窗吃看板已在轮询的 `/api/ha/states`（新增 `lockEntities`/`doorbellEntities`/`roomTempEntities` 三个筛选切片），CPU/内存弹窗吃 `/api/nas/status` + `/api/hw/status`。「统一样式」落成代码：把 DisksSheet/HADeviceSheet/ServiceControlSheet/WeatherSheet 各自手抄的那套头部抽成 `BoardSheetHeader`（`Typography.title` bold + Spacer + 次级计数 + `xmark.circle.fill` 关闭钮 + 18/18/`Spacing.lg` 边距），新弹窗一律它 + `.dashboardCard()` 分组卡（**v3.9.47 已换成 `.frostedCard()`**） + `[.medium(,.large)]` detents + `matchedTransitionSource`/`.navigationTransition(.zoom)`，挂载仍走 `.sheet(item: $activeSheet)`。**CPU/内存弹窗只讲后端真有的数**：整机单值 cpu%、mem{total,used}、两个容器各自内存、CPU/SSD 温度——没有每核占用/负载均值/进程榜，就在脚注里写明白，不画假精度条
-- **安防卡可点布防/撤防**：`requestArm` → `confirmationDialog`（危险动作既有方言，同「执行场景」）→ `applyArm` 走 `POST /api/ha/services/switch/turn_on|turn_off` + `entity_id`（Aqara 网关警戒模式本体是个 switch 实体）。**不做乐观更新**，成功后立即 `loadHA()` 回读真值；失败必须出声（`alarmError` → alert + `Haptics.error()`，v3.9.41「静默吞掉 HA 控制失败」的同款教训）；`alarmBusy` 吞在途连点；找不到 `guard_mode` 实体时卡片副标题直接写「未找到网关警戒开关」而不是骗人写「点击布防」。动态按钮单独抽成 `armDialogButtons`（塞进 body 大表达式撞过类型检查超时）
-- **天气进程内缓存**（`WeatherCache`，`Core/WeatherService.swift`）：客户端原先零缓存，同一个 `/api/weather` 三条重复路径（看板切回首刷 / 弹窗每次打开 / 弹窗关闭同步城市名）。TTL 600s **刻意小于后端自己的 30min**，保证不会读到比后端更旧的数据；换城市（`saveCity`）与「重试」（`reloadForce`）显式作废该城条目，其他城市照旧秒开。弹窗命中缓存时连骨架屏都不闪
-- **聊天页头部两枚胶囊尺寸统一**：思考档位与朗读原先各自手写「字号 + padding + `glassPillStroke`」，v3.9.43 已把 padding 对齐却仍差 1~2pt——**病根不是 padding 而是内容固有高度**（10pt 图标 + 11pt 文字 vs 光 11pt 图标，SF Symbol 行高≠文字行高）。新增 `chatHeaderPill()`（`Theme/Pill.swift`）把内容 `frame(height: 15)` 框死再套同一档 padding；它不属于 `PillSize` 三档「操作胶囊」口径，故单独一个方法而不是硬套 `.pill()`
-- **修任务中心右上角空玻璃胶囊**：iOS 26 的 tab/toolbar 玻璃是系统自绘的，**空 `ToolbarItem` 依然会拿到一层玻璃底**——原来两个按钮写在同一个 `ToolbarItem` 的空 `HStack` 里，两个 `if` 都不成立时胶囊还在、字没了。改为把条件判定提到 `ToolbarItem` 外层（`@ToolbarContentBuilder` 支持 `if`），没有按钮就根本不产生 toolbar item
-- **智慧球那一 tab 不铺玻璃（方案 A，需真机验收）** ← **真机结论：无效，v3.9.47 已回退**（用户：玻璃还在）：`.toolbarBackground(.hidden, for: .tabBar)` 挂在聊天页根内容上（两个分支都挂）= 只有这一页褪玻璃，其他 tab 照旧。两个未知数与退路写在 `DockTabView.chatTab` 注释里；**红线仍然有效**：不许在 TabView 下层铺不透明色（v3.9.46 之前 v3.4.29 的教训——会掐死所有页的滚动边缘折射）
-- **登录页视觉美化**（接 v3.9.45 动效四件套）：背景补 SplashView 同款三团模糊光斑（蓝/靛/青，静态不放动，纯装饰 `allowsHitTesting(false)`）；logo 从 52pt 无底无影的扁符号升到 64pt + 背后主色光晕 + 蓝色投影，副标题 `tracking(1.2)`；主操作按钮补 `shadow(blue 0.32, r14, y7)`（成功态不投影）；**层级重排**——Face ID 保持淡底 + 同色细描边（次级），「测试连接」从一模一样的大胶囊降为纯文字小按钮（三级，原先两个按钮同样式互相抢视线）；错误与测试结果从裸 Text 换成 `LoginNotice` 状态横幅（淡底 + 同色图标 + 同色细描边，测试结果串自带的 ✅/⚠️/❌ 前缀剥掉由图标表态）；服务器历史下拉从 `secondarySystemBackground` 换成与输入框同款的 `ultraThinMaterial` + 细描边；三枚按钮 `.plain` → `PressStyle()` 补按压手感；5 处各写一遍的 `.padding(.horizontal, 28)` 收敛成 `Self.formH`
-- **登录页两个功能缺口**：① 键盘 return 串联——`GlassField` 新增 `submitLabel` / `onSubmitAction`（**必须声明在 `focus` 之后**，现有调用点按位走成员初始化器），服务器→用户名→密码→`submitLogin()` 一条链；② 密码框加眼睛切换明文（原先全程盲打，输错只能靠失败抖动反推），`SecureField ↔ TextField` 是两个视图会掉焦点，切换后显式 `focus.wrappedValue = field` 抢回来
-
-## 🆕 近期变更（v3.9.45，2026-09-20）
-
-- **登录页动效四件套（需真机验收）**：① 进场递延——Splash 淡出后 8 段视图按 45ms 逐档上浮入位（`stagedIn`，原来整页同时硬现）；② 输入框焦点形变——`@FocusState<LoginField?>` 单选焦点，聚焦框描边走主色 + 图标点亮 + 一层极淡主色底 + 1.012 微放大（原来四个框长一个样，眼睛跟不上光标）；③ 发送键三态直出——空闲「登 录」/ 登录中环形进度 / 成功绿勾，`frame(height: 26)` 等高压掉换态跳动，成功时渐变转绿并轻微顶起，同时 `Haptics.success()`；④ 登录成功「卡片飞成首页」交接——整页上浮淡出 0.45s，DockTabView 在它下面就位（详见上方关键设计决策那条的挂载窗口）
-- **登录失败不再静默**：`errorMessage` 一变即 `Haptics.error()` + 整列水平抖动一次（`keyframeAnimator` 一条 x 轨串五个关键帧 -9/8/-6/3/回弹，靠 trigger 计数触发，不用 sleep 对节拍）。背景色块不参与抖动，所以不会出现边缘漏白
-- 四件套全部有静态档：`reduceMotion` 下递延直出满位、抖动 trigger 传 0、交接窗口不挂载（回到改动前的瞬间切换）
-
-## 🆕 近期变更（v3.9.7，2026-09-12）
-
-- **灵动岛 / 锁屏实时活动美化（方案 A+B 合并）**：A 视觉——轻聊球贯穿全部形态（`Canvas` + `TimelineView(.animation, minimumInterval: 1/20)` 呼吸；侧载免费签名无 APNs，唯一帧源是本地驱动）；B 信息与交互——思考脉冲环 → 输出**不确定态旋转弧**（不画假百分比）→ 完成绿对勾保持 2s 三态、展开态状态文案 + 「停止生成」按钮（`StopGenerationIntent` 用 `LiveActivityIntent`：在**主 App 进程**执行且**不打开 App**，才能真停掉 App 里的流；`openAppWhenRun` 已废弃且在 extension 里置 true 直接编译报错），点灵动岛 `.widgetURL(qingliao://chat)` 回聊天页（官方推荐方式，零新 API 风险）；`LiveActivityManager` 只在 phase 变化时 update（不跟 token 刷）+ 代际令牌 + 会话归属校验；脉冲环半径上限 `r×1.15` 防灵动岛遮罩切半圆
-- **收件箱「进行中进度」气泡**（配合后端 v3.7.1，后端已上线）：`task_type="progress"` → 会话 🔔 进度气泡（`isPush=true` 故**不进模型上下文**、不弹本地通知、不进任务中心）；`pollOnce` 的「流式进行中跳过整轮」改为**只跳过 reply 类**——回前台立刻看到过程留痕，不再压到流结束才一起涌出
-- **语音转文字态输入框去掉流光特效层**：只保留「发送键变收音图标」（撤销 v3.2.4「语音模式保留流光」的决定；顺带语音期间输入栏已无每帧重绘视图）
-
-## 🆕 近期变更（v3.9.6，2026-09-12）
-
-- **语音录音「实时上屏」根治**：v3.9.5 只把红色胶囊去掉、让输入框常显，实测录音全程仍只有「输入消息…」占位、松手才一次性出字 → v3.9.6 录音态**直接渲染 `liveSpeech.liveText`**（`@Published` 驱动，必然刷新）在输入栏同一行位置，并加 `.onChange(of: liveSpeech.liveText)` 同步进 `inputText`（不再依赖「闭包捕获的 @State 写入 + TextField 外部刷新」这两条不可靠路径）
-- **诊断自证**：`LiveSpeechTranscriber` 统计 `volatileCount/finalCount/firstResultMs`，录音 3s 仍零结果才置 `liveStalled` → 输入栏仅在此时显示 `V0/F0` 小字（正常时零杂物，异常时一眼看出「实时结果没到」）
-- **后端 ASR 整体下线**：`asr_api.py` + `unified_router` 的 `/api/asr`、`/r/asr` + `stream_api._proxy_asr`/relay 白名单 + nginx 三份 conf 的 `location /api/asr` + compose/.env 的 `QL_ASR_*` + 引擎（whisper_venv 431M、whisper_models 142M、asr_server.py、scripts/asr）全部清除；App/PWA 已 grep 确认零引用
-
-## 🆕 近期变更（v3.9.5，2026-09-12）
-
-- **语音录音态 UI 修正（用户实测反馈）**：录音中不再用红色「正在聆听…」胶囊**整块顶掉输入框**——那样既看不见输入框、也看不见转写全文（长句还被单行截断）→ 改为**输入框全程常显**，设备端识别结果（`liveSpeech.onTextChange`）实时落进框里，边说边看
-- 仅保留左侧 **7pt 红点**作「正在听」标识；录音中给输入框加 `.allowsHitTesting(false)`，防误触弹键盘打断语音模式
-- 清理已无用的 `recordingText` 参数与 `ChatView` 传参（实时文本改由 `inputText` 直接承载）
-
-## 🆕 近期变更（v3.9.4，2026-09-11）
-
-- **修「一按语音转文字就闪退」**（v3.9.3 引入的回归，用户报 `Signal(5)`）：设备端转写的 `LiveSpeechTranscriber.start()` 是 `@MainActor`，其中 `installTap` 的闭包字面量**继承 MainActor 隔离**，而麦克风 tap 在**音频线程**回调 ⇒ 进闭包即 Swift 6 隔离断言 SIGTRAP。用 v3.9.3 的 dSYM 符号化定案（崩溃帧就是这个闭包），修复=闭包显式 `@Sendable`；`requestRecordPermission` 回调一并补 `@Sendable`
-- **这类错编译器零告警、`check_swift.sh`(-parse) 查不出**（同族首例 = v3.7.0 剪贴板闪退）：判据是「查 Apple 文档 JSON 该形参有没有 @Sendable」，没有就必须显式 `@Sendable` 或改官方 async 桥接；`@preconcurrency` conformance ≠ 安全（只是把断言推迟到运行时）
-- **按钮统一「文字 + 胶囊」去图标**：刷新 15 处（看板生活数据/资讯/空态、Docker 容器与镜像、路由器面板、诊断、日志、云端设置、本地模型、视觉模型、执行历史、模型管理导航栏）、重新生成 2 处、添加/添加股票 5 处；长按菜单项与纯「+」图标入口保持原样
-- **AI 头像**：去掉蓝色渐变底圆；玻璃球半径 `uniforms[4]` 由上游默认 `0.72` 提到 `0.98`（球径≈头像格，与原来底圆尺寸对齐），30pt 消息头像 / 38pt 思考头像 / 96pt 欢迎页 logo 同步生效
-- **通知 delegate 加固**：`UNUserNotificationCenterDelegate` 协议非 @MainActor 且无线程承诺，原 `@preconcurrency` 只是把隔离断言推迟到运行时 → witness 标 `nonisolated`（方法体只碰 UserDefaults，行为零变化）
-- 只读并发隔离审计扫全仓 102 个 .swift（逐条比对 Apple 文档 JSON）：除上述外无第二处必崩代码
-
-## 🆕 近期变更（v3.9.3，2026-09-11）
-
-- **语音转文字改 iOS 设备端实时转写**（用户拍板「不需要后端了，只用苹果系统自身」）：iOS 26 `SpeechAnalyzer` + `SpeechTranscriber`，**边说边出字**（`.volatileResults`）、音频不出设备、可离线、无时长上限；新增 `Core/LiveSpeechTranscriber.swift`；语音模型走 `AssetInventory` 按需下载（不占 App 体积，**首次使用要等下载数十秒**）
-- **删掉旧链路**：`Core/VoiceRecorder.swift`（录音 m4a）+ `AuthStore.asrTranscribe`（上传后端 `/api/asr/transcribe`）整条下线，App 启动时一次性清理历史遗留 `voice_asr_*.m4a`；**云端模式放开语音入口**（v3.0.4 的屏蔽撤销，本地/云端共用同一条路径）
-- **权限**：`project.yml` 补 `NSMicrophoneUsageDescription` + `NSSpeechRecognitionUsageDescription`（此前一个都没有）；Speech 框架**不需要任何 entitlement**，历史「侧载无语音 entitlement 必闪退」系权限串缺失的误判；CI Verify 加断言「两个权限串必须真进包」
-- **接入要点（真机首次必撞的坑，均已处理）**：`SpeechTranscriber` 有硬件要求 → 先查 `isAvailable`/`supportedLocales` 是否为空（不支持要明确提示，别拿 en-US 兜底去初始化）；准备期（下模型/权限弹窗）**不可重入**（一个 bus 只能挂一个 tap，二次 `installTap` 抛异常）、点 × 必须真取消（原来 cancel 在准备期是空操作）；**录音态必须显示实时文本**（原来整块被「红点+松开上屏」替换，边说边出字用户一个字都看不见）；结果流中断要自愈且 `CancellationError` 不误报「转写中断」；`Analyzer` 不做音频转换（converter 为 nil 且格式不符时必须丢弃 buffer）
-- 与 v3.9.1/v3.9.2 攒的改动一起出包：AI 头像换 siri 液态玻璃球（思考中动 / 不思考静态）、UI 打磨 5 批（动效令牌/zoom 转场/滚动层次/字号 8 档/骨架屏）、性能省电 4 项、剪贴板误报修复
-
-## 🆕 近期变更（v3.8.0，2026-09-11）
-
-- **灵动岛 / 锁屏实时活动**：AI 回复中在灵动岛显示（紧凑态图标 + 计时；展开态会话名 +「AI 正在回复 · 模型名」+ 计时），结束自动收起。新增 `QingliaoWidget` app-extension target（**项目首个 widget extension**）+ `LiveActivityManager`（本地驱动，不依赖 APNs）
-- **设置开关**：设置 → 外观 → 交互 →「灵动岛实时活动」（默认开）。关掉立即收回正在显示的活动；启动时会清理上一进程遗留的活动（防"锁屏一直挂着、计时还在跑"）
-- **侧载安装提示**：装这版前先在 SideStore → Advanced → User Customizations 打开 **Customize App Extensions**（否则新挂件会被当"多余扩展"静默删除），弹窗选 **Keep App Extensions (Use Main Profile)**（不额外注册 App ID，不占 10 个/7 天额度）
-- **发版链路加强**：CI Verify 新增 `.appex` 精确路径 + `NSExtensionPointIdentifier` + `NSSupportsLiveActivities` 校验；版本号从 4 处变 **8 处**
-
-## 🆕 近期变更（v3.0.27，2026-08-21）
-
-- **⑧长文目录/大纲导航**：MarkdownRenderer 提取标题生成目录，ChatView 新增 TOC Sheet，长对话可快速跳转到指定章节
-- **⑨会话文件夹/标签**：CategoryStore + SessionsView 分类菜单，会话支持按文件夹分组管理
-- **⑦图片持久化**：ChatStore.uploadImage 将图片上传到服务器，云端对话图片不再丢失
-- **⑩用量统计**：CloudDashboardView 新增 UsageStatsCard 显示消息/Token/会话数
-- **Dock胶囊高亮修复**：DockTabView ultraThinMaterial 改用 View modifier（Shape 方法在 iOS 27 不生效）
-- **ChatView底部间距补回**：v3.0.24 丢失的底部 76pt padding 已恢复
-
-## 🆕 近期变更（v3.0.20~26，2026-08-20~21）
-
-- **视觉模型配置（v3.0.21）**：CloudConfig 新增视觉模型 UserDefaults 存储 + VisionModelSheet 选择弹窗；ChatStore 自动切换视觉模型（主模型支持视觉→用主模型；不支持→用配置视觉模型；未配置→降级文本）
-- **看板重构（v3.0.20）**：卡片统一 dashboardCard() 修饰符；空态折叠；SettingsView 拆分 500 行 body → 8 个 @ViewBuilder + 共用组件；模型层格式化搬到 NASStatus/NASDisk
-- **统一弹窗风格**：所有设置弹窗统一 NavigationStack + toolbar 完成按钮，移除手动 header + xmark
-- **v3.0.22 cherry-pick**：ServerSheet URL/端口校验、主题切换过渡动画、hwCpuText/hwSsdText 预格式化、exportMarkdown 导出、txt/md/pdf 三选导出菜单
-- **v3.0.25**：视觉模型配置移入模型管理弹窗 + 微信通道视觉模型
-- **v3.0.26**：DockTabView @Environment 转义修复
-
-## 🆕 近期变更（v3.0.19，2026-08-20）
-
-- **⭐ 语音指令闭环**：长按智能球从"语音转文字"改为**语音指令**——按住说话"打开客厅灯"→ 松手自动识别 → 直接执行（不确认）→ TTS 播报结果（"客厅灯已打开"）。工具类指令播结果、闲聊播回复摘要；执行中球转圈；语音指令消息带 🎤 标记；**输入框内语音按钮保留原"语音转文字"功能**（两条入口独立）。云端模式新增 **control_ha**（灯/空调/开关控制：toggle/turn_on/turn_off/设温度/切模式，按设备名自动匹配实体）和 **control_docker**（容器启停/重启）两个工具，写操作走确认弹窗
-- **⭐ 微信窗通道模型设置**：本地 AI 设置 →「连接与模型」新增"微信窗通道模型"——可为 **Hermes 微信通道单独选择模型**（模型列表与模型管理一致），设置后重启 gateway 生效，**只影响微信通道，其他通道不受影响**。实现：独立 wechat-profile + profile_routes 路由 + 后端 channel API（9152）
-- **限流友好提示**：本地模式流式中途遇到 429/tpm exhausted（sensenova 等免费额度爆了）时，消息内直接提示"额度限流，请到模型管理换 provider 路由"，不再只显示裸错误
-
-## 🆕 近期变更（v3.0.18，2026-08-20）
-
-- **AI 消息"字挤小框"彻底根治**：v3.0.17 只把**流式中**的 AI 长文改成 SwiftUI Text 渲染（落库后切回 UITextView 仍复现锁窄 bug）——v3.0.18 AI 消息**全程**（含落库后）用 SwiftUI Text 渲染，长按菜单改用 contextMenu 提供（复制/引用/分享/大爆炸/重新生成/删除），`.textSelection(.enabled)` 保系统原生选词复制；用户消息保持 UITextView（短文本无此问题）
-- **云端模式流式气泡统一**：云端直连（SSE）流式输出改用 `stream.content` 驱动 streamingBubble——粒子头像 + SwiftUI Text 渲染与本地模式完全一致；流中报错直接显示错误消息不再留残留气泡
-- **思考期头像改为彩色粒子球**：AI 思考中（三点动画旁）的 bot 头像从静态图标改为粒子球（38pt 蓝紫粉白四色），与输出中粒子球头像全程一致
-- **⭐ 云端 AI 本地工具调用（function calling）**：云端模式对话中模型可调用手机本地工具并自动执行——**日历建事件 / 提醒事项 / 计时器 / 天气 / 剪贴板 / 计算器 / 本地通知** 7 个工具（纯 App 内闭环，不经 NAS 后端）。说"明天下午3点提醒我开会"→ 模型调 create_reminder → 确认弹窗 → 提醒创建。日历/提醒/计时器写操作弹确认框，查询类直接执行；工具执行卡片显示在气泡上方；最多 3 轮工具循环防死循环；设置页"本地工具"开关可关
-- **看板新增设备一键体检**：NAS 面板下方新增"设备体检"卡（六维诊断：服务/磁盘/容器/负载/内存/温度）——点击一键体检，完成显示等级（良好/留意/异常）+ 明细列表（状态色点 + 建议），可展开收起/重新体检；后端 `/api/nas/diagnose` 聚合 15 项诊断（阈值：磁盘 80/90、负载 0.5/1.0 核、内存 25/15%、CPU 温度 70/80、SSD 65）
-
-## 🆕 近期变更（v2.0.139，2026-08-18）
-
-- **特效全面减负（第三轮性能优化）**：①粒子爆发 160→120 颗、光晕大圆只对半数粒子绘制，每帧绘制调用 320→~180（-44%）；②输入框流光 60→30fps（流式回复时重绘开销减半）；③球呼吸外发光 blur 8→6、光晕 88→84pt（blur 开销随半径超线性下降）。视觉密度几乎无差，卡顿进一步消除
-
-## 🆕 近期变更（v2.0.138，2026-08-18）
-
-- **移除圆环波纹特效**：点智能球的"圈圈放大扩散"波纹在 60fps 下持续全屏放大插值仍卡顿（v2.0.135 改 Core Animation 隐式动画后依旧），按用户要求直接移除波纹层，只保留彩色粒子爆发——特效更轻，不再有卡顿感
-
-## 🆕 近期变更（v2.0.137，2026-08-18）
-
-- **粒子爆发冲灵动岛**：点智能球的烟花粒子不再只在下半屏——粒子提速（480-950）提寿命（0.9-1.45s）+ 重力下拉减到 25pt，最大飞行距离约 826pt 能直冲屏幕顶部灵动岛；向上粒子占比 92%、扇形收窄更集中朝上
-- **智能球下沉贴近 Dock**：球态底部间距 26→40pt（球底距 Dock 顶约 12pt），爆发原点同步跟随球心，烟花/波纹从新球心散开
-
-## 🆕 近期变更（v2.0.135，2026-08-18）
-
-- **圆环波纹卡顿修复**：点智能球的"圆环波一圈圈向外扩"特效不再卡——波纹原在 Canvas 里每帧全屏重绘（3 个大椭圆描边），改为 Core Animation 隐式动画（GPU 合成、零逐帧重绘），粒子层保留 Canvas 160 颗；视觉效果不变（3 层错相循环扩散 + 淡出）
-- **键盘收回修复**：键盘打开时点聊天区任意空白即可收回（此前只有点居中 logo 才收）——根因是收键盘手势挂在无 contentShape 的透明容器上，空白处不可命中，且 ScrollView 区域点击不冒泡；修复：消息区补 contentShape + ScrollView 自身挂收键盘手势 + 输入栏消费点击不误收
-
-## 🆕 近期变更（v2.0.134，2026-08-17）
-
-- **粒子纯烟花效果**：去掉末段闪烁与十字星芒，只保留满天烟花粒子（160 颗，先快后慢 + 1.2s 平滑淡出）
-- **粒子 Canvas 性能再优化**：单位圆 Path 复用（原每帧 320 次对象分配 → 1 次）+ 特效层锁 60fps——粒子动画不再拖慢点球展开
-- **键盘衔接优化**：弹键盘顺延到展开动画完成之后（0.4s，完全串行不抢帧）+ 输入框贴键盘动画跟随系统键盘时长/曲线——点球到打字全程平滑无跳变
-
-## 🆕 近期变更（v2.0.133，2026-08-17）
-
-- **智能球动效性能优化**：删局部 BurstEffect（与全屏特效重叠）+ 去掉 blurReplace 过渡（最吃 GPU 的离屏模糊）+ 展开动画 0.5s→0.35s + 键盘弹出顺延 0.28s——点球展开不再掉帧，键盘衔接更顺
-- **智能球呼吸降帧率**：常驻呼吸动画 60fps→30fps（肉眼无差，常驻开销减半）
-- **粒子放烟花效果**：160 颗粒子 + 速度放缓（先快后慢的爆开轨迹）+ 寿命延至 1.2s + 末段星辰闪烁淡出——点击智能球像烟花绽放、满天星辰
-
-## 🆕 近期变更（v2.0.132，2026-08-17）
-
-- **模型管理同步补拉 opencode**：同步按钮拉取 Go 订阅全部 26 个模型（原硬编码 7 个），显示名映射 + 本地兜底 + UserDefaults 持久化
-- **智能球满屏粒子爆发（v2.0.132）**：点击球瞬间 Canvas 90 粒全屏散开 + 超大波纹 + 十字星芒（0.95s 自动消失，Siri 蓝紫粉配色）
-- **智能球语音激活反馈**：长按进语音 → 球变珊瑚红渐变 + 呼吸加速 + waveform 波形图标（替代原小红点）——视觉一眼可辨进入语音输入
-- **长聊天记录流畅性**：消息列表 VStack → LazyVStack（仅渲染可见气泡，长文本滑动/左右切页不再卡）；SELECTABLETEXTLABEL 内容指纹跳过重复 layoutIfNeeded
-- **智能建议主动生成**：进看板无建议时自动生成一次 + 30 分钟本地缓存（轮询/重启不重复生成），不用再手动点
-- **执行历史管理**：滑动单条删除 + 编辑模式多选/全选删除 + 全部清除（后端新增 DELETE /api/history，含存量数据 id 兼容）
-- **设置页文案**：「Siri 圆球输入」改名「智能球」
-
-## 🆕 近期变更（v2.0.125，2026-08-16，回滚后重建）
-
-- **v2.0.125**：聊天文字长按菜单新增「选择文本」（v2.0.120 基础上重建；v2.0.122-124 被另一模型改坏已回滚，备份分支 `backup-v2.0.124-20260816`）
-  - 新文件 `SelectableTextLabel.swift`：文字渲染 Text → UITextView 包装（isSelectable），长按弹原生编辑菜单：复制/引用/分享/大爆炸/**选择文本**/重新生成/撤回/删除
-  - 点「选择文本」→ 选中手按位置的词（tokenizer.rangeEnclosingPosition）+ 原生拖动手柄，可自由拖动复制
-  - **⚠️ iOS 26+ 双 API 必须都实现**：新 `textView(_:editMenuForTextInRanges:)`（ranges 为 [NSValue] 包装 UITextRange，取首个转 UITextRange）+ 旧 `editMenuForTextIn`，共用 buildMenu；只实现旧 API 则 iOS 27 自定义菜单全丢（v2.0.123 坑）
-  - **⚠️ 选中文字用标准 `selectedTextRange`（UITextRange 版）**：iOS 26 弃用的是 UITextView.selectedRange（NSRange 版），selectedTextRange 未弃用；v2.0.124 误信"selectedTextRange 弃用"改 selectedRanges NSRange 换算 → 改坏根源
-  - **⚠️ 气泡级 contextMenu 必须移除**：抢占 UITextView 长按手势致编辑菜单弹不出（v2.0.122 实测）；菜单按区域分发——文字区 UITextView 菜单 / 图片与文件卡片 `cardMenu` / 代码块与表格 `MessageBlockView` 内 SwiftUI 菜单
-  - AI 回复行距缩小：markdown 段 lineSpacing 3→2（用户要求"行跟行中间太宽"，字号不变）
-  - 设置页 9 处开关统一绿底小号（`tint(.green)` + `scaleEffect(0.8)`）
-  - **蜂窝 relay 3.5KB 限制自动分段**（用户实测粘贴长文本被裁）：`sendCore` 发送前用 `relayPayloadLength`（模拟 base64url URL 长度）预判，超 3400 自动 `splitLongText` 二分拆段；第一段先发，后续段 queued 入队（流式/非流式顺序均正确，递归不再触发分段）；`startStream` 蜂窝下 `relaySafeHistory` 从后往前保留历史至 payload 达标——长文本不再被裁，AI 逐段收到完整内容
-- **v2.0.127（修复 125 实测 bug）**：
-  - **🚨🚨 长按菜单全丢根因（v2.0.124/125 都栽在这）**：iOS 26 全面转向 NSRange 体系（`selectedRanges: [NSRange]`、UITextField 新 API 直接 `[NSRange]`），`editMenuForTextInRanges` 的 `ranges: [NSValue]` 包装的是 **NSRange**——必须 `rangeValue` 取；124/125 用 `nonretainedObjectValue as? UITextRange` 转换必然失败 → 返回 nil → **Apple 文档：返回 nil = 显示系统默认菜单**（自定义项全丢、长按直接变文本选择）。修复：`rangeValue` 取 NSRange（兼容 UITextRange 双分支），"选择文本"用 iOS 26 新属性 `textView.selectedRanges = [range]`，旧 API `editMenuForTextIn` 直接删除（部署目标 26.0 永不调用）
-  - AI 回复行距再缩小：lineSpacing 2→1（用户实测 UITextView 渲染视觉比 SwiftUI Text 宽，数值需更小）
-- **v2.0.128**：
-  - **AI 直接发图**：AI 回复中的 markdown 图片语法 `![alt](url)` 自动解析为图片块（`MessageContentBlock.image`），气泡内渲染圆角图（240 上限，与用户图片一致），点击打开大图查看器（含流式中可点）
-    - ⚠️ **自签证书双通道加载**（用户 NAS 就是自签）：URLSession 加载外部公开图，失败降级 `StreamHTTPClient`（忽略证书链校验）——纯 AsyncImage 会因自签证书必失败
-    - 远程图片 NSCache 缓存（`cachedRemoteImage`，40MB，滚动复用不重复下载）；data URL 复用 `dataURLImage`
-    - 折叠消息（>800字）预览中图片语法替换为 `[图片]` 占位
-    - 能力边界：Hermes/后端回复含 markdown 图片 URL 即显示；生图工具未接（NAS 无 GPU）
-  - **设置页 AI 输出行高滑条**：`@AppStorage("qingliao_ai_line_spacing")` 0-6 步进 0.5 默认 1.0（字体大小滑条同款交互，indigo 图标），AI markdown/折叠消息实时生效
-- **v2.0.129**：
-  - **Siri 圆球输入**（用户深夜设计，默认开，设置开关 `qingliao_ball_input`）
-    - 默认状态聊天输入区 = Siri 多彩光晕圆球（TimelineView + AngularGradient 蓝紫粉呼吸，复用 Siri 发光配色）
-    - **单击球** → spring 动画展开成完整输入框（文字/附件/拍照/发送功能与原来一致）+ 自动弹键盘
-    - **长按球** → 语音转文字（球保持特效不展开输入框）；录音中红圈脉冲"松开结束"，转写中转圈，**转写完成自动展开输入框 + 弹键盘**（用户细节③）
-    - 展开态保留直到切换会话（`.id(chat.sessionId)` 重建复位回球，用户细节②）；转写中点击球不响应
-    - ⚠️ 手势 ExclusiveGesture(LongPress, Tap) 互斥（v2.0.98 SIGTRAP 教训，勿叠加 onTap+onLongPress）
-    - 球态居中，独立渲染（不继承输入栏胶囊背景）；`SiriBallView` 组件独立
-- **v2.0.130**：
-  - **修复 AI 长消息文字截断断句**（用户截图实测：气泡底部最后一行只显示一半）：根因 = SwiftUI 用 intrinsicContentSize 布局时宽度未定，UITextView 按单行算高度 → 多行被裁；`SelectableTextLabel` 实现 `sizeThatFits(_:uiView:context:)` 用提案宽度精确计算换行高度，宽度钳制到气泡最大宽（屏幕-60）防 `.infinity` 提案再次单行
-  - **修复行高滑条不生效**：AI 消息行距改为 UserDefaults 直读（`lineSpacingFromSettings`，不依赖 SwiftUI 参数传递时机），主显示 + 折叠消息两处同步
-  - **圆球放大**：主体 44→**72pt**（= 首页"你好，我是轻聊"Logo 同尺寸），外光晕 52→88，整体 56→92，录音红圈同步 92
-  - **球中心样式**（用户指定）：默认态 mic 图标 → **录音圆形 logo 声呐波纹**（3 层圆环 120° 相位差扩散 + 中心白点白光晕，动效+光晕）；录音中红点+松开结束 11pt；转写中转圈 24pt
+**发版红线**：打 tag、正式 IPA 必须先经用户明确批准。
 
 ## 🔀 分支与版本
 
-- `main`：**当前默认分支**，Nori 的开发线（2026-10 起）
-- `native-3.0`：3.0 早期主线，已停更（勿再作为发版基线）
-- `native-2.0`：2.0 历史冻结（终版 tag `v2.0.140`）
-- 版本演进记录在提交信息（v2.0.87bn 起每提交带版本后缀）；发版 tag = `v3.9.x` 递增，`project.yml` 的 build 号（`CFBundleVersion`/`CURRENT_PROJECT_VERSION`）同步 +1
-- 仓库为 public：**任何提交不得包含真实服务器域名/公网 IP/内网 IP/密码/token**（此前已做全历史脱敏，v2.0.52-54；新引入敏感信息即泄露）
+- `main`：**当前默认分支**，Nori 开发线（2026-10 起）
+- `native-3.0` / `native-2.0`：历史版本，已冻结
 
-## 📁 仓库外运维（宿主本机，不在 git）
+## 🎨 视觉规范
 
-- `/opt/data/qingliao_icon/`：`watch_ci_v2034.py`（轮询 CI → 下载 artifact，改 RUN_ID/EXPECT_SHA 后运行）、`ship_ipa.py`（paramiko 转存 IPA 到交付目录，stdin base64 管道 + md5 校验）、`sync_app_dir.py`；**脚本目录可能被系统清理，丢失从会话历史重建**
-- 后端（自部署 Python 服务）与完整开发经验沉淀在 Hermes 技能 `qingliao-ios-native` / `qingliao-webui`（改后端前必读）
+- iOS 26 原生液态玻璃 + 中性系统灰度
+- `systemBackground` 白底、`label` 黑字、`secondary` #8E8E93
+- **无暖色、无奶油色、无手画图标**（用真实资产/SF Symbols）
+- 底栏：系统 tab bar，普通项灰色、选中项黑色
+- 对标 ChatGPT/Muse 设置页质感，拒绝廉价感
+
+## 后端
+
+配套后端：[`github.com/yyyyymmmmm/nori-backend`](https://github.com/yyyyymmmmm/nori-backend)（Docker 部署，含 compose + 部署文档）。
