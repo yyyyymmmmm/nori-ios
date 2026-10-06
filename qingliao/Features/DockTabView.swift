@@ -622,29 +622,22 @@ extension TabTransitionModifier {
         let symbol = (UIImage(systemName: tab.icon, withConfiguration: symbolConfig) ?? UIImage())
             .withTintColor(tint, renderingMode: .alwaysOriginal)
 
-        let label = UILabel()
-        label.text = tab.title
-        label.font = .systemFont(ofSize: 10.5, weight: isSelected ? .semibold : .regular)
-        label.textColor = tint
-        label.textAlignment = .center
-        label.sizeToFit()
+        // 2026-10-07 fix：之前用 UIView.drawHierarchy(afterScreenUpdates:true) 离屏渲染，
+        // 未选中 tab 全画成空白图（选中态因时机恰好画出来）。改纯 CG 直接绘制，离屏可靠。
+        let font = UIFont.systemFont(ofSize: 10.5, weight: isSelected ? .semibold : .regular)
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: tint]
+        let titleSize = (tab.title as NSString).size(withAttributes: attrs)
 
         let spacing: CGFloat = 3
-        let width = ceil(max(symbol.size.width, label.bounds.width)) + 12
-        let height = ceil(symbol.size.height + spacing + label.bounds.height)
-        let size = CGSize(width: width, height: height)
+        let width = ceil(max(symbol.size.width, titleSize.width)) + 12
+        let height = ceil(symbol.size.height + spacing + titleSize.height)
 
-        let container = UIView(frame: CGRect(origin: .zero, size: size))
-        container.backgroundColor = .clear
-        let iv = UIImageView(image: symbol)
-        iv.frame = CGRect(x: (width - symbol.size.width) / 2, y: 0,
-                          width: symbol.size.width, height: symbol.size.height)
-        label.frame = CGRect(x: 0, y: symbol.size.height + spacing, width: width, height: label.bounds.height)
-        container.addSubview(iv)
-        container.addSubview(label)
-
-        let image = UIGraphicsImageRenderer(size: size).image { _ in
-            container.drawHierarchy(in: container.bounds, afterScreenUpdates: true)
+        let image = UIGraphicsImageRenderer(size: CGSize(width: width, height: height)).image { _ in
+            symbol.draw(at: CGPoint(x: (width - symbol.size.width) / 2, y: 0))
+            (tab.title as NSString).draw(
+                at: CGPoint(x: (width - titleSize.width) / 2, y: symbol.size.height + spacing),
+                withAttributes: attrs
+            )
         }
         return image.withRenderingMode(.alwaysOriginal)
     }
