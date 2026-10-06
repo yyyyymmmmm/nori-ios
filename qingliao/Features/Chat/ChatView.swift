@@ -1137,6 +1137,8 @@ struct ChatView: View {
         Color.clear
         .task {
             await resumePersistedStream()
+            // 2026-10-07：从后端同步当前选中模型（只认后端，覆盖本地 UserDefaults）
+            await syncModelFromBackend()
             // v3.9.58c：探测未完任务标记——标记归属**其他**会话时显示「继续上次任务」横幅
             // （归属当前会话的情形 resumePersistedStream 已直接自动接回，无需横幅）
             if !stream.isStreaming, pendingResumeInfo == nil {
@@ -3819,6 +3821,44 @@ struct ChatView: View {
 
     /// v3.5.1：接回在途任务（杀后台/重启前的流）——抽成方法供 .task 与「AI 正在输入」探针共用，
     /// 保证两条路径落库回调一致（否则探针接回的回复没有 onFinished 收尾，答案会丢）。
+    // 2026-10-07：从后端同步当前选中模型（只认后端 /api/agent/hermes/models 的 selected）
+    private func syncModelFromBackend() async {
+        guard let j = try? await auth.json("/api/agent/hermes/models", method: "GET") else { return }
+        var found: (String, String)?
+        if let groups = j["groups"] as? [[String: Any]] {
+            for g in groups {
+                let pid = g["id"] as? String ?? ""
+                if let models = g["models"] as? [[String: Any]] {
+                    for m in models {
+                        if (m["selected"] as? Bool) == true,
+                           let mid = m["id"] as? String {
+                            found = (pid, mid)
+                            break
+                        }
+                    }
+                }
+                if found != nil { break }
+            }
+        } else if let models = j["models"] as? [[String: Any]] {
+            for m in models {
+                if (m["selected"] as? Bool) == true,
+                   let mid = m["id"] as? String {
+                    let pid = m["provider"] as? String ?? ""
+                    found = (pid, mid)
+                    break
+                }
+            }
+        }
+        if let (pid, mid) = found {
+            // 直接写 AppStorage，触发 UI 更新
+            UserDefaults.standard.set(pid, forKey: "qingliao_provider")
+            UserDefaults.standard.set(mid, forKey: "qingliao_model")
+            // 触发 @AppStorage 更新
+            provider = pid
+            modelName = mid
+        }
+    }
+
     private func resumePersistedStream() async {
         // SR2：接回路径也会「在 await 期间被切会话追上」。原来回调无条件写 chat.messages
         // 并用无参 saveToServer（= 当下会话快照）→ A 的答案整会话覆盖掉 B 的历史。

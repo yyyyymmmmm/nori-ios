@@ -114,7 +114,7 @@ struct OnboardingPrimaryButton: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color(uiColor: .systemBackground))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(

@@ -557,9 +557,8 @@ struct MessageBubble: View {
         // v3.0.51：AI 长回复多气泡段落流式——按空行拆段，每段独立气泡，
         // 完成段落稳定可读、末尾段落持续流式（用户感知持续在动）
         // v4.0 fix：流式中跳过拆分（缓存全 miss → 白算 O(n)）
-        // v3.6.5：流式中按「换行」拆行级小气泡（💭心跳/🔧工具行各自独立蹦出）——
-        // splitParagraphs 新增 lineMode：流式中按单换行拆，代价 O(n) 但流式内容短（<10KB）
-        let paras = Self.splitParagraphs(displayContent, streaming: streamingText, lineMode: streamingText)
+        // 2026-10-07：AI 回复不再按段落拆气泡（用户要求：一次回复=一个气泡，对标 ChatGPT/Muse）
+        let paras = [displayContent]
         if paras.count > 1 {
             // 多气泡：每个段落一个独立气泡（贴左，头像在本气泡外右下角）
             VStack(alignment: .leading, spacing: 6) {
