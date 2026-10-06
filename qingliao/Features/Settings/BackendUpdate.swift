@@ -344,12 +344,8 @@ struct BackendUpdateRow: View {
     @State private var showSheet = false
 
     var body: some View {
-        SettingRow(icon: "arrow.triangle.2.circlepath.circle.fill",
-                   iconColor: rowColor,
-                   title: "后端更新",
-                   value: rowValue,
-                   chevron: true)
-            .tapButton { showSheet = true }
+        // 灰度重做 B 路 2026-10-06：新行样式（标题+右侧值+chevron，无图标）；绑定/检查逻辑原样保留
+        GraySettingsRow(title: "后端更新", value: rowValue, chevron: true) { showSheet = true }
             .sheet(isPresented: $showSheet) {
                 BackendUpdateSheet(model: model)
             }
@@ -359,11 +355,6 @@ struct BackendUpdateRow: View {
             }
     }
 
-    private var rowColor: Color {
-        if case .available = model.phase { return .orange }
-        if case .upToDate = model.phase { return .green }
-        return .teal
-    }
     private var rowValue: String {
         switch model.phase {
         case .available: return "有新版本"

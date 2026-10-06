@@ -147,8 +147,9 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("返回")
                 Spacer()
+                // 灰度重做 B 路 2026-10-06：标题对标 Today 参考（约 28pt bold 居中）
                 Text("设置")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(.primary)
                 Spacer()
                 // 右侧占位，保持标题居中（与左侧按钮等宽）
@@ -161,22 +162,19 @@ struct SettingsView: View {
             SettingsSearchBar(text: $settingsQuery)
             ScrollView {
                 ScrollViewReader { proxy in
-                    VStack(spacing: 0) {
+                    // 灰度重做 B 路 2026-10-06：分组之间大间距（对标 Today 参考）
+                    VStack(spacing: 28) {
                         // v4.0.22：搜索结果插在最上面；下面各分组照旧全在 —— 点「滚到分组看」那条结果时
                         // 锚点一定在树上，不需要「先清查询、等一帧再滚」的时序把戏
                         if !settingsQuery.isEmpty {
                             SettingsSearchList(query: settingsQuery) { openSearchEntry($0) }
                         }
-                        // v4.0.6：卡通宠物大头像（设置页顶部，点进去自定义）
-                        AnyView(petStudioBanner)
-                        AnyView(accountSection.id("sec-account"))
-                        AnyView(connectionSection)
-                        AnyView(aiSection.id("sec-ai"))
-                        AnyView(dataSection)
-                        AnyView(agentSection)
-                        AnyView(appearanceSection.id("sec-appearance"))
-                        AnyView(aboutSection)
-                        AnyView(logoutButton)
+                        // 4 分组（能力与连接 / 通用 / 通知 / 关于）；AI形象行已进「通用」，
+                        // 顶部宠物大横幅撤掉（一个功能一个入口）。
+                        capabilitySection.id("sec-ai")
+                        generalSection.id("sec-account")
+                        notificationSection
+                        aboutSection
                     }
                     .onChange(of: searchScrollTarget) { _, target in
                         guard let target else { return }
@@ -192,6 +190,8 @@ struct SettingsView: View {
             }
             .scrollPosition($scrollPos)
         }
+        // 灰度重做 B 路：浅灰分组底（参考图是浅色渐变；灰度语言里用 systemGroupedBackground）
+        .background(Color(uiColor: .systemGroupedBackground))
         .background(settingsCold1())
         .background(settingsCold2())
         .background(settingsCold3())
@@ -466,94 +466,25 @@ struct SettingsView: View {
 
 // MARK: ===== 以下原为 Features/Settings/SettingsViewSections.swift =====
 
-// MARK: - Section 计算属性（body 瘦身：500 行 → 8 个独立段，SwiftUI diff 只遍历变化段）
+// MARK: - Section 计算属性（灰度重做 B 路：4 分组，见下方 MARK）
 
 extension SettingsView {
 
-    @ViewBuilder var accountSection: some View {
-        SectionHeader("账号与安全")
-        VStack(spacing: 0) {
-            SettingRow(icon: "person.crop.circle.fill", iconColor: .blue, title: auth.username, value: "已登录")
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "key.horizontal.fill", iconColor: .gray, title: "修改密码", chevron: true)
-                .tapButton { showPasswordSheet = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            toggleRow(icon: "faceid", iconColor: .blue, title: "Face ID 登录", isOn: $faceIDLogin)
-                .onChange(of: faceIDLogin) { _, on in
-                    if on { requestFaceIDAuth() } else { FaceIDStore.clear() }
-                }
-                .alert("Face ID 未授权", isPresented: $faceIDAuthFailed) {
-                    Button("好的", role: .cancel) {}
-                } message: {
-                    Text("未通过系统 Face ID 验证，登录页快捷登录不可用。")
-                }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            toggleRow(icon: "lock.fill", iconColor: .green, title: "App 锁", isOn: $appLockOn)
-                .onChange(of: appLockOn) { _, on in
-                    if on { requestAppLockAuth() }
-                }
-                .alert("Face ID 未授权", isPresented: $appLockAuthFailed) {
-                    Button("好的", role: .cancel) {}
-                } message: {
-                    Text("未通过系统 Face ID 验证，App 锁不可用。")
-                }
-        }
-        .glassListCard()
-    }
+    // MARK: - 灰度重做 B 路 2026-10-06：4 分组（对标 Today 设置参考图）
+    // 只改视觉结构：所有 @State 弹窗/sheet 开关与行为原样保留。
 
-    @ViewBuilder var connectionSection: some View {
-        SectionHeader("连接与模型")
-        VStack(spacing: 0) {
-            SettingRow(icon: "globe.asia.australia.fill", iconColor: .green, title: "连接设置", chevron: true)
-                .tapButton { showConnSettings = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v4.0.15：后端一键更新（落后自动挂橙点提示；详见 BackendUpdate.swift）
+    @ViewBuilder var capabilitySection: some View {
+        GraySettingsGroup(title: "能力与连接") {
+            GraySettingsRow(title: "连接设置") { showConnSettings = true }
             BackendUpdateRow()
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "cpu.fill", iconColor: .orange, title: "模型管理", value: currentModel, chevron: true)
-                .tapButton { showModelSheet = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "bubble.left.and.bubble.right.fill", iconColor: .blue,
-                       title: "微信通道模型", value: wechatChannelModel, chevron: true)
-                .tapButton { showWechatChannel = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "house.fill", iconColor: .purple, title: "HA 设置", chevron: true)
-                .tapButton { showHASettings = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v3.5.0：MCP 工具服务（App 配 key → Hermes 原生 MCP 工具）
-            SettingRow(icon: "puzzlepiece.extension.fill", iconColor: .teal, title: "MCP 工具服务", chevron: true)
-                .tapButton { showMCPSettings = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v4.0.x：邮件接入（配一次邮箱，AI 就能收发邮件）
-            SettingRow(icon: "envelope.fill", iconColor: .blue, title: "邮件接入", chevron: true)
-                .tapButton { showMailSettings = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v4.0.x：网盘接入（位置按用户要求放设置，不塞连接器面板）
-            SettingRow(icon: "externaldrive.fill", iconColor: .teal, title: "网盘接入", chevron: true)
-                .tapButton { showCloudDrive = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v3.9.95：权限与 AI 操控（授权状态 + 逐项「允许 AI 操作」开关 + 能力边界）
-            SettingRow(icon: "lock.shield.fill", iconColor: .indigo, title: "权限与 AI 操控", chevron: true)
-                .tapButton { showAppPermissions = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            localModelToggle
-        }
-        .glassListCard()
-    }
-
-    @ViewBuilder var localModelToggle: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "cpu")
-                .font(.system(size: Typography.subhead, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 28, height: 28)
-                .background(Color.indigo, in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
-            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                Text("本地模型").font(.system(size: Typography.body, weight: .medium))
-                Text(localStatusText).font(.system(size: Typography.caption)).foregroundStyle(.tertiary).lineLimit(1)
-            }
-            Spacer()
-            Toggle("", isOn: $localModelOn).qingliaoSwitch()
+            GraySettingsRow(title: "模型管理", value: currentModel) { showModelSheet = true }
+            GraySettingsRow(title: "微信通道模型", value: wechatChannelModel) { showWechatChannel = true }
+            GraySettingsRow(title: "HA 设置") { showHASettings = true }
+            GraySettingsRow(title: "MCP 工具服务") { showMCPSettings = true }
+            GraySettingsRow(title: "邮件接入") { showMailSettings = true }
+            GraySettingsRow(title: "网盘接入") { showCloudDrive = true }
+            GraySettingsRow(title: "权限与 AI 操控") { showAppPermissions = true }
+            GraySettingsToggleRow(title: "本地模型", subtitle: localStatusText, isOn: $localModelOn)
                 .onChange(of: localModelOn) { _, new in
                     guard !localModelSyncing else { return }
                     Task {
@@ -571,98 +502,157 @@ extension SettingsView {
                         }
                     }
                 }
-        }
-        .padding(.horizontal, Spacing.xxl).padding(.vertical, Spacing.sm)
-        if localModelOn {
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "shippingbox.fill", iconColor: .indigo, title: "管理模型",
-                       value: "已装列表 / 拉取新模型", chevron: true)
-                .tapButton { showLocalModels = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            Button { Task { await checkLocalUpdate() } } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: Typography.subhead, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(Color.teal, in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
-                    VStack(alignment: .leading, spacing: Spacing.xxs) {
-                        Text("检查模型更新").font(.system(size: Typography.body, weight: .medium))
-                        Text(localUpdateText).font(.system(size: Typography.caption)).foregroundStyle(.tertiary)
+            if localModelOn {
+                GraySettingsRow(title: "管理模型", subtitle: "已装列表 / 拉取新模型") { showLocalModels = true }
+                Button { Task { await checkLocalUpdate() } } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("检查模型更新")
+                                .font(.system(size: 17, weight: .medium))
+                            Text(localUpdateText)
+                                .font(.system(size: 15))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        if localChecking { ProgressView().controlSize(.small) }
                     }
-                    Spacer()
-                    if localChecking { ProgressView().controlSize(.small) }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 13)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, Spacing.xxl).padding(.vertical, Spacing.sm)
-        }
-    }
-
-    @ViewBuilder var aiSection: some View {
-        SectionHeader("AI 智能")
-        VStack(spacing: 0) {
-            SettingRow(icon: "books.vertical.fill", iconColor: .green, title: "知识库", value: "文档检索问答", chevron: true)
-                .tapButton { showKB = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "brain.head.profile", iconColor: .pink, title: "AI 记忆", value: "\(memoryCount) 条", chevron: true)
-                .tapButton { showMemory = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v3.9.26：能力示例（卡片画廊）——让「AI 能出什么卡」可见，不用靠碰运气触发
-            SettingRow(icon: "rectangle.grid.2x2.fill", iconColor: .indigo, title: "能力示例", value: "5 种卡片形态", chevron: true)
-                .tapButton { showCardGallery = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v3.0.81：上下文自动管理
-            toggleRow(icon: "arrow.down.circle.fill", iconColor: .purple,
-                      title: "上下文自动压缩", subtitle: "token超限时AI摘要压缩历史消息", isOn: $contextAutoCompress)
+            GraySettingsRow(title: "知识库", subtitle: "文档检索问答") { showKB = true }
+            GraySettingsRow(title: "AI 记忆", value: "\(memoryCount) 条") { showMemory = true }
+            GraySettingsRow(title: "能力示例", subtitle: "5 种卡片形态") { showCardGallery = true }
+            GraySettingsToggleRow(title: "上下文自动压缩", subtitle: "token超限时AI摘要压缩历史消息", isOn: $contextAutoCompress)
                 .onChange(of: contextAutoCompress) { _, new in
                     UserDefaults.standard.set(new, forKey: "qingliao_context_auto_compress")
                 }
             if contextAutoCompress {
-                Divider().padding(.leading, Spacing.rowDividerInset)
                 HStack {
                     Text("压缩阈值")
-                        .font(.system(size: Typography.body))
+                        .font(.system(size: 17))
                     Spacer()
                     Text("\(contextThreshold) tokens")
-                        .font(.system(size: Typography.body))
+                        .font(.system(size: 15))
                         .foregroundStyle(.secondary)
                     Stepper("", value: $contextThreshold, in: 1000...16000, step: 500)
                         .labelsHidden()
                 }
-                .padding(.horizontal, Spacing.section)
-                .padding(.vertical, Spacing.lg)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
                 .onChange(of: contextThreshold) { _, new in
                     UserDefaults.standard.set(new, forKey: "qingliao_context_threshold")
                 }
             }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v3.9.56：智能路由（TypeSafe 判定开关）——用户 2026-09-21 拍板「开关 + 就地展开」方案。
-            // 后端为真源：开关/模式/阈值改动当场写后端（免重启即时生效），本地不存一份。
-            toggleRow(icon: "arrow.triangle.branch", iconColor: .purple,
-                      title: "智能路由", subtitle: tsRouting.subtitleText, isOn: tsEnabledBinding)
+            GraySettingsToggleRow(title: "智能路由", subtitle: tsRouting.subtitleText, isOn: tsEnabledBinding)
             if tsRouting.enabled {
                 tsRoutingParams
             }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            toggleRow(icon: "message.badge.filled.fill", iconColor: .green,
-                      title: "微信推送", subtitle: "自动化执行结果推送到微信", isOn: $pushWeixin)
+            GraySettingsRow(title: "主动 Agent", subtitle: "AI 主动开口 · 预算/静默/复盘") { showProactive = true }
+            GraySettingsRow(title: "Agent 模型", value: agentModel.isEmpty ? "跟随主模型" : agentModel) { showAgentModelSheet = true }
+            GraySettingsRow(title: "使用说明", chevron: false) {
+                withAnimation(Motion.snap) { showAgentHelp.toggle() }
+            }
+            if showAgentHelp {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Agent 回复恒走 Hermes 智能体：查磁盘/内存、控制设备等自动调用工具")
+                    Text("▸ 直接问：查磁盘/内存/温度、控制设备、执行场景，自动调用工具回复")
+                    Text("▸ 记忆规则：说「以后XX都用agent」，下次同类问题直接 Agent 处理")
+                    Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
+                    Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考轻聊记忆与规则")
+                }
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 14)
+            }
+            GraySettingsRow(title: "Agent 关键词", subtitle: "分流匹配词管理") { showAgentKeywords = true }
+            GraySettingsRow(title: "Agent 记忆", value: agentRuleCount > 0 ? "\(agentRuleCount) 条规则" : "暂无") { showAgentMemory = true }
+        }
+    }
+
+    @ViewBuilder var generalSection: some View {
+        GraySettingsGroup(title: "通用") {
+            GraySettingsStaticRow(title: auth.username, subtitle: "已登录")
+            GraySettingsRow(title: "修改密码") { showPasswordSheet = true }
+            GraySettingsToggleRow(title: "Face ID 登录", isOn: $faceIDLogin)
+                .onChange(of: faceIDLogin) { _, on in
+                    if on { requestFaceIDAuth() } else { FaceIDStore.clear() }
+                }
+                .alert("Face ID 未授权", isPresented: $faceIDAuthFailed) {
+                    Button("好的", role: .cancel) {}
+                } message: {
+                    Text("未通过系统 Face ID 验证，登录页快捷登录不可用。")
+                }
+            GraySettingsToggleRow(title: "App 锁", isOn: $appLockOn)
+                .onChange(of: appLockOn) { _, on in
+                    if on { requestAppLockAuth() }
+                }
+                .alert("Face ID 未授权", isPresented: $appLockAuthFailed) {
+                    Button("好的", role: .cancel) {}
+                } message: {
+                    Text("未通过系统 Face ID 验证，App 锁不可用。")
+                }
+            GraySettingsRow(title: "密码管理", value: "\(secretCount) 条凭据") { showSecrets = true }
+            GraySettingsRow(title: "外观", value: appearanceName) { withAnimation(Motion.snap) { showAppearance = true } }
+                .id("sec-appearance")
+            GraySettingsRow(title: "AI形象", value: petSummary) { showPetStudio = true }
+            GraySettingsToggleRow(title: "震动反馈", isOn: $hapticsOn)
+            GraySettingsToggleRow(title: "首页快捷卡片", isOn: $homeCardsOn)
+            GraySettingsRow(title: "桌面快捷方式",
+                            value: "已选 \(HomeShortcutStore.ids(from: homeShortcutsRaw).count)/\(HomeShortcut.maxCount)") { showHomeShortcuts = true }
+            GraySettingsRow(title: "生活卡片", subtitle: "股票 / 资讯 / 快递") { showLifeCards = true }
+            GraySettingsRow(title: "文件管理", subtitle: "上传目录里的文件") { showFilesManager = true }
+            GraySettingsRow(title: "定时任务") { showTasks = true }
+            GraySettingsRow(title: "执行历史", subtitle: "自动化/场景执行记录") { showHistory = true }
+            GraySettingsRow(title: "日志") { showLogs = true }
+            GraySettingsRow(title: "诊断", value: CrashReporter.hasPendingLog() ? "有待查看" : "设备/网络/崩溃记录") { showDiagnostics = true }
+        }
+    }
+
+    @ViewBuilder var notificationSection: some View {
+        GraySettingsGroup(title: "通知") {
+            GraySettingsToggleRow(title: "微信推送", subtitle: "自动化执行结果推送到微信", isOn: $pushWeixin)
                 .onChange(of: pushWeixin) { _, new in
                     Task { _ = try? await auth.json("/api/push/settings", method: "POST", body: ["pushWeixin": new]) }
                 }
+            GraySettingsRow(title: "定时提醒", subtitle: "一句话定时间") { showQuickReminder = true }
         }
-        .glassListCard()
+    }
+
+    @ViewBuilder var aboutSection: some View {
+        GraySettingsGroup(title: "关于") {
+            GraySettingsRow(title: "关于轻聊") { showAbout = true }
+            // v3.0.5 review fix：退出登录二次确认（与云端一致）
+            Button {
+                confirmLogout = true
+            } label: {
+                Text("退出登录")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+            }
+            .buttonStyle(.plain)
+            .confirmationDialog("退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
+                Button("退出登录", role: .destructive) { auth.logout() }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("退出后回到登录页，可切换本地 AI / 云端 AI 模式。云端配置（API Key）仍保留在手机本地。")
+            }
+        }
     }
 
     /// v3.9.56：智能路由「就地展开」参数区。
-    /// 沿用「上下文自动压缩 → 压缩阈值」的既有展开形态（Divider + 行），不新增 sheet / 文件。
+    /// 灰度重做 B 路：去分割线，行距对标新行组件；判定/回写逻辑原样保留。
     @ViewBuilder var tsRoutingParams: some View {
-        Divider().padding(.leading, Spacing.rowDividerInset)
-
         // 判定模式：两枚胶囊。没有「关闭」档 —— 关掉上面那个开关就是不判定
-        HStack(spacing: Spacing.md) {
-            Text("判定模式").font(.system(size: Typography.body))
-            Spacer(minLength: Spacing.md)
+        HStack(spacing: 12) {
+            Text("判定模式").font(.system(size: 17))
+            Spacer(minLength: 12)
             tsCapsule("智能分流", on: tsRouting.mode == "smart") {
                 Task { await saveTypesafeRouting(["mode": "smart"]) }
             }
@@ -670,56 +660,50 @@ extension SettingsView {
                 Task { await saveTypesafeRouting(["mode": "force_agent"]) }
             }
         }
-        .padding(.horizontal, Spacing.section)
-        .padding(.vertical, Spacing.lg)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
 
         // 后端被 CLI 设成 mode=off 时如实说明（App 里设不出这一档，但读得到）
         if tsRouting.mode == "off" {
             tsParamNote(TypesafeRouting.modeOffHint, warn: true)
         }
 
-        Divider().padding(.leading, Spacing.rowDividerInset)
-
         // 判定阈值：概率 ≥ 该值 → 判「要干活」。后端允许 0~1，UI 收窄到有意义的区间
-        HStack(spacing: Spacing.md) {
-            Text("判定阈值").font(.system(size: Typography.body))
-            Spacer(minLength: Spacing.md)
+        HStack(spacing: 12) {
+            Text("判定阈值").font(.system(size: 17))
+            Spacer(minLength: 12)
             Text(tsRouting.thresholdText)
-                .font(.system(size: Typography.body))
+                .font(.system(size: 15))
                 .foregroundStyle(.secondary)
             Stepper("", value: tsThresholdBinding, in: 0.30...0.95, step: 0.05).labelsHidden()
         }
-        .padding(.horizontal, Spacing.section)
-        .padding(.vertical, Spacing.lg)
-
-        Divider().padding(.leading, Spacing.rowDividerInset)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
 
         // 判定超时：超时即回退关键词规则（不让用户等判定）
-        HStack(spacing: Spacing.md) {
-            Text("判定超时").font(.system(size: Typography.body))
-            Spacer(minLength: Spacing.md)
+        HStack(spacing: 12) {
+            Text("判定超时").font(.system(size: 17))
+            Spacer(minLength: 12)
             Text(tsRouting.timeoutText)
-                .font(.system(size: Typography.body))
+                .font(.system(size: 15))
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, Spacing.section)
-        .padding(.vertical, Spacing.lg)
-
-        Divider().padding(.leading, Spacing.rowDividerInset)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
 
         // 熔断状态：key 失效/上游挂掉连续失败 → 判定自动停 X 秒，期间零上游调用（不再白等）
-        HStack(spacing: Spacing.sm) {
+        HStack(spacing: 8) {
             Circle()
                 .fill(tsBreaker.open ? Color.red : Color.secondary.opacity(Tint.soft))
                 .frame(width: 6, height: 6)
             Text(tsBreaker.statusText(tsRouting))
-                .font(.system(size: Typography.caption))
+                .font(.system(size: 13))
                 .foregroundStyle(tsBreaker.open ? AnyShapeStyle(Color.red) : AnyShapeStyle(.secondary))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, Spacing.section)
-        .padding(.vertical, Spacing.lg)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
         // 熔断期间每 5 秒跟一次后端：倒计时会走，后端半开重试成功后状态自己翻回来
         .task(id: tsBreaker.open) {
             guard tsBreaker.open else { return }
@@ -731,15 +715,15 @@ extension SettingsView {
             }
         }
 
-        HStack(spacing: Spacing.md) {
+        HStack(spacing: 12) {
             tsCapsule("立即复位熔断", on: false) {
                 Task { await saveTypesafeRouting(["reset_breaker": true]) }
             }
             if tsBusy { ProgressView().controlSize(.small) }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, Spacing.section)
-        .padding(.bottom, Spacing.lg)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
 
         if !tsError.isEmpty {
             tsParamNote(tsError, warn: true)
@@ -751,222 +735,19 @@ extension SettingsView {
     @ViewBuilder func tsParamNote(_ text: String, warn: Bool) -> some View {
         HStack {
             Text(text)
-                .font(.system(size: Typography.caption))
+                .font(.system(size: 13))
                 .foregroundStyle(warn ? AnyShapeStyle(Color.red) : AnyShapeStyle(.tertiary))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, Spacing.section)
-        .padding(.bottom, Spacing.lg)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
     }
 
-    @ViewBuilder var dataSection: some View {
-        SectionHeader("数据与自动化")
-        VStack(spacing: 0) {
-            SettingRow(icon: "key.fill", iconColor: .teal, title: "密码管理", value: "\(secretCount) 条凭据", chevron: true)
-                .tapButton { showSecrets = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "clock.badge.fill", iconColor: .red, title: "定时任务", chevron: true)
-                .tapButton { showTasks = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "clock.arrow.circlepath", iconColor: .orange, title: "执行历史",
-                       value: "自动化/场景执行记录", chevron: true)
-                .tapButton { showHistory = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "doc.text.fill", iconColor: .orange, title: "日志", chevron: true)
-                .tapButton { showLogs = true }
-            // v3.6.0：崩溃日志入口整合为「诊断」页（App 自身诊断 + 崩溃/卡顿自上报）
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "stethoscope", iconColor: .red, title: "诊断",
-                       value: CrashReporter.hasPendingLog() ? "有待查看" : "设备/网络/崩溃记录",
-                       chevron: true)
-                .tapButton { showDiagnostics = true }
-            // v3.5.x：生活卡片设置（股票 / 资讯 / 快递）
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "rectangle.grid.2x2", iconColor: .green, title: "生活卡片",
-                       value: "股票 / 资讯 / 快递", chevron: true)
-                .tapButton { showLifeCards = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v3.9.32：一句话本地定时提醒（与上面「定时任务」不同：纯本地系统通知，App 不在也响）
-            SettingRow(icon: "bell.badge.fill", iconColor: .pink, title: "定时提醒",
-                       value: "一句话定时间", chevron: true)
-                .tapButton { showQuickReminder = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v3.9.32：文件管理（上传目录浏览：预览 / 分享 / 重命名 / 删除）
-            SettingRow(icon: "folder.fill", iconColor: .indigo, title: "文件管理",
-                       value: "上传目录里的文件", chevron: true)
-                .tapButton { showFilesManager = true }
-        }
-        .glassListCard()
-    }
-
-    @ViewBuilder var agentSection: some View {
-        // v3.4.12：移除「Agent 智能回复」开关——后端主链路（STREAM_HERMES_SESSION=1）v3.4.8 起
-        // 所有聊天恒走 Hermes agent 工具循环，开关已无实权（只影响日志/回退路径），移除 UI 防误导；
-        // Agent 模型/关键词/记忆入口保留（模型仍影响 resolveModel 选型，关键词/记忆管理后端端点仍活）。
-        SectionHeader("Agent 设置")
-        VStack(spacing: 0) {
-            // v4.0.11：主动 Agent 入口（放最前——这是「AI 会自己开口」的总闸，用户第一眼要看它）
-            SettingRow(icon: "bolt.horizontal.circle.fill", iconColor: .orange, title: "主动 Agent",
-                       value: "AI 主动开口 · 预算/静默/复盘", chevron: true)
-                .tapButton { showProactive = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            // v3.0.20：Agent 模型自定义（可单独指定 Agent 使用的模型，不依赖主模型）
-            SettingRow(icon: "cpu.fill", iconColor: .indigo, title: "Agent 模型",
-                       value: agentModel.isEmpty ? "跟随主模型" : agentModel, chevron: true)
-                .tapButton { showAgentModelSheet = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "questionmark.circle.fill", iconColor: .gray, title: "使用说明", chevron: false)
-                .tapButton { withAnimation(Motion.snap) { showAgentHelp.toggle() } }
-            if showAgentHelp {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Agent 回复恒走 Hermes 智能体：查磁盘/内存、控制设备等自动调用工具")
-                    Text("▸ 直接问：查磁盘/内存/温度、控制设备、执行场景，自动调用工具回复")
-                    Text("▸ 记忆规则：说「以后XX都用agent」，下次同类问题直接 Agent 处理")
-                    Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
-                    Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考轻聊记忆与规则")
-                }
-                .font(.system(size: Typography.subhead)).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Spacing.xxl).padding(.bottom, Spacing.xl)
-            }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "text.badge.plus", iconColor: .orange, title: "Agent 关键词", value: "分流匹配词管理", chevron: true)
-                .tapButton { showAgentKeywords = true }
-            Divider().padding(.leading, Spacing.rowDividerInset)
-            SettingRow(icon: "brain.head.profile", iconColor: .purple, title: "Agent 记忆",
-                       value: agentRuleCount > 0 ? "\(agentRuleCount) 条规则" : "暂无", chevron: true)
-                .tapButton { showAgentMemory = true }
-        }
-        .glassListCard()
-    }
-
-    @ViewBuilder var appearanceSection: some View {
-        SectionHeader("外观与显示")
-        VStack(spacing: 0) {
-            SettingRow(icon: "circle.lefthalf.filled", iconColor: .purple, title: "外观", value: appearanceName, chevron: true)
-                .tapButton { withAnimation(Motion.snap) { showAppearance = true } }
-            // v4.0.6：宠物配置行（顶部大头像是主入口，这里是滚动后的兜底入口，同一个 sheet）
-            SettingRow(icon: "face.smiling.inverse", iconColor: .pink, title: "AI形象",
-                       value: petSummary, chevron: true)
-                .tapButton { showPetStudio = true }
-            // v4.0.9：点击震动总开关。闸门在 Core/Haptics.swift 的 4+5 个语义入口统一 early-return，
-            // 覆盖全站 144 处 Haptics.* 调用点；这里只是那个开关的唯一 UI 入口。
-            // 默认开（key 缺失 = 开）→ 老用户行为不变。
-            SettingRow(icon: "iphone.radiowaves.left.and.right", iconColor: .teal, title: "震动反馈",
-                       toggle: $hapticsOn)
-            // v4.0.10（用户要求）：首页快捷卡片**总开关**。关掉 = 聊天页首页那一整块网格
-            // （含「自定义」入口）都不渲染；卡片的逐张开关与排序**原样留着**，再打开照旧。
-            // 关掉后想加回来就走这里（首页没有入口可点了，所以这一行必须恒在）。
-            SettingRow(icon: "rectangle.grid.2x2.fill", iconColor: .blue, title: "首页快捷卡片",
-                       toggle: $homeCardsOn)
-            // v3.9.82：桌面图标长按快捷方式（长按桌面「轻聊」图标即可看到选中的几项）。
-            // 行尾计数读 @AppStorage 原始串（HomeShortcutStore.ids(from:)）→ 弹窗里改完立即刷新。
-            SettingRow(icon: "square.grid.2x2.fill", iconColor: .indigo, title: "桌面快捷方式",
-                       value: "已选 \(HomeShortcutStore.ids(from: homeShortcutsRaw).count)/\(HomeShortcut.maxCount)",
-                       chevron: true)
-                .tapButton { showHomeShortcuts = true }
-            // v3.x review fix：showAppearanceOptions 死代码块（深浅色 chips/输入框流光/Siri 发光滑条/
-            // AI 输出行高）永不显示（唯一写点恒置 false）——已删除，统一由 AppearanceSheet 管理
-        }
-        .glassListCard()
-    }
-
-    // v4.0.6：卡通宠物大头像入口（设置页顶部居中）。
-    //
-    // 为什么放最顶：宠物是 App 的表情门面，入口要显眼；同时「聊天页形象」段已从外观页搬进
-    // 那一层（用户 v4.0.6 拍板），所以这里就是**唯一**的宠物配置入口。
-    //
-    // ⚠️ 尺寸口径：直接 `PetAvatar(size: 96)` 画，**不要**再套 `.frame` 去"缩"（v3.9.78 真机报修：
-    // frame 只改布局槽位、不缩放画面，96pt 画布会溢出 52pt 槽位压住边框和文字）。真要小就传小 size。
-    @ViewBuilder var petStudioBanner: some View {
-        // v4.0.11：只留卡通头像本体 + 头像下方一行名称（petSummary），角标/提示文字撤掉
-        Button {
-            showPetStudio = true
-        } label: {
-            VStack(spacing: Spacing.xs) {
-                PetAvatar(size: 96, state: .idle, keepDetail: true)
-                Text(petStyle.name)
-                    .font(.system(size: Typography.subhead, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
-                    .fill(Color(uiColor: .secondarySystemGroupedBackground).opacity(0.6))
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("卡通宠物：\(petSummary)")
-        .accessibilityHint("轻点进入自定义")
-        .padding(.bottom, Spacing.sm)
-    }
-
-    /// 行尾/角标摘要：形象 + 表情 + 动作数（一行说完，别让人点进去才发现是空的）
+    /// 行尾摘要：形象 + 表情 + 动作数（一行说完，别让人点进去才发现是空的）
     private var petSummary: String {
         let on = PetKeys.enabledQuirks().count
         return "\(petStyle.name) · \(petFace.name)脸 · 动作 \(on)/\(Quirk.pool.count)"
-    }
-
-    @ViewBuilder var aboutSection: some View {
-        SectionHeader("关于")
-        VStack(spacing: 0) {
-            SettingRow(icon: "info.circle.fill", iconColor: .gray, title: "关于轻聊", chevron: true)
-                .tapButton { showAbout = true }
-        }
-        .glassListCard()
-    }
-
-    @ViewBuilder var logoutButton: some View {
-        SectionHeader("")
-        Button {
-            confirmLogout = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
-                    .font(.system(size: Typography.body, weight: .semibold))
-                Text("退出登录")
-                    .font(.system(size: Typography.body, weight: .semibold))
-            }
-            .foregroundStyle(.red)
-            .padding(.horizontal, 40).padding(.vertical, Spacing.xl)
-            .background(Color.red.opacity(0.35), in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .confirmationDialog("退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
-            Button("退出登录", role: .destructive) { auth.logout() }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("退出后回到登录页，可切换本地 AI / 云端 AI 模式。云端配置（API Key）仍保留在手机本地。")
-        }
-        .padding(.top, Spacing.xxs)
-    }
-}
-
-// MARK: ===== 以下原为 Features/Settings/SettingsViewHelpers.swift =====
-
-// MARK: - 共用组件（toggle 行 / Siri 滑条）
-
-extension SettingsView {
-
-    func toggleRow(icon: String, iconColor: Color, title: String, subtitle: String? = nil, isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 12) {
-            // 灰度重做 2026-10-06 晚：行去图标（对标 iOS 26 设置参考）。
-            // icon/iconColor 参数保留（多处调用，改签名风险高），此处不再渲染。
-            if let subtitle {
-                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                    Text(title).font(.system(size: Typography.body, weight: .medium))
-                    Text(subtitle).font(.system(size: Typography.caption)).foregroundStyle(.tertiary)
-                }
-            } else {
-                Text(title).font(.system(size: Typography.body)).foregroundStyle(.primary)
-            }
-            Spacer()
-            Toggle("", isOn: isOn).qingliaoSwitch()
-        }
-        .padding(.horizontal, Spacing.xxl).padding(.vertical, Spacing.lg)
     }
 }
 
