@@ -114,7 +114,7 @@ struct DockTabView: View {
 
             TabView(selection: $selected) {
                 // 灰度重做 2026-10-06：5 Tab IA（对话/资讯/点子/目标/看板）。
-                // 系统 tab bar 藏掉（见下方 .toolbar），用自绘灰胶囊 tab bar。
+                // iOS 26 系统 tab bar 原生就是悬浮液态玻璃胶囊（见 sarunw iOS 26 适配），直接用系统。
                 chatTab
                 // 资讯：动态 feed 页（信息流，对标 Muse「动态」）
                 FeedTabView(onAskAI: askAI)
@@ -136,13 +136,10 @@ struct DockTabView: View {
                     .tabTransition(for: .dashboard, selected: $selected)
             }
             // F线 2026-10-06：不再藏系统 tab bar（iOS 26 藏不干净导致双底栏，用户拍板直接用系统）。
-            // 2026-10-07：选中态原生 tint 保底（.primary 纯黑/纯白，不准蓝色）；未选中态走
-            // configureGrayTabBarAppearance（App init 最早时机）+ tabItem 显式前景色。
+            // 2026-10-07 根因：iOS 26 下唯一生效的是 SwiftUI .tint（管选中态）；
+            // UITabBar.appearance() / 实例 tintColor / tabItem 内 foregroundStyle
+            // 全被 Liquid Glass bar 忽略——未选中色没有 API，只能接受系统默认灰。
             .tint(.primary)
-            // 2026-10-07 真机两轮未生效：iOS 26 下 SwiftUI TabView 不吃 UITabBar.appearance()
-            // 代理（未选中 tetap 黑）。改实例级硬设：onAppear 后遍历 window 找到 UITabBar
-            // 实例，直接写 unselectedItemTintColor——实例属性优先级高于代理，必生效。
-            .onAppear { DockTabView.enforceTabBarItemColors() }
             // v4.0.49x：启动链折叠（防 demangler 栈溢出）——原 24 条顶层修饰器按序折进 4 个具名分组，
             // body 这里只留 4 个 .modifier(…) 泛型调用。事故/手法同 ChatView.v4.0.49：
             // 巨型链把 body 编译后类型名撑到 2574 字符（全 App 最长），Swift 运行时按嵌套层数递归
@@ -571,15 +568,17 @@ private struct TabTransitionModifier: ViewModifier {
         content
             .tag(tab)
             .tabItem {
-                // 2026-10-07 真机反馈：未选中仍是黑色——SwiftUI 原生再保一层：
-                // 按选中态显式给 label 前景色（选中 .primary+semibold，未选中 .tertiary）
+                // 2026-10-07 根因（iOS 26 实测 + 第三方验证）：
+                // iOS 26 的 Liquid Glass tab bar 在把 Label 转成 UITabBarItem 时会丢掉
+                // 里面的 .foregroundStyle，显式设色反而让系统用整条 bar 的 tint 渲染
+                // 所有项 → 未选中也被染黑。正确做法：tabItem 里不设任何颜色，
+                // 只留 .tint(.primary) 管选中态（唯一生效的 API），未选中交给系统默认灰。
                 Label {
                     Text(tab.title)
                         .fontWeight(selected == tab ? .semibold : .regular)
                 } icon: {
                     Image(systemName: tab.icon)
                 }
-                .foregroundStyle(selected == tab ? .primary : .tertiary)
             }
             .scaleEffect(appeared ? 1 : 0.985, anchor: .center)   // v3.4.29：0.97→0.985，入场更细腻
             .animation(Motion.snap, value: appeared)
@@ -792,9 +791,11 @@ private extension DockTabView {
     /// 三种 layoutAppearance 全配（iOS 26 横竖屏/紧凑模式走不同的 layout）。
     /// v4.x item4：选中标题加一档字重（semibold），未选中换更淡的 tertiaryLabel 拉开对比。
     /// 只改颜色，不动背景/玻璃（v3.9.47 透明化判无效的前车之鉴）。
-    /// 2026-10-07 真机反馈：未选中仍是黑色——根因是本函数之前挂在 `.onAppear`，
-    /// 调用时机晚于 tab bar 创建，appearance 代理没吃上。改：App init 最早时机只执行一次
-    ///（见 QingliaoApp.init），并补 tintColor/unselectedItemTintColor 双保险。
+    /// 2026-10-07 注：iOS 26 下本函数实际不生效（第三方 iPhone 17 Pro/iOS 26.5
+    /// 诊断构建验证：Liquid Glass bar 完全忽略 UITabBar.appearance 代理——
+    /// standardAppearance/scrollEdgeAppearance/tintColor/unselectedItemTintColor
+    /// 全被忽略）。保留仅作前向兼容（未来小版本若恢复代理即生效），
+    /// 当前真机颜色只靠 TabView.tint(.primary)（选中黑）+ 系统默认（未选中灰）。
     /// 注意：所在 extension 是 private，必须显式标 internal，否则 App 入口调不到。
     internal static func configureGrayTabBarAppearance() {        let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
@@ -814,30 +815,6 @@ private extension DockTabView {
         proxy.scrollEdgeAppearance = appearance
         proxy.tintColor = selected               // 选中态双保险（SwiftUI .tint 同口径）
         proxy.unselectedItemTintColor = normal   // 未选中态双保险
-    }
-
-    /// 2026-10-07：实例级硬设（见 TabView.onAppear 调用点）。appearance 代理在 iOS 26
-    /// SwiftUI 下两轮未生效，直接对 UITabBar 实例写色。async 到下一 runloop，确保
-    /// tab bar 已创建。
-    internal static func enforceTabBarItemColors() {
-        DispatchQueue.main.async {
-            for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
-                for window in scene.windows {
-                    if let bar = findTabBar(in: window) {
-                        bar.tintColor = .label
-                        bar.unselectedItemTintColor = .tertiaryLabel
-                    }
-                }
-            }
-        }
-    }
-
-    private static func findTabBar(in view: UIView) -> UITabBar? {
-        if let bar = view as? UITabBar { return bar }
-        for sub in view.subviews {
-            if let found = findTabBar(in: sub) { return found }
-        }
-        return nil
     }
 
     /// 折叠第 2 组（6 条）：菜单/识别浮层的动画 + 宠物菜单修饰符 + 识别浮层 + 语音对话/会话纪要两个全屏页。
