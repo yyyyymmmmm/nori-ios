@@ -14,7 +14,7 @@ struct IdeasTabView: View {
                     PageHeader(title: "点子", subtitle: "灵感与备忘")
                     MemoSection()
                 }
-                .padding(.horizontal, Spacing.page)
+                .padding(.horizontal, Spacing.section)
                 .padding(.bottom, 100)   // 给悬浮 tab bar 留空
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -31,7 +31,7 @@ struct GoalsTabView: View {
                     PageHeader(title: "目标", subtitle: "长期目标与进展")
                     GoalsSection()
                 }
-                .padding(.horizontal, Spacing.page)
+                .padding(.horizontal, Spacing.section)
                 .padding(.bottom, 100)   // 给悬浮 tab bar 留空
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -64,7 +64,7 @@ struct FeedTabView: View {
                         }
                     }
                 }
-                .padding(.horizontal, Spacing.page)
+                .padding(.horizontal, Spacing.section)
                 .padding(.bottom, 100)   // 给悬浮 tab bar 留空
             }
             .toolbar(.hidden, for: .navigationBar)

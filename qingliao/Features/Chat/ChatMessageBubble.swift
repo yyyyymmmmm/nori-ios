@@ -527,7 +527,7 @@ struct MessageBubble: View {
                     .font: UIFont.systemFont(ofSize: CGFloat(fontSize)),
                     .foregroundColor: UIColor.label
                 ]),
-                fallbackColor: .primary,
+                fallbackColor: .label,
                 lineSpacing: LineSpacing.compact,
                 onCopy: { UIPasteboard.general.string = message.content; Haptics.success() },   // v3.9.30：复制触感
                 onQuote: onQuote,
