@@ -28,18 +28,16 @@ private struct ChatScrollSnapshot: Equatable {
 }
 
 // 2026-10-07：聊天底部可见性检测（回到底部按钮用）
-@MainActor
 private struct ChatBottomVisibleKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    nonisolated(unsafe) static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
 }
 
 // 2026-10-07：聊天视口高度（配合底部锚点判断是否在底部）
-@MainActor
 private struct ChatViewportHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    nonisolated(unsafe) static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
