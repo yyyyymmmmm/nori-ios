@@ -69,7 +69,8 @@ struct BubbleTheme {
     static func aiBubble(scheme: ColorScheme, highlighted: Bool = false) -> Color {
         highlighted
             ? Color.accentColor.opacity(Tint.subtle)
-            : (scheme == .dark ? Color(uiColor: .systemGray5) : .white)
+            // 2026-10-07：浅色 AI 气泡改浅灰（用户指定，对标截图 #E9E9EB）
+            : (scheme == .dark ? Color(uiColor: .systemGray5) : Color(red: 0.914, green: 0.914, blue: 0.922))
     }
 }
 
