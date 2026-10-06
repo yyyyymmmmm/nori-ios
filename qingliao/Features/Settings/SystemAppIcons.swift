@@ -1,11 +1,50 @@
 import SwiftUI
+import UIKit
 
-// MARK: - Apple 风格应用图标（手绘复刻）
+// MARK: - 真机 App 图标（私有 API）
 //
-// 背景：iOS 没有公开 API 能拿到其它 App 的真实图标；Muse 的「连接应用」页用的是
-// 真机 App 图标（日历/通讯录/提醒事项/健康/照片/音乐），咱们用 SF 符号被用户一眼看穿。
-// 这里按 Apple 原图标手绘一套（日历带当天日期），只用于「连接应用·本机」页。
-// 非 Apple 系能力（剪贴板/文件/通知/邮件/家庭/待办）继续用 SF 符号，不冒充系统应用。
+// 别人（Muse 等）怎么拿到的：iOS 私有 API
+// `+[UIImage _applicationIconImageForBundleIdentifier:format:scale:]`。
+// 公开 SDK 没有，App Store 审核不让用；咱们是侧载包，不受审核限制。
+// 拿不到（未来 iOS 改掉）时自动回退下面的手绘复刻，不会崩、不会空白。
+
+enum RealAppIcon {
+    static func image(for bundleID: String) -> UIImage? {
+        let sel = NSSelectorFromString("_applicationIconImageForBundleIdentifier:format:scale:")
+        guard let method = class_getClassMethod(UIImage.self, sel) else { return nil }
+        let imp = method_getImplementation(method)
+        typealias Fn = @convention(c) (AnyClass, Selector, NSString, Int, CGFloat) -> Unmanaged<UIImage>?
+        let fn = unsafeBitCast(imp, to: Fn.self)
+        guard let unmanaged = fn(UIImage.self, sel, bundleID as NSString, 0, UIScreen.main.scale) else {
+            return nil
+        }
+        return unmanaged.takeUnretainedValue()
+    }
+}
+
+/// 系统应用图标：优先私有 API 拿真图标（含日历当天日期），失败回退手绘。
+struct SystemAppIconView: View {
+    var bundleID: String?
+    var fallback: AppleStyleIcon.Kind
+    var size: CGFloat = 44
+
+    var body: some View {
+        Group {
+            if let bundleID, let uiImage = RealAppIcon.image(for: bundleID) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                AppleStyleIcon(kind: fallback, size: size)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.235, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+    }
+}
+
+// MARK: - Apple 风格应用图标（手绘复刻，仅作私有 API 拿不到时的回退）
 
 struct AppleStyleIcon: View {
     enum Kind {
@@ -150,7 +189,7 @@ struct AppleStyleIcon: View {
     ]
 }
 
-// MARK: - AppCapability → Apple 风格图标映射
+// MARK: - AppCapability → 系统应用映射
 
 extension AppCapability {
     /// 本机页用真机风格图标；非 Apple 系能力返回 nil（继续用 SF 符号）
@@ -162,6 +201,19 @@ extension AppCapability {
         case .photos:    return .photos
         case .location:  return .location
         case .health:    return .health
+        default:         return nil
+        }
+    }
+
+    /// 真机 App 的 Bundle ID（私有 API 取真实图标用）
+    var systemAppBundleID: String? {
+        switch self {
+        case .calendar:  return "com.apple.mobilecal"
+        case .reminders: return "com.apple.reminders"
+        case .contacts:  return "com.apple.MobileAddressBook"
+        case .photos:    return "com.apple.mobileslideshow"
+        case .location:  return "com.apple.findmy"
+        case .health:    return "com.apple.Health"
         default:         return nil
         }
     }

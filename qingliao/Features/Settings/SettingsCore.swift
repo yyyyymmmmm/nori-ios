@@ -617,6 +617,24 @@ extension SettingsView {
                 }
             MuseRowDivider()
             GraySettingsRow(icon: "lock.rectangle.stack", title: "密码管理", value: "\(secretCount) 条密码") { showSecrets = true }
+            MuseRowDivider()
+            // 2026-10-07 真机反馈：退出登录从「关于我们」搬到个人中心（一个功能一个入口）
+            Button {
+                confirmLogout = true
+            } label: {
+                Text("退出登录")
+                    .font(.system(size: Typography.title, weight: .semibold))
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Spacing.xxl)
+            }
+            .buttonStyle(.plain)
+        }
+        .confirmationDialog("退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
+            Button("退出登录", role: .destructive) { auth.logout() }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("退出后回到登录页。云端配置（API Key）仍保留在手机本地。")
         }
     }
 
@@ -641,24 +659,6 @@ extension SettingsView {
             MuseRowDivider()
             // K 线 2026-10-06：使用说明从智能体组移到关于组（静态帮助）
             GraySettingsRow(icon: "questionmark.circle", title: "使用说明") { showAgentHelp = true }
-            MuseRowDivider()
-            // v3.0.5 review fix：退出登录二次确认（与云端一致）
-            Button {
-                confirmLogout = true
-            } label: {
-                Text("退出登录")
-                    .font(.system(size: Typography.title, weight: .semibold))
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.xxl)
-            }
-            .buttonStyle(.plain)
-            .confirmationDialog("退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
-                Button("退出登录", role: .destructive) { auth.logout() }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("退出后回到登录页。云端配置（API Key）仍保留在手机本地。")
-            }
         }
     }
 

@@ -137,8 +137,11 @@ struct ConnectAppsView: View {
     @ViewBuilder
     private func deviceRow(_ cap: AppCapability) -> some View {
         let st = states[cap] ?? .notDetermined
-        // 2026-10-07 真机反馈：本机页用 Apple 风格真机图标（对标 Muse），不用 SF 符号
-        let appleIcon: AnyView? = cap.appleStyleKind.map { AnyView(AppleStyleIcon(kind: $0, size: 44)) }
+        // 2026-10-07 真机反馈：本机页用真机 App 图标（私有 API，对标 Muse），
+        // 拿不到时回退手绘；非 Apple 系能力继续 SF 符号
+        let appleIcon: AnyView? = cap.appleStyleKind.map { kind in
+            AnyView(SystemAppIconView(bundleID: cap.systemAppBundleID, fallback: kind, size: 44))
+        }
         GraySettingsRow(icon: appleIcon == nil ? cap.sfSymbol : nil,
                         colorful: appleIcon == nil,
                         iconView: appleIcon,
@@ -149,7 +152,8 @@ struct ConnectAppsView: View {
     }
 
     private var musicRow: some View {
-        GraySettingsRow(iconView: AnyView(AppleStyleIcon(kind: .music, size: 44)),
+        GraySettingsRow(iconView: AnyView(SystemAppIconView(bundleID: "com.apple.Music",
+                                                            fallback: .music, size: 44)),
                         title: "音乐",
                         subtitle: "读取媒体库，为你播放音乐", value: musicState.label, chevron: false) {
             Task { await tapMusic() }
@@ -157,7 +161,8 @@ struct ConnectAppsView: View {
     }
 
     private var micRow: some View {
-        GraySettingsRow(iconView: AnyView(AppleStyleIcon(kind: .mic, size: 44)),
+        GraySettingsRow(iconView: AnyView(SystemAppIconView(bundleID: nil,
+                                                            fallback: .mic, size: 44)),
                         title: "麦克风",
                         subtitle: "语音输入与语音对话", value: micState.label, chevron: false) {
             Task { await tapMic() }
