@@ -1,5 +1,5 @@
 // 本文件原为 Features/Settings/SettingsModels.swift 的物理拆分（纯搬运，UI 与行为零改动）。
-// 上游文件保留 ModelSheet / provider 缓存 / 自定义模型组；本文件承载 自定义 provider 编辑表 + 关于页。
+// 上游文件（SettingsModels.swift）保留 provider 缓存 / 自定义模型组（J 线 2026-10-06：ModelSheet 已删，模型切换并入「连接设置」）；本文件承载 自定义 provider 编辑表 + 关于页。
 
 import Foundation
 import SwiftUI

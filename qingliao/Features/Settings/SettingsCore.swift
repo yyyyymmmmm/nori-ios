@@ -51,16 +51,19 @@ struct SettingsView: View {
     @State var showHomeShortcuts = false
     @AppStorage(HomeShortcutStore.defaultsKey) var homeShortcutsRaw = ""
     @State var scrollPos = ScrollPosition()
-    @State var showModelSheet = false
-    @State var showWechatChannel = false   // v3.0.19：微信窗通道模型设置
+    // J 线 2026-10-06：模型管理独立页已删（模型切换并入「连接设置」）；
+    // 微信通道模型已删（微信走「对接第三方」platforms）；权限与 AI 操控已拆入「连接应用」；
+    // 能力示例（卡片画廊）整行删掉；微信推送开关删掉。
     @State var showAbout = false
     @State var confirmLogout = false   // v3.0.5 review fix：退出登录二次确认（与云端一致）
     @State var secretCount = 0
     @State var showHASettings = false
     // v3.5.0：MCP 工具服务管理弹窗
     @State var showMCPSettings = false
-    // v3.9.95：权限与 AI 操控（日历/相册/通知/HomeKit 的授权与 AI 开关）
-    @State var showAppPermissions = false
+    // J 线 2026-10-06：新增页开关
+    @State var showConnectApps = false
+    @State var showThirdParty = false
+    @State var showReadAloud = false
     // v4.0.x：邮件接入（IMAP/SMTP 邮箱账号，AI 可收发邮件）
     @State var showMailSettings = false
     // v4.0.x：网盘接入（夸克等官方 skill 包 + 授权码；用户口径=放设置，不进连接器面板）
@@ -82,7 +85,8 @@ struct SettingsView: View {
     @State var showAgentMemory = false
     @State var agentRuleCount = 0
     // v3.0.20：Agent 模型自定义（独立于主模型，可单独指定 Agent 使用的模型）
-    @State var showAgentModelSheet = false
+    // J 线 2026-10-06：Agent 模型独立页已删（一个功能一个入口，主模型在「连接设置」统一管理）；
+    // UserDefaultsKey.agentModel / agentProvider 的 key 保留（ChatStore/AppIntents 仍在读）。
     @AppStorage(UserDefaultsKey.agentModel) var agentModel = ""
     @AppStorage(UserDefaultsKey.agentProvider) var agentProvider = ""
     // v2.0.116：执行历史弹窗
@@ -99,10 +103,7 @@ struct SettingsView: View {
     @State var localChecking = false
     // v2.0.118：本地模型管理弹窗
     @State var showLocalModels = false
-    @State var showCardGallery = false   // v3.9.26：能力示例（卡片画廊）
-    // v3.0.10：视觉模型配置弹窗（已移至模型管理弹窗内）
-    // v2.0.113：微信推送开关（同步后端 push_settings.json）
-    @AppStorage("qingliao_push_weixin") var pushWeixin = true
+    // J 线 2026-10-06：能力示例（卡片画廊）整行删掉；微信推送开关删掉。
     // v3.0.81：上下文管理（v4.0.x：默认值与真源 ContextTuning.defaultThreshold 同源，勿再写字面量）
     @AppStorage("qingliao_context_auto_compress") var contextAutoCompress = false
     @AppStorage("qingliao_context_threshold") var contextThreshold = ContextTuning.defaultThreshold
@@ -132,33 +133,62 @@ struct SettingsView: View {
     @AppStorage(PetKeys.face) var petFace: PetFace = .calm
     var body: some View {
         VStack(spacing: 0) {
-            // 灰度重做 2026-10-06 晚：设置页顶栏（对标 iOS 26 设置参考）。
-            // 左上圆形返回键 + 居中标题「设置」；原 PageHeader 大标题已干掉。
+            // J 线 2026-10-06：Muse 式顶栏 —— 居中小标题「设置」（约 20pt 半粗）+ 右上 X 关闭
+            // （sheet 场景）。玻璃只用在 X 按钮上。
             HStack {
+                Color.clear.frame(width: 44, height: 44)
+                Spacer()
+                Text("设置")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Spacer()
                 Button {
                     Haptics.tap()
                     dismissSettings()
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 44, height: 44)
                         .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("返回")
-                Spacer()
-                // 灰度重做 B 路 2026-10-06：标题对标 Today 参考（约 28pt bold 居中）
-                Text("设置")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(.primary)
-                Spacer()
-                // 右侧占位，保持标题居中（与左侧按钮等宽）
-                Color.clear.frame(width: 44, height: 44)
+                .accessibilityLabel("关闭")
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 4)
+            // J 线 2026-10-06：顶部紧凑 AI 头像区（PetAvatar +「轻聊」+ 状态小字），
+            // 点按进 AI 形象设置（复用 PetStudioSheet 链路）；原「AI形象」行删掉。
+            Button {
+                Haptics.tap()
+                showPetStudio = true
+            } label: {
+                HStack(spacing: 12) {
+                    PetAvatar(size: 52, state: .idle, keepDetail: true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("轻聊")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Text(petSummary)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color(uiColor: .secondarySystemGroupedBackground),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
             // v4.0.22：设置项越堆越多，顶部给一行搜索框（索引与匹配见 Core/SettingsSearchIndex.swift）
             SettingsSearchBar(text: $settingsQuery)
             ScrollView {
@@ -170,10 +200,11 @@ struct SettingsView: View {
                         if !settingsQuery.isEmpty {
                             SettingsSearchList(query: settingsQuery) { openSearchEntry($0) }
                         }
-                        // 4 分组（能力与连接 / 通用 / 通知 / 关于）；AI形象行已进「通用」，
-                        // 顶部宠物大横幅撤掉（一个功能一个入口）。
-                        capabilitySection.id("sec-ai")
-                        generalSection.id("sec-account")
+                        // J 线 2026-10-06：6 分组（智能体 / 连接 / 通用 / 账号与安全 / 通知 / 关于）
+                        agentSection.id("sec-ai")
+                        connectionSection
+                        generalSection.id("sec-appearance")
+                        accountSection.id("sec-account")
                         notificationSection
                         aboutSection
                     }
@@ -252,19 +283,13 @@ struct SettingsView: View {
             ConnSettingsView(initiallyShowPinPath: connOpenPinPath)
                 .presentationDetents([.medium, .large])
         }
-        .sheet(isPresented: $showModelSheet) {
-            ModelSheet(current: currentModel)
-                .presentationDetents([.medium, .large])
-        }
+        // J 线 2026-10-06：模型管理独立页已删（模型切换并入连接设置页内）
     }
 
     /// 深度治理：行为型深层修饰器下沉背景层（.background 不影响布局，语义等价）
     private func settingsCold3() -> some View {
         Color.clear
-        .sheet(isPresented: $showWechatChannel) {
-            WechatChannelSheet()
-                .presentationDetents([.medium, .large])
-        }
+        // J 线 2026-10-06：微信通道模型页已删（微信走「对接第三方」platforms 统一管理）
         .sheet(isPresented: $showAbout) {
             AboutView()
                 .presentationDetents([.medium])
@@ -316,11 +341,9 @@ struct SettingsView: View {
                 .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
-        // v3.9.95：权限与 AI 操控
-        .sheet(isPresented: $showAppPermissions) {
-            AppPermissionsSheet()
-                .presentationDetents([.large])
-                .scrollContentBackground(.hidden)
+        // v3.9.95：权限与 AI 操控已拆散 —— 本机权限逐项进「连接应用」页（AppPermissionKit 逐项授权）
+        .sheet(isPresented: $showConnectApps) {
+            ConnectAppsView()
         }
         // v3.5.x：生活卡片设置页（股票 / 资讯 / 快递）
         .sheet(isPresented: $showLifeCards) {
@@ -361,16 +384,23 @@ struct SettingsView: View {
             AgentMemorySheet()
                 .scrollContentBackground(.hidden)
         }
-        // v3.0.20：Agent 模型选择弹窗
+        // J 线 2026-10-06：Agent 模型独立页已删（主模型在「连接设置」统一管理）
+        // J 线 2026-10-06：对接第三方（消息渠道平台列表，OAuth 点按授权）
+        .sheet(isPresented: $showThirdParty) {
+            ThirdPartyView()
+                .presentationDetents([.medium, .large])
+        }
+        // J 线 2026-10-06：朗读声音（TTS 音色设置）
+        .sheet(isPresented: $showReadAloud) {
+            ReadAloudSheet()
+                .presentationDetents([.medium, .large])
+        }
     }
 
     /// 深度治理：行为型深层修饰器下沉背景层（.background 不影响布局，语义等价）
     private func settingsCold7() -> some View {
         Color.clear
-        .sheet(isPresented: $showAgentModelSheet) {
-            AgentModelSheet()
-                .presentationDetents([.medium, .large])
-        }
+        // J 线 2026-10-06：Agent 模型独立页已删（见 settingsCold6 注释）
         // v2.0.116：执行历史弹窗（v3.9.35：补 presentationDetents——漏挂导致默认全屏，
         // 与全站弹窗「默认半屏 medium、可上拉 large」不一致）
         .sheet(isPresented: $showHistory) {
@@ -396,11 +426,7 @@ struct SettingsView: View {
     /// 深度治理：行为型深层修饰器下沉背景层（.background 不影响布局，语义等价）
     private func settingsCold8() -> some View {
         Color.clear
-        .sheet(isPresented: $showCardGallery) {
-            CardGallerySheet()
-                .presentationDetents([.medium, .large])
-                .scrollContentBackground(.hidden)
-        }
+        // J 线 2026-10-06：能力示例（卡片画廊）整行删掉，不再挂载
         // v2.0.102：切回设置页刷新计数（密码管理/记忆增删后行尾数字即时更新，原只有 .task 首刷）
         .onAppear { Task { await loadCounts() } }
         .task {
@@ -422,17 +448,23 @@ struct SettingsView: View {
         case "conn":
             connOpenPinPath = false
             showConnSettings = true
-        case "model": showModelSheet = true
-        case "wechatChannel": showWechatChannel = true
+        // J 线 2026-10-06：已删 route 的映射（Core/SettingsSearchIndex.swift 是禁区，映射写在这里）：
+        // model→连接设置（模型切换并入该页）；wechatChannel→对接第三方；
+        // appPermissions→连接应用（权限已拆散进该页）；cardGallery→忽略（整行删掉）；
+        // agentModel→连接设置（Agent 模型独立页已删，一个功能一个入口）
+        case "model":
+            connOpenPinPath = false
+            showConnSettings = true
+        case "wechatChannel": showThirdParty = true
         case "ha": showHASettings = true
         case "mcp": showMCPSettings = true
         case "mail": showMailSettings = true
         case "cloudDrive": showCloudDrive = true
-        case "appPermissions": showAppPermissions = true
+        case "appPermissions": showConnectApps = true
         case "localModels": showLocalModels = true
         case "kb": showKB = true
         case "memory": showMemory = true
-        case "cardGallery": showCardGallery = true
+        case "cardGallery": break
         case "secrets": showSecrets = true
         case "tasks": showTasks = true
         case "history": showHistory = true
@@ -446,7 +478,9 @@ struct SettingsView: View {
         case "quickReminder": showQuickReminder = true
         case "filesManager": showFilesManager = true
         case "proactive": showProactive = true
-        case "agentModel": showAgentModelSheet = true
+        case "agentModel":
+            connOpenPinPath = false
+            showConnSettings = true
         case "agentHelp":
             // 使用说明是**行内展开**（不是弹窗）：点结果就把那一段展开，并滚到它所在的分组
             showAgentHelp = true
@@ -467,25 +501,92 @@ struct SettingsView: View {
 
 // MARK: ===== 以下原为 Features/Settings/SettingsViewSections.swift =====
 
-// MARK: - Section 计算属性（灰度重做 B 路：4 分组，见下方 MARK）
+// MARK: - Section 计算属性（J 线 2026-10-06：6 分组，对标 Muse 设置参考图）
+// 只搬行、不改功能：所有 @State 弹窗/sheet 开关与行为原样保留。
+// 行 = 单色线条图标 + 标题(+副标题) + 灰 chevron；行间细分割线用 MuseRowDivider。
 
 extension SettingsView {
 
-    // MARK: - 灰度重做 B 路 2026-10-06：4 分组（对标 Today 设置参考图）
-    // 只改视觉结构：所有 @State 弹窗/sheet 开关与行为原样保留。
+    // MARK: - 智能体
 
-    @ViewBuilder var capabilitySection: some View {
-        GraySettingsGroup(title: "能力与连接") {
-            GraySettingsRow(title: "连接设置") { showConnSettings = true }
-            BackendUpdateRow()
-            GraySettingsRow(title: "模型管理", value: currentModel) { showModelSheet = true }
-            GraySettingsRow(title: "微信通道模型", value: wechatChannelModel) { showWechatChannel = true }
-            GraySettingsRow(title: "HA 设置") { showHASettings = true }
-            GraySettingsRow(title: "MCP 工具服务") { showMCPSettings = true }
-            GraySettingsRow(title: "邮件接入") { showMailSettings = true }
-            GraySettingsRow(title: "网盘接入") { showCloudDrive = true }
-            GraySettingsRow(title: "权限与 AI 操控") { showAppPermissions = true }
-            GraySettingsToggleRow(title: "本地模型", subtitle: localStatusText, isOn: $localModelOn)
+    @ViewBuilder var agentSection: some View {
+        GraySettingsGroup(title: "智能体") {
+            GraySettingsRow(icon: "brain.head.profile", title: "AI 记忆", value: "\(memoryCount) 条") { showMemory = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "list.bullet.rectangle", title: "Agent 记忆",
+                            value: agentRuleCount > 0 ? "\(agentRuleCount) 条规则" : "暂无") { showAgentMemory = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "tag", title: "Agent 关键词", subtitle: "分流匹配词管理") { showAgentKeywords = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "bolt", title: "主动 Agent", subtitle: "AI 主动开口 · 预算/静默/复盘") { showProactive = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "timer", title: "定时任务") { showTasks = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "clock.arrow.circlepath", title: "执行历史", subtitle: "自动化/场景执行记录") { showHistory = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "book.closed", title: "知识库", subtitle: "文档检索问答") { showKB = true }
+            MuseRowDivider()
+            GraySettingsToggleRow(icon: "arrow.triangle.branch", title: "智能路由", subtitle: tsRouting.subtitleText, isOn: tsEnabledBinding)
+            if tsRouting.enabled {
+                tsRoutingParams
+            }
+            MuseRowDivider()
+            GraySettingsToggleRow(icon: "rectangle.compress.vertical", title: "上下文自动压缩",
+                                  subtitle: "token超限时AI摘要压缩历史消息", isOn: $contextAutoCompress)
+                .onChange(of: contextAutoCompress) { _, new in
+                    UserDefaults.standard.set(new, forKey: "qingliao_context_auto_compress")
+                }
+            MuseRowDivider()
+            if contextAutoCompress {
+                HStack {
+                    Text("压缩阈值")
+                        .font(.system(size: 17))
+                    Spacer()
+                    Text("\(contextThreshold) tokens")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                    Stepper("", value: $contextThreshold, in: 1000...16000, step: 500)
+                        .labelsHidden()
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .onChange(of: contextThreshold) { _, new in
+                    UserDefaults.standard.set(new, forKey: "qingliao_context_threshold")
+                }
+                MuseRowDivider()
+            }
+            GraySettingsRow(icon: "questionmark.circle", title: "使用说明", chevron: false) {
+                withAnimation(Motion.snap) { showAgentHelp.toggle() }
+            }
+            if showAgentHelp {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Agent 回复恒走 Hermes 智能体：查磁盘/内存、控制设备等自动调用工具")
+                    Text("▸ 直接问：查磁盘/内存/温度、控制设备、执行场景，自动调用工具回复")
+                    Text("▸ 记忆规则：说「以后XX都用agent」，下次同类问题直接 Agent 处理")
+                    Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
+                    Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考轻聊记忆与规则")
+                }
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 14)
+            }
+        }
+    }
+
+    // MARK: - 连接
+
+    @ViewBuilder var connectionSection: some View {
+        GraySettingsGroup(title: "连接") {
+            GraySettingsRow(icon: "network", title: "连接设置") { showConnSettings = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "square.grid.2x2", title: "连接应用",
+                            subtitle: "本机权限与云端服务，点按授权") { showConnectApps = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "hammer", title: "MCP 工具服务") { showMCPSettings = true }
+            MuseRowDivider()
+            GraySettingsToggleRow(icon: "internaldrive", title: "本地模型", subtitle: localStatusText, isOn: $localModelOn)
                 .onChange(of: localModelOn) { _, new in
                     guard !localModelSyncing else { return }
                     Task {
@@ -503,83 +604,70 @@ extension SettingsView {
                         }
                     }
                 }
+            MuseRowDivider()
             if localModelOn {
-                GraySettingsRow(title: "管理模型", subtitle: "已装列表 / 拉取新模型") { showLocalModels = true }
+                GraySettingsRow(icon: "tray.and.arrow.down", title: "管理模型", subtitle: "已装列表 / 拉取新模型") { showLocalModels = true }
+                MuseRowDivider()
                 Button { Task { await checkLocalUpdate() } } label: {
                     HStack(spacing: 12) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.primary)
+                            .frame(width: 28)
                         VStack(alignment: .leading, spacing: 3) {
                             Text("检查模型更新")
-                                .font(.system(size: 17, weight: .medium))
+                                .font(.system(size: 17))
+                                .foregroundStyle(.primary)
                             Text(localUpdateText)
-                                .font(.system(size: 15))
+                                .font(.system(size: 14))
                                 .foregroundStyle(.tertiary)
                         }
                         Spacer()
                         if localChecking { ProgressView().controlSize(.small) }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 13)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                MuseRowDivider()
             }
-            GraySettingsRow(title: "知识库", subtitle: "文档检索问答") { showKB = true }
-            GraySettingsRow(title: "AI 记忆", value: "\(memoryCount) 条") { showMemory = true }
-            GraySettingsRow(title: "能力示例", subtitle: "5 种卡片形态") { showCardGallery = true }
-            GraySettingsToggleRow(title: "上下文自动压缩", subtitle: "token超限时AI摘要压缩历史消息", isOn: $contextAutoCompress)
-                .onChange(of: contextAutoCompress) { _, new in
-                    UserDefaults.standard.set(new, forKey: "qingliao_context_auto_compress")
-                }
-            if contextAutoCompress {
-                HStack {
-                    Text("压缩阈值")
-                        .font(.system(size: 17))
-                    Spacer()
-                    Text("\(contextThreshold) tokens")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.secondary)
-                    Stepper("", value: $contextThreshold, in: 1000...16000, step: 500)
-                        .labelsHidden()
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .onChange(of: contextThreshold) { _, new in
-                    UserDefaults.standard.set(new, forKey: "qingliao_context_threshold")
-                }
-            }
-            GraySettingsToggleRow(title: "智能路由", subtitle: tsRouting.subtitleText, isOn: tsEnabledBinding)
-            if tsRouting.enabled {
-                tsRoutingParams
-            }
-            GraySettingsRow(title: "主动 Agent", subtitle: "AI 主动开口 · 预算/静默/复盘") { showProactive = true }
-            GraySettingsRow(title: "Agent 模型", value: agentModel.isEmpty ? "跟随主模型" : agentModel) { showAgentModelSheet = true }
-            GraySettingsRow(title: "使用说明", chevron: false) {
-                withAnimation(Motion.snap) { showAgentHelp.toggle() }
-            }
-            if showAgentHelp {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Agent 回复恒走 Hermes 智能体：查磁盘/内存、控制设备等自动调用工具")
-                    Text("▸ 直接问：查磁盘/内存/温度、控制设备、执行场景，自动调用工具回复")
-                    Text("▸ 记忆规则：说「以后XX都用agent」，下次同类问题直接 Agent 处理")
-                    Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
-                    Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考轻聊记忆与规则")
-                }
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 14)
-            }
-            GraySettingsRow(title: "Agent 关键词", subtitle: "分流匹配词管理") { showAgentKeywords = true }
-            GraySettingsRow(title: "Agent 记忆", value: agentRuleCount > 0 ? "\(agentRuleCount) 条规则" : "暂无") { showAgentMemory = true }
+            BackendUpdateRow()
         }
     }
 
+    // MARK: - 通用
+
     @ViewBuilder var generalSection: some View {
         GraySettingsGroup(title: "通用") {
-            GraySettingsStaticRow(title: auth.username, subtitle: "已登录")
-            GraySettingsRow(title: "修改密码") { showPasswordSheet = true }
-            GraySettingsToggleRow(title: "Face ID 登录", isOn: $faceIDLogin)
+            GraySettingsRow(icon: "paintbrush", title: "外观", value: appearanceName) {
+                withAnimation(Motion.snap) { showAppearance = true }
+            }
+            MuseRowDivider()
+            GraySettingsRow(icon: "waveform", title: "朗读声音", subtitle: "AI 语音朗读的音色") { showReadAloud = true }
+            MuseRowDivider()
+            GraySettingsToggleRow(icon: "iphone.radiowaves.left.and.right", title: "震动反馈", isOn: $hapticsOn)
+            MuseRowDivider()
+            GraySettingsToggleRow(icon: "rectangle.grid.2x2", title: "首页快捷卡片", isOn: $homeCardsOn)
+            MuseRowDivider()
+            GraySettingsRow(icon: "square.grid.3x3", title: "桌面快捷方式",
+                            value: "已选 \(HomeShortcutStore.ids(from: homeShortcutsRaw).count)/\(HomeShortcut.maxCount)") { showHomeShortcuts = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "rectangle.stack", title: "生活卡片", subtitle: "股票 / 资讯 / 快递") { showLifeCards = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "folder", title: "文件管理", subtitle: "上传目录里的文件") { showFilesManager = true }
+        }
+    }
+
+    // MARK: - 账号与安全
+
+    @ViewBuilder var accountSection: some View {
+        GraySettingsGroup(title: "账号与安全") {
+            GraySettingsStaticRow(icon: "person.circle", title: auth.username, subtitle: "已登录")
+            MuseRowDivider()
+            GraySettingsRow(icon: "key", title: "修改密码") { showPasswordSheet = true }
+            MuseRowDivider()
+            GraySettingsToggleRow(icon: "faceid", title: "Face ID 登录", isOn: $faceIDLogin)
                 .onChange(of: faceIDLogin) { _, on in
                     if on { requestFaceIDAuth() } else { FaceIDStore.clear() }
                 }
@@ -588,7 +676,8 @@ extension SettingsView {
                 } message: {
                     Text("未通过系统 Face ID 验证，登录页快捷登录不可用。")
                 }
-            GraySettingsToggleRow(title: "App 锁", isOn: $appLockOn)
+            MuseRowDivider()
+            GraySettingsToggleRow(icon: "lock", title: "App 锁", isOn: $appLockOn)
                 .onChange(of: appLockOn) { _, on in
                     if on { requestAppLockAuth() }
                 }
@@ -597,36 +686,30 @@ extension SettingsView {
                 } message: {
                     Text("未通过系统 Face ID 验证，App 锁不可用。")
                 }
-            GraySettingsRow(title: "密码管理", value: "\(secretCount) 条凭据") { showSecrets = true }
-            GraySettingsRow(title: "外观", value: appearanceName) { withAnimation(Motion.snap) { showAppearance = true } }
-                .id("sec-appearance")
-            GraySettingsRow(title: "AI形象", value: petSummary) { showPetStudio = true }
-            GraySettingsToggleRow(title: "震动反馈", isOn: $hapticsOn)
-            GraySettingsToggleRow(title: "首页快捷卡片", isOn: $homeCardsOn)
-            GraySettingsRow(title: "桌面快捷方式",
-                            value: "已选 \(HomeShortcutStore.ids(from: homeShortcutsRaw).count)/\(HomeShortcut.maxCount)") { showHomeShortcuts = true }
-            GraySettingsRow(title: "生活卡片", subtitle: "股票 / 资讯 / 快递") { showLifeCards = true }
-            GraySettingsRow(title: "文件管理", subtitle: "上传目录里的文件") { showFilesManager = true }
-            GraySettingsRow(title: "定时任务") { showTasks = true }
-            GraySettingsRow(title: "执行历史", subtitle: "自动化/场景执行记录") { showHistory = true }
-            GraySettingsRow(title: "日志") { showLogs = true }
-            GraySettingsRow(title: "诊断", value: CrashReporter.hasPendingLog() ? "有待查看" : "设备/网络/崩溃记录") { showDiagnostics = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "lock.rectangle.stack", title: "密码管理", value: "\(secretCount) 条凭据") { showSecrets = true }
         }
     }
+
+    // MARK: - 通知
 
     @ViewBuilder var notificationSection: some View {
         GraySettingsGroup(title: "通知") {
-            GraySettingsToggleRow(title: "微信推送", subtitle: "自动化执行结果推送到微信", isOn: $pushWeixin)
-                .onChange(of: pushWeixin) { _, new in
-                    Task { _ = try? await auth.json("/api/push/settings", method: "POST", body: ["pushWeixin": new]) }
-                }
-            GraySettingsRow(title: "定时提醒", subtitle: "一句话定时间") { showQuickReminder = true }
+            GraySettingsRow(icon: "bell.badge", title: "定时提醒", subtitle: "一句话定时间") { showQuickReminder = true }
         }
     }
 
+    // MARK: - 关于
+
     @ViewBuilder var aboutSection: some View {
         GraySettingsGroup(title: "关于") {
-            GraySettingsRow(title: "关于轻聊") { showAbout = true }
+            GraySettingsRow(icon: "info.circle", title: "关于轻聊") { showAbout = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "doc.text", title: "日志") { showLogs = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "stethoscope", title: "诊断",
+                            value: CrashReporter.hasPendingLog() ? "有待查看" : "设备/网络/崩溃记录") { showDiagnostics = true }
+            MuseRowDivider()
             // v3.0.5 review fix：退出登录二次确认（与云端一致）
             Button {
                 confirmLogout = true
@@ -798,11 +881,7 @@ extension SettingsView {
         if let j = try? await auth.json("/api/memory/list") {
             memoryCount = (j["entries"] as? [String] ?? []).count
         }
-        // v2.0.113：同步微信推送开关（后端为准）
-        if let j = try? await auth.json("/api/push/settings"),
-           let v = j["pushWeixin"] as? Bool {
-            pushWeixin = v
-        }
+        // J 线 2026-10-06：微信推送开关已删（不再同步 /api/push/settings）
         // v2.0.113：Agent 记忆条数（行尾数字）
         if let j = try? await auth.json("/api/agent/rules") {
             agentRuleCount = (j["rules"] as? [Any] ?? []).count
@@ -817,16 +896,8 @@ extension SettingsView {
         }
     }
 
-    /// 当前默认模型（UserDefaults）
-    var currentModel: String {
-        UserDefaults.standard.string(forKey: "qingliao_model") ?? "deepseek-v4-flash"
-    }
-
-    // v3.0.19：微信通道当前模型（UserDefaults 缓存，进弹窗时刷新）
-    var wechatChannelModel: String {
-        UserDefaults.standard.string(forKey: "qingliao_wechat_channel_model") ?? "跟随默认"
-    }
-
+    // J 线 2026-10-06：模型管理独立页已删（模型切换并入「连接设置」页内模型下拉）；
+    // 微信通道模型页已删（微信走「对接第三方」platforms 统一管理）。
     /// v2.0.89f：打开 Face ID 开关时立即申请系统权限（用户实测"点开关没有权限申请"）
     func requestFaceIDAuth() {
         let context = LAContext()

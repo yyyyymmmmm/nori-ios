@@ -1,10 +1,11 @@
-// 灰度重做 B 路 2026-10-06：设置页视觉组件（对标 Today 设置参考图）。
-// 只管视觉结构：分组标题(17pt 灰) + 圆角20玻璃卡片 + 标题17/副标题15/无图标行 + 右绿 Toggle。
-// 所有跳转行为由调用方原样保留，这里不碰任何业务逻辑。
+// J 线 2026-10-06：设置页视觉组件（对标 Muse 设置参考图）。
+// 行 = 单色线条图标 + 标题(17) + 副标题(15) + 右侧值(15) + 灰 chevron；
+// 分组 = 圆角 16 实色卡片（行间细分割线由调用方用 MuseRowDivider 显式插入）；
+// iOS 26 玻璃只用在顶栏按钮，卡片一律实色（深色模式自适应）。
 
 import SwiftUI
 
-// MARK: - 分组：灰色分组标题 + 圆角 20 玻璃卡片（行与行之间无分割线）
+// MARK: - 分组：分组标题 + 圆角 16 实色卡片
 
 struct GraySettingsGroup<Content: View>: View {
     let title: String
@@ -14,22 +15,32 @@ struct GraySettingsGroup<Content: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             if !title.isEmpty {
                 Text(title)
-                    .font(.system(size: 17))
+                    .font(.system(size: 15))
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 20)
             }
             VStack(spacing: 0) {
                 content
             }
-            .padding(.vertical, 8)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color(uiColor: .secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 }
 
-// MARK: - 普通行：标题(17 medium) + 副标题(15 灰) + 右侧值(15) + 灰 chevron，无行图标
+// MARK: - 行间细分割线（Muse 式：左端对齐图标右缘）
+
+struct MuseRowDivider: View {
+    var body: some View {
+        Divider()
+            .padding(.leading, 52)
+    }
+}
+
+// MARK: - 普通行：图标 + 标题/副标题 + 右侧值 + 灰 chevron
 
 struct GraySettingsRow: View {
+    var icon: String? = nil
     let title: String
     var subtitle: String? = nil
     var value: String? = nil
@@ -37,15 +48,24 @@ struct GraySettingsRow: View {
     var action: () -> Void = {}
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
             HStack(spacing: 12) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.primary)
+                        .frame(width: 28)
+                }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 17, weight: .medium))
+                        .font(.system(size: 17))
                         .foregroundStyle(.primary)
                     if let subtitle {
                         Text(subtitle)
-                            .font(.system(size: 15))
+                            .font(.system(size: 14))
                             .foregroundStyle(.tertiary)
                             .lineLimit(2)
                     }
@@ -63,56 +83,70 @@ struct GraySettingsRow: View {
                         .foregroundStyle(.tertiary)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 13)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 }
 
-// MARK: - 静态行（不可点，如已登录用户名）
+// MARK: - 静态行（不可点）
 
 struct GraySettingsStaticRow: View {
+    var icon: String? = nil
     let title: String
     var subtitle: String? = nil
 
     var body: some View {
         HStack(spacing: 12) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundStyle(.primary)
+                    .frame(width: 28)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 17))
                     .foregroundStyle(.primary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 15))
+                        .font(.system(size: 14))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                 }
             }
             Spacer(minLength: 8)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 13)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
-// MARK: - 开关行：标题+副标题在左，绿色 Toggle 在右
+// MARK: - 开关行：图标 + 标题/副标题在左，系统 Toggle 在右
 
 struct GraySettingsToggleRow: View {
+    var icon: String? = nil
     let title: String
     var subtitle: String? = nil
     @Binding var isOn: Bool
 
     var body: some View {
         HStack(spacing: 12) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundStyle(.primary)
+                    .frame(width: 28)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 17))
                     .foregroundStyle(.primary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 15))
+                        .font(.system(size: 14))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                 }
@@ -120,7 +154,7 @@ struct GraySettingsToggleRow: View {
             Spacer(minLength: 8)
             Toggle("", isOn: $isOn).qingliaoSwitch()
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 13)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }

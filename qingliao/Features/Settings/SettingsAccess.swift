@@ -28,6 +28,12 @@ struct ConnSettingsView: View {
     @State private var showServerSheet = false
     @State private var showSessionLocSheet = false
     @State private var showUploadDirSheet = false   // v2.0.85 文件上传位置
+    // J 线 2026-10-06：模型切换并入连接设置（模型管理独立页已删，一个功能一个入口）
+    @State private var showModelPicker = false
+
+    private var currentHermesModel: String {
+        UserDefaults.standard.string(forKey: "qingliao_model") ?? ""
+    }
     @State private var sessionLoc = ""
     @State private var uploadDir = ""
     @State private var testResult: String?
@@ -66,6 +72,22 @@ struct ConnSettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
+                    // J 线 2026-10-06：模型（原「模型管理」独立页迁入此处）
+                    Text("模型")
+                        .font(.system(size: Typography.subhead, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, Spacing.xs)
+                    VStack(spacing: 0) {
+                        SettingRow(icon: "cpu", iconColor: .green,
+                                   title: "当前模型", value: currentHermesModel.isEmpty ? "未设置" : currentHermesModel,
+                                   chevron: true)
+                            .onTapGesture {
+                                Haptics.tap()
+                                showModelPicker = true
+                            }
+                    }
+                    .glassListCard()
+
                     Text("服务器")
                         .font(.system(size: Typography.subhead, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -147,6 +169,11 @@ struct ConnSettingsView: View {
                     uploadDir = newDir
                 }
                 .presentationDetents([.medium])
+            }
+            // J 线 2026-10-06：模型选择（原「模型管理」独立页迁入）
+            .sheet(isPresented: $showModelPicker) {
+                HermesModelPickerSheet()
+                    .presentationDetents([.medium, .large])
             }
             .onAppear {
                 // v4.0.61：搜索「钉一钉存储」直达（只认呈现时那一次，关掉不复发）
@@ -1438,5 +1465,118 @@ private struct PasteKBSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - J 线 2026-10-06：Hermes 模型选择器（原「模型管理」独立页迁入「连接设置」）
+// GET /api/hermes/models → 列表；POST /api/hermes/model {model_id} → 切换。
+// 切换成功后同步写 UserDefaults qingliao_model（App 内兼容口径）。
+
+struct HermesModelOption: Identifiable {
+    let id: String
+    let selected: Bool
+
+    init?(json: [String: Any]) {
+        guard let id = json["id"] as? String, !id.isEmpty else { return nil }
+        self.id = id
+        self.selected = (json["selected"] as? Bool) ?? false
+    }
+}
+
+struct HermesModelPickerSheet: View {
+    @Environment(AuthStore.self) private var auth
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var models: [HermesModelOption] = []
+    @State private var loading = true
+    @State private var loadError = false
+    @State private var busyID: String? = nil
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if loading {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if loadError {
+                    VStack(spacing: 10) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.tertiary)
+                        Text("未能获取模型列表")
+                            .font(.system(size: 17, weight: .medium))
+                        Text("检查 Hermes 连接后重试")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.tertiary)
+                        Button("重试") {
+                            Haptics.tap()
+                            Task { await load() }
+                        }
+                        .font(.system(size: 15, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        ForEach(models) { m in
+                            Button {
+                                Haptics.tap()
+                                Task { await select(m) }
+                            } label: {
+                                HStack {
+                                    Text(m.id)
+                                        .font(.system(size: 17))
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    if busyID == m.id {
+                                        ProgressView().controlSize(.small)
+                                    } else if m.selected {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(.primary)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                }
+            }
+            .navigationTitle("选择模型")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("完成") {
+                        Haptics.tap()
+                        dismiss()
+                    }
+                }
+            }
+            .task { await load() }
+        }
+    }
+
+    private func load() async {
+        loading = true
+        loadError = false
+        defer { loading = false }
+        guard let j = try? await auth.json("/api/hermes/models"),
+              let arr = j["models"] as? [[String: Any]] else {
+            loadError = true
+            return
+        }
+        models = arr.compactMap(HermesModelOption.init(json:))
+    }
+
+    private func select(_ m: HermesModelOption) async {
+        guard busyID == nil else { return }
+        busyID = m.id
+        defer { busyID = nil }
+        guard let j = try? await auth.json("/api/hermes/model", method: "POST",
+                                           body: ["model_id": m.id]),
+              (j["ok"] as? Bool) == true else { return }
+        // App 内兼容口径：本地也存一份（聊天页兜底读 UserDefaults）
+        UserDefaults.standard.set(m.id, forKey: "qingliao_model")
+        await load()
     }
 }
