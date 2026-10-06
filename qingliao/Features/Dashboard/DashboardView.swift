@@ -145,7 +145,8 @@ struct DashboardView: View {
                     // w5-1：总览 Hero
                     heroBlock
 
-                    // MARK: - 记忆卡接入点（coordinator 统一接入 MemoryHeroCard）
+                    // w5 记忆一级入口：Hero 下方记忆大卡（自取数、sheet 进二级页，无需传参）
+                    MemoryHeroCard()
 
                     // w5-2：快捷入口
                     groupTitle("快捷入口")
