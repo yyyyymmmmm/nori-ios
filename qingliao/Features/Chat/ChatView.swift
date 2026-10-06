@@ -1322,6 +1322,13 @@ struct ChatView: View {
                 sendCore(text: text, imageData: nil)
             }
         }
+        // 2026-10-06 H线：点子/目标卡片「填进对话框」——只填 inputText，不发送；顺手聚焦输入框。
+        .onReceive(NotificationCenter.default.publisher(for: .qingliaoFillInput)) { note in
+            if let text = note.object as? String, !text.isEmpty {
+                inputText = text
+                inputFocus = true
+            }
+        }
         // v3.9.14：生活页备忘录「发给 AI」→ 同样作为用户消息发出（备忘立刻能变成行动）
         // v3.9.14：新一轮开始 → 工具卡回到默认收起态（否则上一轮手动展开会带到下一轮）
         // v4.0.x：观察只增的 `startSeq` 而不是 `isStreaming`——finish() 同帧续发会把 false→true 吞掉，

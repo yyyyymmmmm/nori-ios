@@ -121,11 +121,11 @@ struct DockTabView: View {
                     .tag(DockTab.feed)
                     .tabTransition(for: .feed, selected: $selected)
                 // 点子：备忘录（灵感记录）
-                IdeasTabView(onAskAI: askAI)
+                IdeasTabView(onFillInput: fillChatInput)
                     .tag(DockTab.ideas)
                     .tabTransition(for: .ideas, selected: $selected)
                 // 目标：长期目标
-                GoalsTabView(onAskAI: askAI)
+                GoalsTabView(onFillInput: fillChatInput)
                     .tag(DockTab.goals)
                     .tabTransition(for: .goals, selected: $selected)
                 // 看板：官方 Dashboard 内容（原「我的」tab 已删，设置收进侧边栏唯一入口）
@@ -238,6 +238,17 @@ struct DockTabView: View {
     /// v3.9.82：「发给 AI」的**唯一出口**（识别动作条 / 译文弹窗共用）——
     /// 切聊天页 + post `.qingliaoTaskSend`（与任务中心、备忘录「发给 AI」同一条通道），
     /// 0.35s 闸：转场还在跑时投递，聊天页可能还没进树，通知会落空。
+    /// 「填进对话框」的出口（点子/目标卡片共用）：切聊天页 + post `.qingliaoFillInput`
+    /// （只填 inputText，不发送；与 askAI 的 qingliaoTaskSend 区分）。
+    /// 0.35s 闸同 askAI：转场中投递会落空。
+    private func fillChatInput(_ text: String) {
+        selected = .chat
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.35))
+            NotificationCenter.default.post(name: .qingliaoFillInput, object: text)
+        }
+    }
+
     private func askAI(_ text: String) {
         showIdentify = false
         identifyStartTranslate = false
