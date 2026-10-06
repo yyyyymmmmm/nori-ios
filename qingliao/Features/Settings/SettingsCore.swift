@@ -321,16 +321,14 @@ struct SettingsView: View {
                 .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
-        // 2026-10-07：技能管理
+        // 2026-10-07：技能管理（整页，对标 Muse）
         .sheet(isPresented: $showSkills) {
             SkillsView()
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
-        // 2026-10-07：MCP 服务管理
+        // 2026-10-07：MCP 服务管理（整页）
         .sheet(isPresented: $showMCP) {
             MCPView()
-                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // v2.0.87：AI 记忆

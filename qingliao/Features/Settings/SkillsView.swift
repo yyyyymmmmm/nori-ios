@@ -94,10 +94,15 @@ struct SkillsView: View {
                         .padding()
                         .frame(maxWidth: .infinity, minHeight: 200)
                     } else {
-                        // 技能列表（对标 Muse 行样式）
+                        // 技能列表（对标 Muse 行样式，点行切换启用/禁用）
                         VStack(spacing: 0) {
                             ForEach(skills) { skill in
-                                skillRow(skill)
+                                Button {
+                                    Task { await toggleSkill(skill) }
+                                } label: {
+                                    skillRow(skill)
+                                }
+                                .buttonStyle(.plain)
                                 if skill.id != skills.last?.id {
                                     Divider()
                                         .padding(.leading, 68)
@@ -112,15 +117,16 @@ struct SkillsView: View {
         .refreshable { await load() }
     }
 
-    // Muse 式技能行：图标｜名称｜描述｜官方/未授权
+    // Muse 式技能行：图标｜名称｜描述｜官方/未授权（点行进详情）
     private func skillRow(_ skill: SkillItem) -> some View {
         HStack(alignment: .top, spacing: 14) {
-            // 图标
-            Image(systemName: "doc.fill")
+            // 图标：installer/creator 用紫色拼图，其他用蓝色文档（对标 Muse）
+            let isTool = skill.name.contains("installer") || skill.name.contains("creator")
+            Image(systemName: isTool ? "puzzlepiece.extension.fill" : "doc.fill")
                 .font(.system(size: 20))
-                .foregroundStyle(.blue)
+                .foregroundStyle(isTool ? .purple : .blue)
                 .frame(width: 48, height: 48)
-                .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                .background((isTool ? Color.purple : Color.blue).opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(skill.name)
@@ -134,7 +140,7 @@ struct SkillsView: View {
                         .truncationMode(.tail)
                 }
 
-                // 底部标签行：官方 ｜ 未授权 ｜ 启用开关
+                // 底部标签行：官方 ｜ 未授权（对标 Muse，无按钮）
                 HStack(spacing: 8) {
                     Text(skill.category == "mine" ? "我的" : "官方")
                         .font(.system(size: 13))
@@ -145,24 +151,6 @@ struct SkillsView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.red)
                     }
-                    
-                    Spacer()
-                    
-                    // 2026-10-07：写闭环 —— 点击切换启用/禁用
-                    Button {
-                        Task { await toggleSkill(skill) }
-                    } label: {
-                        Text((skill.enabled == true) ? "已启用" : "启用")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle((skill.enabled == true) ? .green : .blue)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                ((skill.enabled == true) ? Color.green : Color.blue).opacity(0.1),
-                                in: Capsule()
-                            )
-                    }
-                    .buttonStyle(.plain)
                 }
                 .padding(.top, 2)
             }
