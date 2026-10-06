@@ -76,7 +76,7 @@ struct ChatInputBar: View {
     @Environment(KeyboardObserver.self) private var kbEnv
     // v3.4.28：横屏限宽
     @Environment(\.horizontalSizeClass) private var hSizeInput
-    @State private var pressKeyboardUp = false
+    // v4.1.0 E路：pressKeyboardUp 已随输入框长按语音入口摘除而删除
     // v-review fix（维度3）：输入框流光开关与设置页同源 @AppStorage 默认 true——
     // 原 UserDefaults.standard.bool 无默认(false)：全新安装设置页显示「开」但门控不生效，拨动一次才对齐
     @AppStorage("qingliao_input_glow") private var inputGlowOn = true
@@ -105,6 +105,16 @@ struct ChatInputBar: View {
     var autoReadIcon: String = ""
     var autoReadOn: Bool = false
     var onToggleAutoRead: () -> Void = {}
+    /// v4.1.0 E路：按住说话（PTT，对标 Today）。麦克风键只在空输入时替代发送键；
+    /// 按下即录音（DragGesture minimumDistance: 0），松手发送、上滑取消。
+    /// ⚠️ 追加在 `onToggleAutoRead` 之后：调用点走成员初始化器且按声明序传参，插在中间会错位。
+    var pttActive: Bool = false
+    var onPTTStart: () -> Void = {}
+    var onPTTUpdate: (Bool) -> Void = { _ in }
+    var onPTTEnd: (Bool) -> Void = { _ in }
+    /// E路：手势进行中旗标（DragGesture minimumDistance: 0 的 onChanged 在按下瞬间就会触发，
+    /// 用旗标保证 onPTTStart 只调一次；@State 不进成员初始化器，顺序无碍）
+    @State private var pttGestureActive = false
     // v3.4.29：发送动作图标弹一下（symbolEffect 驱动，无自定义动画开销）
     // v3.9.42：同一个 tick 兼作发送键关键帧的 trigger（原来另有一个 sendScale + 两段 withAnimation）
     @State private var sendBounceTick = 0
@@ -481,22 +491,7 @@ struct ChatInputBar: View {
                 .padding(.horizontal, Spacing.xxs)
                 .fixedSize(horizontal: false, vertical: true)   // 文字超宽自动增高输入框，旧文字始终可见
                 .focused($focused)
-                // v2.0.106：长按输入框 = 进入语音转文字（与长按发送键同效；收键盘由 ChatView 处理）
-                // v2.0.106b：onLongPressGesture 被 UITextField 内置长按(放大镜/选择)拦截不触发
-                //           → 改 simultaneousGesture 与系统手势共存触发
-                // v2.0.109b：onChanged（down 瞬间）记录键盘可见状态——键盘开=true 保持，关=false 收回
-                // v3.9.3：语音恒可用（设备端）——voiceEnabled 现恒为 true，保留判断以便按需关闭
-                //           （用 .simultaneousGesture 里 if/else 各自挂同类型 LongPressGesture，规避泛型不一致）
-                .simultaneousGesture(
-                    LongPressGesture(minimumDuration: voiceEnabled ? 0.4 : 3600)
-                        .onChanged { _ in
-                            pressKeyboardUp = kbEnv.isVisible
-                        }
-                        .onEnded { _ in
-                            guard voiceEnabled else { return }
-                            onLongPressInput(pressKeyboardUp)
-                        }
-                )
+                // v4.1.0 E路：输入框长按进语音已摘除（PTT 麦克风键是唯一语音入口，一个功能一个入口）
                 .overlay {
                     if text.isEmpty {
                         if transcribing {
@@ -543,13 +538,7 @@ struct ChatInputBar: View {
                 .hitArea44(h: 6, v: 6)
             }
 
-            // v2.0.96：发送按钮——普通发送；语音模式下点击=退出；长按=进入语音转文字（Siri 彩色图标）
-            // v2.0.96b：Button 内置手势会拦截 onLongPressGesture → 改自定义视图 + 显式 Tap/LongPress
-            // v2.0.98：onTapGesture+onLongPressGesture 叠加 = 两个独立手势系统在手势激活中改
-            //          视图树（voiceMode 切换重建按钮）→ 实测 SIGTRAP 闪退（crash_reports 4 次）。
-            //          改用 ExclusiveGesture（长按优先、互斥），onEnded 时手势已结束，视图重建安全。
-            // v2.0.100：transcribing 时按钮显示转圈（转换中动画）
-            // v2.0.101：转圈旁加红色停止按钮（随时中断转换）；手势只在非转写时挂载（停止按钮独立可点）
+            // v4.1.0 E路：发送/转写按钮组——长按进语音已摘除（PTT 接管），只剩轻点发送/转写中转圈
             Group {
                 if transcribing {
                     HStack(spacing: 6) {
@@ -568,49 +557,12 @@ struct ChatInputBar: View {
                         // v3.9.34：命中区 44×44（xmark 视觉 26×26、间距零变化）
                         .hitArea44(h: 9, v: 9)
                     }
+                } else if showMicButton {
+                    // v4.1.0 E路：按住说话麦克风键（空输入时替代发送键）
+                    micButton
                 } else {
-                    // v3.9.14：录音态 waveform 图标持续波动（用户反馈「录音图标静态不动」）。
-                    // 拆 if/else 而非三元 —— 两个 symbolEffect 类型不同，三元会触发类型推断冲突（本仓踩过）。
-                    Group {
-                        if voiceMode {
-                            Image(systemName: "waveform")
-                                .symbolEffect(.variableColor.iterative, options: .repeating)
-                        } else {
-                            Image(systemName: "arrow.up")
-                                .symbolEffect(.bounce, value: sendBounceTick)   // v3.4.29：发送图标弹动
-                        }
-                    }
-                    .font(.system(size: Typography.body, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                        .contentShape(Circle())
-                        // v3.9.34：命中区 44×44（发送键视觉 32×32、间距零变化）
-                        .hitArea44(h: 6, v: 6)
-                        // v3.4.19：发送回弹缩放（仅轻点发送路径，长按转文字不缩放）
-                        // v3.9.42：两步 withAnimation + Task.sleep → 一条关键帧轨道（见 sendPulse 定义处）
-                        .sendPulse(trigger: reduceMotion ? 0 : sendBounceTick)
-                        .gesture(
-                            LongPressGesture(minimumDuration: 0.4)
-                                .exclusively(before: TapGesture())
-                                .onEnded { value in
-                                    // .first = 长按成功（语音模式开关）；.second = 轻点（发送/退出）
-                                    switch value {
-                                    case .first:
-                                        // v3.0.4：云端无语音 → 长按等同轻点发送
-                                        if voiceEnabled {
-                                            onVoiceModeToggle()
-                                        } else {
-                                            fireSend()
-                                        }
-                                    case .second:
-                                        if voiceMode {
-                                            onVoiceModeToggle()
-                                        } else {
-                                            fireSend()
-                                        }
-                                    }
-                                }
-                        )
+                    // v4.1.0 E路：发送键——长按进语音已摘除（PTT 接管唯一语音入口），只剩轻点发送
+                    sendButton
                 }
             }
             .background(
@@ -621,6 +573,68 @@ struct ChatInputBar: View {
             )
             .animation(Motion.snap, value: sendColors)
         }
+    }
+
+    /// v4.1.0 E路：麦克风键可见性——空输入时替代发送键；PTT 录音中保持可见
+    /// （避免手势中途 liveText 回填导致 text 非空、按钮被换掉、手势中断）。
+    private var showMicButton: Bool {
+        (text.isEmpty || pttActive) && !streaming && !voiceMode && !transcribing && voiceEnabled
+    }
+
+    /// v4.1.0 E路：按住说话按钮。DragGesture(minimumDistance: 0) 按下瞬间即触发 onPTTStart；
+    /// 上滑超 60pt → onPTTUpdate(true)（面板变"松手取消"）；松手 → onPTTEnd。
+    /// 不是 Button（避免 Button 内置手势与 DragGesture 互斥的老坑）；按压反馈由录音面板 + 触感承担。
+    private var micButton: some View {
+        Image(systemName: "mic.fill")
+            .font(.system(size: Typography.body, weight: .medium))
+            .foregroundStyle(.white)
+            .frame(width: 32, height: 32)
+            .contentShape(Circle())
+            // v3.9.34：命中区 44×44（视觉 32×32 → 外扩 6），手势挂在最外层，整片 44 可按
+            .hitArea44(h: 6, v: 6)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if !pttGestureActive {
+                            pttGestureActive = true
+                            onPTTStart()
+                        }
+                        onPTTUpdate(value.translation.height < -60)
+                    }
+                    .onEnded { value in
+                        pttGestureActive = false
+                        onPTTEnd(value.translation.height < -60)
+                    }
+            )
+            .accessibilityLabel("按住说话")
+    }
+
+    /// v4.1.0 E路：发送键（从 trailingButtons 拆出；手势改为纯轻点）。
+    /// v3.9.14 的 waveform/arrow 分支保留（voiceMode 已无入口，分支恒走 arrow，不删减渲染代码）。
+    private var sendButton: some View {
+        Button(action: fireSend) {
+            Group {
+                // v3.9.14：录音态 waveform 图标持续波动（用户反馈「录音图标静态不动」）。
+                // 拆 if/else 而非三元 —— 两个 symbolEffect 类型不同，三元会触发类型推断冲突（本仓踩过）。
+                if voiceMode {
+                    Image(systemName: "waveform")
+                        .symbolEffect(.variableColor.iterative, options: .repeating)
+                } else {
+                    Image(systemName: "arrow.up")
+                        .symbolEffect(.bounce, value: sendBounceTick)   // v3.4.29：发送图标弹动
+                }
+            }
+            .font(.system(size: Typography.body, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 32, height: 32)
+            .contentShape(Circle())
+            // v3.4.19：发送回弹缩放（长按转文字路径已摘除，只剩轻点发送）
+            .sendPulse(trigger: reduceMotion ? 0 : sendBounceTick)
+        }
+        .buttonStyle(PressStyle())   // v3.4.29：统一按压反馈
+        // v3.9.34：命中区 44×44（发送键视觉 32×32、间距零变化）
+        .hitArea44(h: 6, v: 6)
+        .accessibilityLabel("发送")
     }
 }
 

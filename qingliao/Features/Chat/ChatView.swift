@@ -162,6 +162,14 @@ struct ChatView: View {
     @State var clearBlockedHint: String?
     @State var voiceTooShort = false   // v2.0.102：录音太短提示
     @State var voiceDiag = ""   // v3.0.78 诊断：录音链路诊断信息
+    /// v4.1.0 E路：按住说话（PTT，对标 Today）——旧 voiceMode 入口（发送键长按/输入框长按）
+    /// 已摘除，本组状态是唯一的语音入口。引擎复用 liveSpeech，不动转写层。
+    @State var pttActive = false        // 录音面板是否展示
+    @State var pttCancelArmed = false   // 上滑超 60pt → 松手取消待命
+    @State var pttBaseline = ""         // 按下前输入框内容（取消/空结果时恢复）
+    @State var pttPressDate = Date()    // 按下时刻（<0.3s 视为轻触误触）
+    @State var pttToastMessage: String? // 轻提示（没听清/按住说话/模型准备中）
+    @State var pttToastToken = 0        // toast 代次防抖
     // v2.0.88：AI 回答中发送的消息队列（回答结束后自动逐条发送）
     @State var pendingQueue: [PendingSend] = []
     // v3.4.0：底部上拉拉取收件箱状态（@Observable 引用——拖动高频写不重建 ChatView body）
@@ -784,7 +792,13 @@ struct ChatView: View {
                     // ⚠️ 实参序必须 = ChatInputBar 存储属性声明序（autoReadIcon 声明在 onPickReasoning 之后）
                     autoReadIcon: "speaker.wave.2.fill",
                     autoReadOn: autoReadReply,
-                    onToggleAutoRead: { toggleAutoRead() })
+                    onToggleAutoRead: { toggleAutoRead() },
+                    // v4.1.0 E路：按住说话（PTT）——麦克风键只在空输入时替代发送键。
+                    // ⚠️ 实参序必须 = ChatInputBar 存储属性声明序（pttActive 声明在 onToggleAutoRead 之后）
+                    pttActive: pttActive,
+                    onPTTStart: { startPTT() },
+                    onPTTUpdate: { updatePTT(cancelArmed: $0) },
+                    onPTTEnd: { endPTT(cancelled: $0) })
                     // v2.0.129：球态输入框 —— 绑定会话 id，切会话重建复位（展开态在切会话后回球态）
                     .id(chat.sessionId)
                     // v2.0.135：消费输入栏区域的点击，防冒泡到消息区 ZStack 根手势误收键盘
@@ -1031,6 +1045,8 @@ struct ChatView: View {
         // v2.0.96：语音授权/转写失败提示（v3.9.3：设备端识别——麦克风权限 / 机型不支持 / 识别中断）
         .background(chatColdChrome1())
         .background(chatColdChrome2())
+        // v4.1.0 E路：按住说话录音面板 + 轻提示（overlay，不进 body 巨型链）
+        .overlay { pttOverlay }
     }
 
     /// v4.0.51：body 修饰器链第 2/7 段（顶层 5 个，纯搬运、顺序不变）。

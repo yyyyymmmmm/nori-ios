@@ -1,0 +1,202 @@
+// MARK: - v4.1.0 E路：按住说话（Push-to-Talk，对标 Today）
+//
+// 交互层重写，不动转写引擎（LiveSpeechTranscriber）：
+//   · 输入框右侧麦克风键（空输入时替代发送键）→ 按下即录音（DragGesture minimumDistance: 0）
+//   · 录音面板：iOS 26 玻璃底 + "松手发送，上滑取消" + 30fps 实时波形
+//   · 松手 → 定稿 → 非空直接发送（走 ChatView.send()）；上滑超 60pt → "松手取消"
+//   · 旧 voiceMode 入口（发送键长按 / 输入框长按）已摘除，一个功能一个入口；
+//     toggleVoiceMode / exitVoiceMode 函数体保留备查，不再有调用方。
+
+import SwiftUI
+
+extension ChatView {
+    /// E路：PTT 按下。引擎启动流程与 toggleVoiceMode 起手段同源（权限/模型/代次作废）。
+    func startPTT() {
+        guard !pttActive else { return }
+        guard !liveSpeech.isRunning, !voiceMode, !transcribing else { return }
+        // 语音模型下载中：按住无效，给轻提示（不弹面板，避免"按住没反应"的死感）
+        if liveSpeech.isPreparing {
+            Haptics.light()
+            showPTTToast("语音模型准备中…")
+            return
+        }
+        pttBaseline = inputText
+        pttPressDate = Date()
+        pttCancelArmed = false
+        Haptics.tap()
+        inputFocus = false
+        voiceStartToken += 1
+        let token = voiceStartToken
+        withAnimation(Motion.snap) { pttActive = true }
+        Task {
+            liveSpeech.onTextChange = { text in inputText = text }
+            liveSpeech.onError = { message in
+                // 运行期错误：收面板 + 复用既有错误弹窗口径（voiceError alert）
+                pttActive = false
+                inputText = pttBaseline
+                voiceError = message
+            }
+            let started = await liveSpeech.start(baseline: pttBaseline)
+            voiceDiag = liveSpeech.diagnostics
+            // 准备期间用户已松手（代次变了）→ 作废本次启动，别进录音态
+            guard token == voiceStartToken else {
+                await liveSpeech.cancel()
+                return
+            }
+            guard started else {
+                withAnimation(Motion.snap) { pttActive = false }
+                inputText = pttBaseline
+                if liveSpeech.needsPermission {
+                    voiceAuthFailed = true   // 复用既有授权引导 alert
+                } else {
+                    voiceError = liveSpeech.lastError ?? "语音识别启动失败"
+                }
+                return
+            }
+        }
+    }
+
+    /// E路：按住期间手指位移更新（上滑超 60pt → 取消待命，给一格刻度触感）
+    func updatePTT(cancelArmed: Bool) {
+        guard pttActive, pttCancelArmed != cancelArmed else { return }
+        pttCancelArmed = cancelArmed
+        if cancelArmed { Haptics.selection() }
+    }
+
+    /// E路：松手。cancelled = 上滑超阈值；极短按压视为误触（轻触提示）。
+    func endPTT(cancelled: Bool) {
+        guard pttActive else { return }
+        let wasTap = Date().timeIntervalSince(pttPressDate) < 0.3
+        voiceStartToken += 1   // 作废准备中的启动（与 cancelTranscribe 同口径）
+        withAnimation(Motion.snap) { pttActive = false }
+        pttCancelArmed = false
+        if wasTap {
+            // 轻触不是按住说话 → 静默取消 + 轻提示（不断 old 流程）
+            Task { await liveSpeech.cancel() }
+            inputText = pttBaseline
+            showPTTToast("按住说话")
+            return
+        }
+        if cancelled {
+            Task { await liveSpeech.cancel() }
+            inputText = pttBaseline
+            Haptics.tap()
+            return
+        }
+        transcribing = true
+        Task {
+            let text = await liveSpeech.stop()
+            transcribing = false
+            voiceDiag = liveSpeech.diagnostics
+            let final = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if final.isEmpty {
+                inputText = pttBaseline
+                showPTTToast("没听清，请再说一次")
+            } else {
+                // 直接发送：走现有发送通道（与输入框点发送同一条路，不重复造逻辑）
+                inputText = final
+                Haptics.notify(.success)
+                send()
+            }
+        }
+    }
+
+    /// E路：轻提示 toast（1.6s 自收，代次防抖）
+    func showPTTToast(_ msg: String) {
+        pttToastMessage = msg
+        pttToastToken += 1
+        let token = pttToastToken
+        Task {
+            try? await Task.sleep(for: .seconds(1.6))
+            guard token == pttToastToken else { return }
+            withAnimation { pttToastMessage = nil }
+        }
+    }
+
+    // MARK: - 录音面板 / 轻提示 overlay（不进 body 巨型链，挂在 chatBodyChrome1）
+
+    /// E路：PTT overlay——录音面板 + 轻提示 toast
+    @ViewBuilder
+    var pttOverlay: some View {
+        if pttActive {
+            ZStack(alignment: .bottom) {
+                // 底幕：只压暗，不拦截触摸（手势正按在麦克风键上，中途不能被抢）
+                Color.black.opacity(0.22)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                PTTRecordingPanel(
+                    cancelArmed: pttCancelArmed,
+                    preparing: liveSpeech.isPreparing,
+                    level: { liveSpeech.currentInputLevel() }
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, GrayCapsuleTabBar.bodyHeight + GrayCapsuleTabBar.bottomGap + safeAreaBottom + 8)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+        }
+        if let msg = pttToastMessage {
+            VStack {
+                Text(msg)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .a11yGlass(.regular, in: Capsule(), stroke: Color.primary.opacity(0.08))
+                Spacer()
+            }
+            .padding(.top, 100)
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+}
+
+// MARK: - 录音面板（对标 Today 参考图）
+
+/// E路：录音面板——玻璃底 + 提示文字 + 30fps 实时波形。灰度，无彩色。
+struct PTTRecordingPanel: View {
+    var cancelArmed: Bool
+    var preparing: Bool
+    var level: () -> Float
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Text(cancelArmed ? "松手取消" : (preparing ? "语音模型准备中…" : "松手发送，上滑取消"))
+                .font(.system(size: 17, weight: .medium))
+                // 取消态弱化：灰度 + 次级字，不用大红（灰度纪律）
+                .foregroundStyle(cancelArmed ? .secondary : .primary)
+            PTTWaveform(level: level)
+                .frame(height: 30)
+        }
+        .padding(.vertical, 22)
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity)
+        .a11yGlass(.regular,
+                   in: RoundedRectangle(cornerRadius: 24, style: .continuous),
+                   stroke: Color.primary.opacity(0.08))
+    }
+}
+
+/// E路：30fps 波形条——TimelineView 自驱动，不走 @State，避免整页重绘。
+/// 电平经正弦抖动调制，静音时收成小圆点，有声时跳动（对标参考图的波形条）。
+struct PTTWaveform: View {
+    var level: () -> Float
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            let lv = CGFloat(level())
+            HStack(spacing: 4) {
+                ForEach(0..<24, id: \.self) { i in
+                    let wobble = 0.55 + 0.45 * sin(t * 5.0 + Double(i) * 0.65)
+                    let h = 3 + lv * 26 * wobble
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .fill(Color.secondary)
+                        .frame(width: 3, height: max(3, h))
+                }
+            }
+        }
+    }
+}
