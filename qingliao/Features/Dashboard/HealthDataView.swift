@@ -81,7 +81,7 @@ struct HealthDataView: View {
                 Button { segment = s } label: {
                     Text(s.rawValue)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(segment == s ? .primary : .white.opacity(0.85))
+                        .foregroundStyle(segment == s ? Color.primary : Color.white.opacity(0.85))
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
                         .background(

@@ -96,7 +96,7 @@ struct HealthBoardView: View {
                        topRight: "00:59",
                        chart: .bars(stepsHistory.isEmpty
                                     ? [0.4, 0.3, 0.35, 0.6, 0.4, 0.15, 0.08]
-                                    : normalized(stepsHistory), highlightLast: true))
+                                    : normalized(stepsHistory)))
         }
     }
 
