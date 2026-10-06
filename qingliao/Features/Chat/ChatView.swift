@@ -3207,12 +3207,8 @@ struct ChatView: View {
         var body: some View {
             // .periodic 墙钟调度永不暂停（沿用三点版 v4.0.19 的根治结论）
             TimelineView(.periodic(from: .now, by: 0.4)) { timeline in
-                let n: Int
-                if reduceMotion {
-                    n = 3
-                } else {
-                    n = 1 + Int(timeline.date.timeIntervalSinceReferenceDate / 0.4) % 3
-                }
+                // ViewBuilder 闭包不支持 deferred let 初始化，必须写成单表达式
+                let n = reduceMotion ? 3 : 1 + Int(timeline.date.timeIntervalSinceReferenceDate / 0.4) % 3
                 Text("思考中" + String(repeating: ".", count: n))
                     .font(.system(size: Typography.body))
                     .foregroundStyle(.secondary)
