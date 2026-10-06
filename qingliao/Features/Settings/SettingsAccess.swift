@@ -92,38 +92,15 @@ struct ConnSettingsView: View {
                     }
                     .glassListCard()
 
-                    // v4.4.x：连接中心——服务状态（Hermes 只读，HA 可点进配置）
+                    // v4.4.x：连接中心——服务状态（2026-10-07 重设计：卡片式对齐大厂）
                     Text("服务")
                         .font(.system(size: Typography.subhead, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .padding(.leading, Spacing.xs)
                         .padding(.top, Spacing.sm)
-                    VStack(spacing: 0) {
+                    VStack(spacing: 12) {
                         ForEach(connections) { conn in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(conn.name)
-                                        .font(.system(size: Typography.body))
-                                        .foregroundStyle(.primary)
-                                    if let note = conn.note, !note.isEmpty {
-                                        Text(note)
-                                            .font(.system(size: Typography.caption))
-                                            .foregroundStyle(.tertiary)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                Spacer(minLength: 8)
-                                ConnStatusDot(configured: conn.configured)
-                                if conn.editable {
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: Typography.subhead, weight: .semibold))
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
-                            .padding(.horizontal, Spacing.xxl)
-                            .padding(.vertical, Spacing.lg)
-                            .background(Color(uiColor: .secondarySystemGroupedBackground))
-                            .onTapGesture {
+                            Button {
                                 if conn.id == "homeassistant" {
                                     Haptics.tap()
                                     showHADetail = true
@@ -131,13 +108,48 @@ struct ConnSettingsView: View {
                                     Haptics.tap()
                                     showNASDetail = true
                                 }
+                            } label: {
+                                HStack(spacing: 14) {
+                                    // 服务图标
+                                    Image(systemName: connIcon(for: conn.id))
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 48, height: 48)
+                                        .background(connColor(for: conn.id), in: RoundedRectangle(cornerRadius: 14))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(conn.name)
+                                            .font(.system(size: 17, weight: .semibold))
+                                            .foregroundStyle(.primary)
+                                        HStack(spacing: 6) {
+                                            Circle()
+                                                .fill(conn.configured ? Color.green : Color.gray.opacity(0.4))
+                                                .frame(width: 8, height: 8)
+                                            Text(conn.configured ? "已连接" : "未配置")
+                                                .font(.system(size: 13))
+                                                .foregroundStyle(conn.configured ? .green : .secondary)
+                                            if let note = conn.note, !note.isEmpty {
+                                                Text("· \(note)")
+                                                    .font(.system(size: 13))
+                                                    .foregroundStyle(.tertiary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                    }
+                                    Spacer(minLength: 8)
+                                    if conn.editable {
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                .padding(16)
+                                .background(Color(uiColor: .secondarySystemGroupedBackground),
+                                            in: RoundedRectangle(cornerRadius: 20))
                             }
-                            if conn.id != connections.last?.id {
-                                Divider().padding(.leading, Spacing.rowDividerInset)
-                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .glassListCard()
+                    .padding(.horizontal, 4)
                     .task {
                         await loadConnections()
                     }
@@ -282,6 +294,26 @@ struct ConnSettingsView: View {
             }
         } catch {
             connections = []
+        }
+    }
+
+    // 2026-10-07：连接服务图标（重设计）
+    private func connIcon(for id: String) -> String {
+        switch id {
+        case "hermes": return "brain.head.profile"
+        case "homeassistant": return "house.fill"
+        case "nas": return "externaldrive.fill"
+        default: return "link"
+        }
+    }
+
+    // 2026-10-07：连接服务图标背景色
+    private func connColor(for id: String) -> Color {
+        switch id {
+        case "hermes": return Color(red: 0.35, green: 0.55, blue: 1.0)
+        case "homeassistant": return Color(red: 0.2, green: 0.7, blue: 0.9)
+        case "nas": return Color(red: 0.5, green: 0.5, blue: 0.55)
+        default: return .gray
         }
     }
 }
