@@ -291,13 +291,10 @@ private struct FeedUnitCard: View {
                     .lineSpacing(4)
 
                 if let img = unit.imageURL, let url = URL(string: img) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        default:
-                            Color.secondary.opacity(0.1)
-                        }
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Color.secondary.opacity(0.1)
                     }
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1.6, contentMode: .fill)
