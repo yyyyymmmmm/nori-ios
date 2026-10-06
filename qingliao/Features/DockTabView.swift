@@ -74,6 +74,7 @@ struct DockTabView: View {
     @Environment(ChatStore.self) private var chat
     @Environment(StreamClient.self) private var stream
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.colorScheme) private var colorScheme
 
     /// dock 槽位数（5：会话/看板/聊天/生活/设置）——长按菜单与识别浮层的槽位几何仍用它定位
     private var dockSlotCount: Int { 5 }
@@ -563,22 +564,22 @@ private struct TabTransitionModifier: ViewModifier {
     let tab: DockTab
     @Binding var selected: DockTab
     @State private var appeared = false
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         content
             .tag(tab)
             .tabItem {
-                // 2026-10-07 根因（iOS 26 实测 + 第三方验证）：
-                // iOS 26 的 Liquid Glass tab bar 在把 Label 转成 UITabBarItem 时会丢掉
-                // 里面的 .foregroundStyle，显式设色反而让系统用整条 bar 的 tint 渲染
-                // 所有项 → 未选中也被染黑。正确做法：tabItem 里不设任何颜色，
-                // 只留 .tint(.primary) 管选中态（唯一生效的 API），未选中交给系统默认灰。
-                Label {
-                    Text(tab.title)
-                        .fontWeight(selected == tab ? .semibold : .regular)
-                } icon: {
-                    Image(systemName: tab.icon)
-                }
+                // 2026-10-07 烤图方案（iOS 26 实测结论 + oriveo 实证）：
+                // iOS 26 的 Liquid Glass tab bar 未选中色是系统自适应的（浅黑/深白），
+                // UITabBar.appearance 全系被忽略、tabItem 里的 .foregroundStyle 被丢弃，
+                // 公开 API 做不出"未选中灰"。绕法：按选中态把"图标+文字"烤成 UIImage
+                // （alwaysOriginal），未选中烤 tertiaryLabel 灰、选中烤 label 黑，
+                // 系统对 alwaysOriginal 的图原样保留颜色（oriveo iOS 26 提交验证）。
+                // 文字必须一起烤进去——UITabBarItem 的 title 颜色系统锁死，Label 里改不动。
+                Image(uiImage: Self.bakedTabImage(for: tab, isSelected: selected == tab, colorScheme: colorScheme))
+                    .renderingMode(.original)
+                    .accessibilityLabel(tab.title)
             }
             .scaleEffect(appeared ? 1 : 0.985, anchor: .center)   // v3.4.29：0.97→0.985，入场更细腻
             .animation(Motion.snap, value: appeared)
@@ -596,6 +597,56 @@ private struct TabTransitionModifier: ViewModifier {
 extension View {
     func tabTransition(for tab: DockTab, selected: Binding<DockTab>) -> some View {
         modifier(TabTransitionModifier(tab: tab, selected: selected))
+    }
+}
+
+// MARK: - 烤图 tabItem（iOS 26 未选中灰的唯一通路）
+extension TabTransitionModifier {
+    /// 5 tab × 选中/未选中 × 浅/深色 = 最多 20 张小图，静态缓存。
+    private static var bakedCache: [String: UIImage] = [:]
+
+    static func bakedTabImage(for tab: DockTab, isSelected: Bool, colorScheme: ColorScheme) -> UIImage {
+        let key = "\(tab.rawValue)-\(isSelected ? 1 : 0)-\(colorScheme == .dark ? "d" : "l")"
+        if let hit = bakedCache[key] { return hit }
+        let img = renderBakedTabImage(for: tab, isSelected: isSelected, colorScheme: colorScheme)
+        bakedCache[key] = img
+        return img
+    }
+
+    private static func renderBakedTabImage(for tab: DockTab, isSelected: Bool, colorScheme: ColorScheme) -> UIImage {
+        // 用 resolved 动态色，保证烤出来的像素跟当前浅/深色模式一致
+        let traits = UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)
+        let tint = (isSelected ? UIColor.label : UIColor.tertiaryLabel).resolvedColor(with: traits)
+
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 24, weight: isSelected ? .semibold : .regular)
+        let symbol = (UIImage(systemName: tab.icon, withConfiguration: symbolConfig) ?? UIImage())
+            .withTintColor(tint, renderingMode: .alwaysOriginal)
+
+        let label = UILabel()
+        label.text = tab.title
+        label.font = .systemFont(ofSize: 10.5, weight: isSelected ? .semibold : .regular)
+        label.textColor = tint
+        label.textAlignment = .center
+        label.sizeToFit()
+
+        let spacing: CGFloat = 3
+        let width = ceil(max(symbol.size.width, label.bounds.width)) + 12
+        let height = ceil(symbol.size.height + spacing + label.bounds.height)
+        let size = CGSize(width: width, height: height)
+
+        let container = UIView(frame: CGRect(origin: .zero, size: size))
+        container.backgroundColor = .clear
+        let iv = UIImageView(image: symbol)
+        iv.frame = CGRect(x: (width - symbol.size.width) / 2, y: 0,
+                          width: symbol.size.width, height: symbol.size.height)
+        label.frame = CGRect(x: 0, y: symbol.size.height + spacing, width: width, height: label.bounds.height)
+        container.addSubview(iv)
+        container.addSubview(label)
+
+        let image = UIGraphicsImageRenderer(size: size).image { _ in
+            container.drawHierarchy(in: container.bounds, afterScreenUpdates: true)
+        }
+        return image.withRenderingMode(.alwaysOriginal)
     }
 }
 
