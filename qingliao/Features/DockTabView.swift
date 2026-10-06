@@ -183,7 +183,7 @@ struct DockTabView: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
             // item8 sheet 规范：整页内容用 .large，可见拖拽指示器，可下滑关闭
-            .presentationDetents([.large()])
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
         // 会话搜索
@@ -193,7 +193,7 @@ struct DockTabView: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
             // item8 sheet 规范：整页列表用 .large，可见拖拽指示器，可下滑关闭
-            .presentationDetents([.large()])
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
         // 灰度重做 2026-10-06 晚：侧边栏开关（聊天页顶栏按钮发通知）
