@@ -244,6 +244,41 @@ final class HealthStore {
         return ([head] + lines).joined(separator: "\n")
     }
 
+    // MARK: - 结构化数值（给健康 UI 用；读不到返回 nil，上层显示 "--" 占位）
+
+    /// 今日步数
+    func todaySteps() async -> Double? {
+        guard Self.isAvailable else { return nil }
+        let cal = Calendar.current
+        let now = Date()
+        return await sum(.stepCount, kind: .count,
+                         from: cal.startOfDay(for: now), to: now)
+    }
+
+    /// 昨晚睡眠小时数（昨天中午 → 今天中午窗口）
+    func lastNightSleepHours() async -> Double? {
+        guard Self.isAvailable else { return nil }
+        let cal = Calendar.current
+        let now = Date()
+        let noonToday = cal.date(bySettingHour: 12, minute: 0, second: 0, of: now) ?? now
+        let noonYesterday = cal.date(byAdding: .day, value: -1, to: noonToday) ?? now.addingTimeInterval(-86400)
+        return await sleepHours(from: noonYesterday, to: noonToday)
+    }
+
+    /// 近 7 天每日步数（给 mini 柱状图；缺数据的天为 0）
+    func last7DaysSteps() async -> [Double] {
+        guard Self.isAvailable else { return [] }
+        let cal = Calendar.current
+        let now = Date()
+        var result: [Double] = []
+        for i in (0..<7).reversed() {
+            let day = cal.date(byAdding: .day, value: -i, to: cal.startOfDay(for: now)) ?? now
+            let end = cal.date(byAdding: .day, value: 1, to: day) ?? now
+            result.append(await sum(.stepCount, kind: .count, from: day, to: end) ?? 0)
+        }
+        return result
+    }
+
     // MARK: - 查询实现（回调里只带 Sendable 值回来；execute 一律在闭包外）
 
     private func quantityValues(_ id: HKQuantityTypeIdentifier,
