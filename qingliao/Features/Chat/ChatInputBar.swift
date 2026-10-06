@@ -44,9 +44,7 @@ enum ChatInputBarLayout {
 struct ChatInputBar: View {
     @Binding var text: String
     @FocusState.Binding var focused: Bool
-    var streaming: Bool
     var onSend: () -> Void
-    var onStop: () -> Void = {}
     var onPickAttachment: () -> Void = {}
     var onCamera: () -> Void = {}   // v2.0.38 拍照输入
     // 语音输入（按住说话）—— v3.9.28 云端模式移除后仅剩 isRecording 态，
@@ -77,9 +75,7 @@ struct ChatInputBar: View {
     // v3.4.28：横屏限宽
     @Environment(\.horizontalSizeClass) private var hSizeInput
     // v4.1.0 E路：pressKeyboardUp 已随输入框长按语音入口摘除而删除
-    // v-review fix（维度3）：输入框流光开关与设置页同源 @AppStorage 默认 true——
-    // 原 UserDefaults.standard.bool 无默认(false)：全新安装设置页显示「开」但门控不生效，拨动一次才对齐
-    @AppStorage("qingliao_input_glow") private var inputGlowOn = true
+    // v4.4：输入框流光开关已删除（特效本身删除），AppStorage key 保留做数据兼容，不再读取。
     // v3.4.25：上下文阈值预警——外部传入上下文使用率（0-1），超 0.8 发送键变橙轻提醒
     var contextUsage: Double = 0
     /// v3.9.48：模型快选——当前模型名（空串 = 整块不显示）+ 点击回调。
@@ -566,21 +562,8 @@ struct ChatInputBar: View {
     /// 内部 `HStack(spacing: 8)` 与外层行距同参 → 拆前拆后视觉零差异。
     private var trailingButtons: some View {
         HStack(spacing: 8) {
-            // v2.0.88：AI 回答中也可继续发送（消息排队，答完自动逐条回）；
-            // 停止按钮独立保留（取消当前回答 + 清空队列）
-            if streaming {
-                Button(action: onStop) {
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: Typography.subhead, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 32, height: 32)
-                        // v3.4.21：停止按钮 Circle → 红胶囊（与发送按钮 Capsule 同族，二元控件形态统一）
-                        .background(Color.red.opacity(0.8), in: Capsule())
-                }
-                .buttonStyle(PressStyle())   // v3.4.29：统一按压反馈
-                // v3.9.34：命中区 44×44（停止红胶囊视觉 32×32、间距零变化）
-                .hitArea44(h: 6, v: 6)
-            }
+            // v4.4：停止键删除——持续任务产品哲学（任务活在后端，聊天框只是遥控器）；
+            // 真要停去任务中心取消（后端 cancel_task），一个功能一个入口。
 
             // v4.1.0 E路：发送/转写按钮组——长按进语音已摘除（PTT 接管），只剩轻点发送/转写中转圈
             // G线：PTT 期间走 transcribingEffective（准备期不抢按钮，见 showMicButton 注释）
@@ -628,7 +611,8 @@ struct ChatInputBar: View {
     /// G线：用 transcribingEffective —— 准备期 transcribing 入参会变 true，
     /// 若直接用它，麦克风键在按住中途被换成发送键 → 手势宿主消失 → 上滑取消失灵（主 bug）。
     private var showMicButton: Bool {
-        (text.isEmpty || pttActive) && !streaming && !voiceMode && !transcribingEffective && voiceEnabled
+        // v4.4：思考中也可继续发送（streaming 门控删除，输入框状态恒稳）
+        (text.isEmpty || pttActive) && !voiceMode && !transcribingEffective && voiceEnabled
     }
 
     /// L线：两段式语音（对标 Today）——麦克风键改为轻点进入语音模式，
@@ -776,33 +760,10 @@ extension ChatInputBar {
         content
             // v2.0.87s：等待回复特效（v2.0.87ay：改回 87 版效果——内部旋转流光，Siri 淡雅）
             .overlay {
-                // v3.9.7：语音转文字过程中输入框**不加这层特效**，保持普通输入框形态——
-                //         语音态唯一的视觉提示是「发送键变收音图标」。流光只在 streaming（等待回复）态出现。
-                // 卡死防护靠 v3.2.3 三件套（流光无 shadow + 15fps + 外层阴影静态化在 overlay 前）。
-                if streaming && inputGlowOn {
-                    // v2.0.139 性能：流光 60→30fps；v3.2.3：30→15fps + **去掉 .shadow**
-                    let schedule: AnimationTimelineSchedule = .animation(minimumInterval: 1.0 / 15.0)
-                    TimelineView(schedule) { context in
-                        let t = context.date.timeIntervalSinceReferenceDate
-                        let angle = (t * 70).truncatingRemainder(dividingBy: 360)
-                        // v3.9.64：用户原话「把输入框流光填满外部的方形框」——流光本体由 **Capsule 改为
-                        //   与容器同形的圆角矩形**。Capsule 版两端半径 = 容器高/2，流光被压成
-                        //   「两端大弧」的条状；同形矩形后流光铺满整个方形圆角框的四边与四角
-                        //   （含圆角处）——玻璃/白边/聚焦蓝边/流光四处同一个形状（v3.9.63 定稿口径）。
-                        // v3.9.65：容器圆角随「加到 18」走同一常量 containerCornerRadius，流光仍是同形。
-                        RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous).fill(
-                            AngularGradient(
-                                colors: [.blue.opacity(0.22), .indigo.opacity(0.22),
-                                         .pink.opacity(0.22), .red.opacity(0.16), .blue.opacity(0.22)],
-                                center: .center, angle: .degrees(angle)
-                            )
-                        )
-                        .allowsHitTesting(false)   // v2.0.87al：不拦截点击（停止按钮可点）
-                    }
-                } else {
-                    RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous)
-                        .strokeBorder(.white.opacity(Tint.subtle), lineWidth: 0.8)
-                }
+                // v4.4：等待回复流光删除——输入框是遥控器，状态要稳；任务状态由顶栏 Nori 胶囊承担。
+                // 两处同时表达状态就是乱。设置页"输入框流光光效"开关同步删除。
+                RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous)
+                    .strokeBorder(.white.opacity(Tint.subtle), lineWidth: 0.8)
             }
             .padding(.horizontal, 18)   // v2.0.87aw：输入框宽度收窄（12→18）
     }

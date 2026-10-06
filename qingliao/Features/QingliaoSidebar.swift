@@ -29,6 +29,13 @@ final class SidebarHistoryStore {
             // 诚实留空：侧边栏里不展开错误态
         }
     }
+
+    /// v4.4：改名/删除后强制刷新（绕开 3 秒节流）
+    @MainActor
+    func refreshNow(auth: AuthStore) async {
+        lastLoadAt = nil
+        await refreshIfNeeded(auth: auth)
+    }
 }
 
 // MARK: - 侧边栏开关通知（聊天页顶栏按钮 → DockTabView）
@@ -62,6 +69,14 @@ struct QingliaoSidebar: View {
     var onSearch: () -> Void
     /// 点历史会话 → 宿主切到聊天页并打开该会话（DockTabView：selected = .chat; chat.load(session)）
     var onOpenSession: (ChatSession) -> Void
+
+    @Environment(AuthStore.self) private var auth
+    // v4.4：历史会话长按菜单（置顶/重命名/删除）——置顶 key 与 SessionsView 同源
+    @State private var pinnedIDs: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "qingliao_pinned_sessions") ?? [])
+    @State private var renameTarget: ChatSession?
+    @State private var renameText = ""
+    @State private var confirmDelete: ChatSession?
+    @State private var opError: String?
 
     var body: some View {
         GeometryReader { geo in
@@ -174,27 +189,8 @@ struct QingliaoSidebar: View {
                             .foregroundStyle(.tertiary)
                             .padding(.horizontal, 20)
                     } else {
-                        ForEach(history.sessions) { session in
-                            Button {
-                                close()
-                                onOpenSession(session)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(session.title.isEmpty ? "新对话" : session.title)
-                                        .font(.system(size: 16))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
-                                    if !session.relativeTime.isEmpty {
-                                        Text(session.relativeTime)
-                                            .font(.system(size: 13))
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                            }
-                            .buttonStyle(.plain)
+                        ForEach(sortedSessions) { session in
+                            historyRow(session)
                         }
                     }
                 }
@@ -241,6 +237,25 @@ struct QingliaoSidebar: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.trailing, 60)   // 右侧露出一点底页，暗示可滑回
         .shadow(color: .black.opacity(0.15), radius: 24, x: 8, y: 0)
+        // v4.4：历史会话长按菜单的改名/删除/失败提示
+        .alert("重命名会话", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
+            TextField("会话名称", text: $renameText)
+            Button("取消", role: .cancel) { renameTarget = nil }
+            Button("确定") { doRename() }
+        }
+        .alert("删除会话", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } })) {
+            Button("取消", role: .cancel) { confirmDelete = nil }
+            Button("删除", role: .destructive) {
+                if let s = confirmDelete { confirmDelete = nil; doDelete(s) }
+            }
+        } message: {
+            Text("将删除「\(confirmDelete?.title ?? "")」及其全部消息，此操作不可恢复")
+        }
+        .alert("操作失败", isPresented: Binding(get: { opError != nil }, set: { if !$0 { opError = nil } })) {
+            Button("好", role: .cancel) { opError = nil }
+        } message: {
+            Text(opError ?? "")
+        }
     }
 
     /// 选项卡行：线条图标 + 文字；选中 = 灰胶囊底
@@ -267,7 +282,133 @@ struct QingliaoSidebar: View {
                 in: RoundedRectangle(cornerRadius: 14, style: .continuous)
             )
             .padding(.horizontal, 12)
+            .contentShape(Rectangle())   // v4.4：整行都是热区（含胶囊外 12pt 边距），点行缝也有反应
         }
         .buttonStyle(.plain)
+    }
+
+    /// v4.4：置顶优先 + 按时间倒序（置顶 key 与 SessionsView 同源）
+    private var sortedSessions: [ChatSession] {
+        history.sessions.sorted {
+            let p0 = pinnedIDs.contains($0.id) ? 0 : 1
+            let p1 = pinnedIDs.contains($1.id) ? 0 : 1
+            if p0 != p1 { return p0 < p1 }
+            return ($0.lastTime ?? 0) > ($1.lastTime ?? 0)
+        }
+    }
+
+    private func isFixedSession(_ id: String) -> Bool {
+        id == ChatStore.deliverySessionId || id == ChatStore.proactiveSessionId
+    }
+
+    /// 历史会话行：点按打开；长按菜单（置顶/重命名/删除，对标 SessionsView）
+    private func historyRow(_ session: ChatSession) -> some View {
+        Button {
+            close()
+            onOpenSession(session)
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    if pinnedIDs.contains(session.id) {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                    }
+                    Text(session.title.isEmpty ? "新对话" : session.title)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+                if !session.relativeTime.isEmpty {
+                    Text(session.relativeTime)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)   // v4.4：10→12，热区 ≥44pt
+            .contentShape(Rectangle())   // v4.4：整行热区
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            // 固定会话（投递/主动）不给操作入口：点了后端也会拒绝
+            if !isFixedSession(session.id) {
+                Button {
+                    togglePin(session)
+                } label: {
+                    Label(pinnedIDs.contains(session.id) ? "取消置顶" : "置顶",
+                          systemImage: pinnedIDs.contains(session.id) ? "pin.slash" : "pin")
+                }
+                Button {
+                    renameTarget = session
+                    renameText = session.title
+                } label: {
+                    Label("重命名", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    confirmDelete = session
+                } label: {
+                    Label("删除", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private func togglePin(_ s: ChatSession) {
+        if pinnedIDs.contains(s.id) {
+            pinnedIDs.remove(s.id)
+        } else {
+            pinnedIDs.insert(s.id)
+        }
+        UserDefaults.standard.set(Array(pinnedIDs), forKey: "qingliao_pinned_sessions")
+        Haptics.tap()
+    }
+
+    /// v4.4：侧边栏改名——走 /api/sessions/merge 整会话覆盖（App 不发 updatedAt，后端恒判 incoming 赢）；
+    /// 必须带上原 messages，否则整会话被只有 id+title 的空壳覆盖（merge 是整行替换）。
+    private func doRename() {
+        guard let t = renameTarget else { return }
+        let newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        renameTarget = nil
+        guard !newName.isEmpty, newName != t.title else { return }
+        Task {
+            do {
+                let j = try await auth.json("/api/sessions/merge", method: "POST", body: [
+                    "sessions": [["id": t.id, "title": newName,
+                                  "messages": ChatStore.messagesPayload(t.messages)] as [String: Any]],
+                    "deleted": [] as [Any]
+                ])
+                if (j["ok"] as? Bool) == true {
+                    Haptics.success()
+                } else {
+                    opError = "改名未同步到服务器，请检查网络后重试"
+                }
+                await history.refreshNow(auth: auth)
+            } catch {
+                opError = "改名未同步到服务器：\(error.localizedDescription)"
+                await history.refreshNow(auth: auth)
+            }
+        }
+    }
+
+    private func doDelete(_ s: ChatSession) {
+        Task {
+            do {
+                let j = try await auth.json("/api/sessions/merge", method: "POST", body: [
+                    "sessions": [] as [Any],
+                    "deleted": [s.id]
+                ])
+                if (j["ok"] as? Bool) == true {
+                    Haptics.success()
+                } else {
+                    opError = "删除未同步到服务器，请检查网络后重试"
+                }
+                await history.refreshNow(auth: auth)
+            } catch {
+                opError = "删除未同步到服务器：\(error.localizedDescription)"
+                await history.refreshNow(auth: auth)
+            }
+        }
     }
 }

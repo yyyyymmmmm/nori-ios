@@ -894,8 +894,8 @@ struct AppearanceSheet: View {
     @AppStorage("qingliao_siri_glow_freq") private var glowFreq = 2.2
     @AppStorage("qingliao_siri_glow_amp") private var glowAmp = 0.18
     @AppStorage("qingliao_siri_glow_width") private var glowWidth = 22.0
+    // v4.4：输入框流光特效删除，AppStorage key 仅保留做数据兼容（不再有读取方）
     // v3.0.4：补全本地外观独有项（输入框流光 / 天气城市）
-    @AppStorage("qingliao_input_glow") private var glowOn = true
     // v4.0.7：烟花粒子特效开关（DockTabView.fireDockBurst 读同一 key）
     @AppStorage("qingliao_dock_burst") private var dockBurstOn = true
     // v4.0.6：聊天页形象/表情/动作/动画档四组 key 已搬去 PetStudioSheet（外观页不再重复持有，
@@ -927,7 +927,7 @@ struct AppearanceSheet: View {
                 // 聊天页顶部仍是同一只宠物（共用 PetKeys.style/.motion/.quirks/.face 四个 key）。
                 // 交互
                 Section("交互") {
-                    Toggle("输入框流光光效", isOn: $glowOn).qingliaoSwitch(hideLabel: false)   // v3.0.4：补全本地独有项
+                    // v4.4：输入框流光特效已删除（用户：不需要输入框炫酷的颜色），开关同步删除
                     // v4.0.7：点 dock 智慧球的烟花粒子特效（用户：烟花也做个开关放设置里）
                     Toggle("烟花粒子特效", isOn: $dockBurstOn).qingliaoSwitch(hideLabel: false)
                     // v3.8.0：灵动岛/锁屏实时活动——AI 回复中亮起、结束收起；关掉立即收起正在显示的活动

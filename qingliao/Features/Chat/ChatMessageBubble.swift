@@ -636,13 +636,10 @@ struct MessageBubble: View {
         }
     }
 
-    /// 已送达 / 排队中状态
+    /// 排队中状态（v4.4："已送达"删除——AI 对话没有第二个人，送达概念无意义；只保留排队中）
     @ViewBuilder
     private var bubbleDeliveryRow: some View {
-        // v2.0.65：已送达小字（用户消息、非失败、非语音、未撤回）
-        // v2.0.87q：加 ✓ 图标（微信式送达状态）
-        // v2.0.88：排队中的消息显示 ⏳ 排队中（AI 回答完自动发送）
-        if message.isUser && !message.failed && !message.withdrawn {
+        if message.isUser && message.queued && !message.failed && !message.withdrawn {
             HStack(spacing: 2.5) {
                 // v3.0.19：语音指令触发的消息带 🎤 小标记
                 if message.voiceCommand {
@@ -650,9 +647,9 @@ struct MessageBubble: View {
                         .font(.system(size: Typography.tiny))
                         .foregroundStyle(.tertiary)
                 }
-                Image(systemName: message.queued ? "hourglass" : "checkmark")
+                Image(systemName: "hourglass")
                     .font(.system(size: Typography.tiny, weight: .bold))
-                Text(message.queued ? "排队中" : "已送达")
+                Text("排队中")
                     .font(.system(size: Typography.tiny))
             }
             .foregroundStyle(.tertiary)

@@ -652,14 +652,7 @@ struct ChatView: View {
         } else {
             ChatInputBar(text: $inputText,
                      focused: $inputFocus,
-                     streaming: thisSessionStreaming,   // v3.9.41：按会话收窄（原来 B 会话会因 A 在跑而长出红色「停止」，一点就掐掉 A 的回答）
                      onSend: { send() },
-                     onStop: {
-                         // v2.0.88：点停止 = 取消当前回答 + 清空排队消息（不再自动发）
-                         clearPendingQueue()
-                         suppressAutoReadOnce = true   // v3.9.9 收口：主动停止 → 残句不念
-                         stream.stop(auth: auth)
-                     },
                      onPickAttachment: {
                          // v3.9.30：面板=大块浮现 → 展开走 emerge（带轻微回弹）；收起保持 settle 不带回弹
                          if showAttachmentMenu {
@@ -3207,57 +3200,24 @@ struct ChatView: View {
         // v2.0.36：录音权限被拒提示
     }
 
-    /// 思考中动画（三点跳动）
+    /// 思考中指示器（v4.4：三点跳动改为"思考中..."文字 + 省略号滚动，用户要求去炫酷）
     struct TypingIndicator: View {
-        // v3.9.19：无障碍——「降低动态效果」时不做循环脉冲
+        // v3.9.19：无障碍——「降低动态效果」时不做循环
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         var body: some View {
-            // v4.0.12 根治「圆点脉冲自己消失」（用户 2026-09-30 真机实报）：改 TimelineView 驱动。
-            // v4.0.14（再报）：抬强度下限 + 切祖先动画事务继承。
-            //
-            // v4.0.19（用户 2026-10-01 三报「动画动一段时间就会消失」）：前两版都没根治，真根因在
-            // **调度本身**——`.animation` 是官方文档定义的「pausable schedule」（可暂停调度）：
-            // 只在系统判定「有动画内容在跑」时全速 tick，子树没有 Core Animation 活动时会被
-            // 降频甚至暂停（OpenSwiftUI 实现注释「Respects system animation settings」）。
-            // 而这三颗点是 TimelineView 自己驱动的——系统看「没有活动动画」→ 停时钟 →
-            // 三点凝在某一帧 → 肉眼「动一会儿就停了/消失」。根治：换 `.periodic` 墙钟调度，
-            // 官方契约「updates at regular intervals」永不暂停，与系统动画状态无关。
-            // 相位仍由时间戳直接算出（丢帧后下一帧相位自动正确，v4.0.12 的核心优点保留）；
-            // 周期/错相与旧版一致（1.2s 全周期 + 每颗错相 0.18s）；强度下限 0.62 保留
-            //（主线程抢占丢帧时那一帧仍看得见）；reduceMotion 直接渲染静止满点（periodic 无 paused 参数）。
-            if reduceMotion {
-                dotRow(timeline: nil)
-            } else {
-                TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { timeline in
-                    dotRow(timeline: timeline.date.timeIntervalSinceReferenceDate)
+            // .periodic 墙钟调度永不暂停（沿用三点版 v4.0.19 的根治结论）
+            TimelineView(.periodic(from: .now, by: 0.4)) { timeline in
+                let n: Int
+                if reduceMotion {
+                    n = 3
+                } else {
+                    n = 1 + Int(timeline.date.timeIntervalSinceReferenceDate / 0.4) % 3
                 }
+                Text("思考中" + String(repeating: ".", count: n))
+                    .font(.system(size: Typography.body))
+                    .foregroundStyle(.secondary)
+                    .transaction { $0.animation = nil }
             }
-        }
-
-        /// 三颗点一行。timeline = 当前墙钟秒数；传 nil = reduceMotion 静止满点。
-        private func dotRow(timeline: Double?) -> some View {
-            HStack(spacing: Spacing.xs) {
-                ForEach(0..<3, id: \.self) { i in
-                    // v3.4.20：三点跳动 → 蓝紫渐变脉冲圆（与发送按钮/Siri 流光同语言，"AI 活着"统一视觉）
-                    // 波形：|sin| 三角化成 0→1→0 脉冲，周期 1.2s（= 旧版 0.6s easeInOut 往返），
-                    // 每颗相位错开 0.18s；上限 1.0 = 旧版高点（不动），下限 v4.0.14 由 0.45 抬到 0.62。
-                    let pulse = timeline.map { t in
-                        abs(2.0 * ((t + Double(i) * 0.18)
-                            .truncatingRemainder(dividingBy: 1.2) / 1.2) - 1.0)   // 1→0→1
-                    }
-                    let strength = pulse.map { 0.62 + 0.38 * (1.0 - $0) } ?? 1.0
-                    Circle()
-                        .fill(LinearGradient(colors: [.blue, .indigo, .pink],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 8, height: 8)
-                        .scaleEffect(0.55 + 0.45 * strength)
-                        .opacity(strength)
-                }
-            }
-            // v4.0.14：切断祖先动画事务的继承。宿主的 withAnimation / .animation(_:value:) 都在
-            // 更上层，逐帧新值可能被上一事务插值/跳过 → 帧在走、画面不动。只清本子树隐式动画，
-            // periodic 逐帧直接给值，动画观感不受影响。
-            .transaction { $0.animation = nil }
         }
     }
 
