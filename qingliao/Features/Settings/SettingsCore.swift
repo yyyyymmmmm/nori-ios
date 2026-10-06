@@ -37,6 +37,8 @@ struct SettingsView: View {
     // v2.0.81：知识库页面
     @State var showKB = false
     @State var showSkills = false
+    // 2026-10-07：MCP 服务
+    @State var showMCP = false
     // v2.0.87：AI 记忆
     @State var showMemory = false
     @State var memoryCount = 0
@@ -325,6 +327,12 @@ struct SettingsView: View {
                 .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
+        // 2026-10-07：MCP 服务管理
+        .sheet(isPresented: $showMCP) {
+            MCPView()
+                .presentationDetents([.medium, .large])
+                .scrollContentBackground(.hidden)
+        }
         // v2.0.87：AI 记忆
     }
 
@@ -558,6 +566,8 @@ extension SettingsView {
             GraySettingsRow(icon: "book.closed", title: "知识库", subtitle: "文档检索问答") { showKB = true }
             MuseRowDivider()
             GraySettingsRow(icon: "puzzlepiece.extension", title: "技能", subtitle: "给 AI 装上领域能力") { showSkills = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "server.rack", title: "MCP 服务", subtitle: "接入外部工具和数据源") { showMCP = true }
             MuseRowDivider()
             // K 线 2026-10-06：判定参数区收进二级页（分流方式/灵敏度/等待超时），列表不再展开
             GraySettingsRow(icon: "arrow.triangle.branch", title: "智能路由",
