@@ -1433,14 +1433,7 @@ struct ChatView: View {
     /// 省电靠 state 映射（idle 只呼吸+眨眼+偶发微动作，无逐帧常驻）。
     /// 交互与欢迎页那只完全同款（拍板 2A）：轻点抚摸+聚焦输入框 / 长按快捷菜单（手势挂 overlay 命中层）。
     private var petHeaderBadge: some View {
-        PetAvatar(size: 60,
-                  state: aiBusy ? .thinking : (headerPetError ? .alert : .idle),
-                  patTrigger: petPat,
-                  celebrateTrigger: petCelebrate,
-                  keepDetail: true,
-                  thinkingFaceOverride: .sleepy,
-                  alertFaceOverride: .calm,
-                  celebrateFace: .happy)
+        ROTAvatarView(state: aiBusy ? .thinking : .idle, size: 60)
     }
 
     /// v4.0.31：header 宠物的出错信号 —— 本会话这轮生成失败（非可重试错误），与欢迎页 alert 同源判定
@@ -2372,9 +2365,7 @@ struct ChatView: View {
             // 现在换成原生矢量宠物：零 SPM 依赖、包体积增量 0，且**不再常驻逐帧渲染**
             // （只有呼吸/眨眼/状态切换时才动，后台/键盘无关场景自动停 —— 比原来省电）。
             // 尺寸仍锁 96pt（欢迎页身份，不因布局改动而变）；三态：思考中（AI 正在回）/ 抚摸（轻点）/ 待机。
-            PetAvatar(size: 96,
-                      state: petState,
-                      patTrigger: petPat)
+            ROTAvatarView(state: petState == .thinking ? .thinking : .idle, size: 96)
         }
         // 尺寸仍锁 96pt（身份尺寸不因命中域而变）
         .frame(width: 96, height: 96)

@@ -438,7 +438,7 @@ struct OrbQuickMenuLayer: View {
     /// 唯一一种画法：宠物（球版分支已删，见上面的口径注释）
     @ViewBuilder
     private var anchorObject: some View {
-        PetAvatar(size: anchorSize, state: thinking ? .thinking : .idle)
+        ROTAvatarView(state: thinking ? .thinking : .idle, size: anchorSize)
             .frame(width: anchorSize, height: anchorSize)
             .position(ballCenter)
             .opacity(shown ? 1 : 0)          // 与轻纱同节奏淡入（onAppear 的 withAnimation 一并驱动）
