@@ -1,19 +1,18 @@
-# 轻聊 3.0（Qingliao）— 原生 iOS AI 助手
+# Nori（原轻聊 3.0）— 原生 iOS AI 助手
 
-家庭 NAS 上的 AI 助手客户端，SwiftUI 原生（非 HTML 套壳），连接自部署后端（Hermes + 自研 Python 服务），提供 AI 对话、智能家居看板（Home Assistant）、NAS/路由器状态、Docker 管理、知识库、AI 记忆、密码管理、定时任务等能力。iOS 17+（实测 iOS 26/27），SideStore 侧载分发。
+家庭 NAS 上的 AI 助手客户端，SwiftUI 原生（非 HTML 套壳）。App 是 **Hermes 服务的控制平面**：只对接一个 Hermes 服务（一个服务器地址、一个 API 面），不感知服务端内部的应用层/Hermes 引擎分层。
 
-> 🔗 **后端开源**：本 App 配套的后端服务（统一 API，Docker 部署）已开源至 [`github.com/lxm20060513-svg/qingliao-backend`](https://github.com/lxm20060513-svg/qingliao-backend)（MIT），含 `docker-compose` + `.env.example` + 完整部署文档，部署/升级请参照该仓库。
+iOS 26 原生液态玻璃 + 中性系统灰度。iOS 17+，SideStore 侧载分发。
+
+> 🔗 **后端**：配套后端服务在 [`github.com/yyyyymmmmm/qingliao-backend`](https://github.com/yyyyymmmmm/qingliao-backend)，Docker 部署，含 `docker-compose` + `.env.example` + 部署文档。
 
 > 本文档面向**接手开发/发版的 AI 代理**：读完可独立完成「改功能 → 自查 → 发版 → 交付」全流程。
->
-> 注：内部交接与运维文档（发版沿革、运维手册、内部体检记录）**不入本公开仓**，只保留在部署环境中。
 
 ---
 
 ## 🚀 快速上手（开发环境）
 
-- 仓库默认分支：**`feature/handoff-301`**（当前的 3.x 开发与发版线，GitHub 上的 default branch）。`native-3.0` 是 3.0 早期主线，已落后本分支数百提交、不再是默认分支
-- **2.0 已收官**（v2.0.140 终版）：历史冻结在 `native-2.0` 分支 + tag `v2.0.140`，2.0 产物归档于 NAS `轻聊app/archive/2.0-final/`；3.0 从 2.0 HEAD 切出，git 历史完整
+- 仓库默认分支：**`main`**（当前开发线）。`feature/redo-gray` 是 2026-10 重做期的分支，已合并入 main
 - 工程由 **XcodeGen** 生成（`project.yml`），源文件目录 `qingliao/` 整体 glob，**新增 .swift 文件无需改 project.yml**
 - `check_swift.sh`：Linux 下的 **swiftc -parse 纯语法检查**（全工程）。**⚠️ 只查语法不查类型/作用域/并发**——类型错误、方法插错 struct、@MainActor 违规只有 CI 编译才暴露（v2.0.90 实踩：方法误入 PasswordSheet struct，语法全过、CI 报 cannot find in scope）
 
