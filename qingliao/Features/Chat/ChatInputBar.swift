@@ -112,9 +112,17 @@ struct ChatInputBar: View {
     var onPTTStart: () -> Void = {}
     var onPTTUpdate: (Bool) -> Void = { _ in }
     var onPTTEnd: (Bool) -> Void = { _ in }
-    /// E路：手势进行中旗标（DragGesture minimumDistance: 0 的 onChanged 在按下瞬间就会触发，
-    /// 用旗标保证 onPTTStart 只调一次；@State 不进成员初始化器，顺序无碍）
-    @State private var pttGestureActive = false
+    /// G线：PTT 感知的等效转写态 —— `transcribing` 入参混入了 `liveSpeech.isPreparing`（准备窗口），
+    /// PTT 按住期间它会变 true；若直接用它，麦克风键/占位符/转圈会被旧语音 UI 抢走。
+    /// 主 bug 回放：准备期 transcribing=true → showMicButton 变 false → 麦克风键（DragGesture 宿主）
+    /// 在按住中途被换成发送键 → 进行中的手势被撕掉 → 上滑取消失灵、pttActive 卡死。
+    /// PTT 期间一律按 false 算（PTT 的 UI 由录音面板接管）；收尾转写（pttActive=false）时恢复原值。
+    private var transcribingEffective: Bool { transcribing && !pttActive }
+    /// G线：输入框顶部到屏幕底部的距离（pt）。高度为 0（尚未布局）时返回 0，调用方用兜底值。
+    private static func pttTopFromBottom(frame: CGRect) -> CGFloat {
+        guard frame.height > 0 else { return 0 }
+        return UIScreen.main.bounds.height - frame.minY
+    }
     // v3.4.29：发送动作图标弹一下（symbolEffect 驱动，无自定义动画开销）
     // v3.9.42：同一个 tick 兼作发送键关键帧的 trigger（原来另有一个 sendScale + 两段 withAnimation）
     @State private var sendBounceTick = 0
@@ -144,6 +152,19 @@ struct ChatInputBar: View {
             // v3.4.28：横屏限宽居中（竖屏 .infinity 不变）
             .frame(maxWidth: AdaptiveLayout.contentMaxWidth(hSizeInput))
             .frame(maxWidth: .infinity)
+            // G线：实测输入框全局 frame → PTTPanelAnchor（录音面板坐输入框正上方）。
+            // 背景 GeometryReader 不占布局；输入框 frame 变化（键盘升降/引用条显隐）实时更新锚点。
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear {
+                            PTTPanelAnchor.shared.topFromBottom = Self.pttTopFromBottom(frame: proxy.frame(in: .global))
+                        }
+                        .onChange(of: proxy.frame(in: .global)) { _, f in
+                            PTTPanelAnchor.shared.topFromBottom = Self.pttTopFromBottom(frame: f)
+                        }
+                }
+            )
     }
 
     /// v3.9.53（真机 497 后用户拍板：「输入框样式还是改回 3.9.46 版本的样式吧，现在的不行，
@@ -441,7 +462,10 @@ struct ChatInputBar: View {
     /// 内容与 v3.9.46 逐字一致（纯拆分，只为让 `fullInputBar` 的容器链那段好看清）
     @ViewBuilder
     private var textArea: some View {
-        if isRecording {
+        // G线：PTT 录音中不走旧录音 UI（"正在听…/没听清，靠近麦克风再说一次"）——
+        // PTT 的状态由录音面板接管，两套 UI 不能同时出现（用户真机截图实锤叠加）。
+        // PTT 的实时文本走 onTextChange 回填 inputText，TextField 分支正常显示。
+        if isRecording && !pttActive {
             // v3.9.6：录音中**直接上屏** —— 在输入框同一行位置实时渲染识别文本。
             // 文本源取 liveSpeech.liveText（@Published），不再依赖 onTextChange 写 @State
             // 或 TextField 的 binding 刷新（v3.9.5 实测：录音中框里始终只有「输入消息…」占位、
@@ -494,7 +518,8 @@ struct ChatInputBar: View {
                 // v4.1.0 E路：输入框长按进语音已摘除（PTT 麦克风键是唯一语音入口，一个功能一个入口）
                 .overlay {
                     if text.isEmpty {
-                        if transcribing {
+                        // G线：PTT 期间不用"语音转换中…"占位（面板已接管状态，避免两套口径打架）
+                        if transcribingEffective {
                             // v2.0.100：转写中动画（waveform 图标 + 文字脉冲）
                             HStack(spacing: 6) {
                                 Image(systemName: "waveform")
@@ -539,8 +564,9 @@ struct ChatInputBar: View {
             }
 
             // v4.1.0 E路：发送/转写按钮组——长按进语音已摘除（PTT 接管），只剩轻点发送/转写中转圈
+            // G线：PTT 期间走 transcribingEffective（准备期不抢按钮，见 showMicButton 注释）
             Group {
-                if transcribing {
+                if transcribingEffective {
                     HStack(spacing: 6) {
                         ProgressView()
                             .tint(.white)
@@ -577,8 +603,10 @@ struct ChatInputBar: View {
 
     /// v4.1.0 E路：麦克风键可见性——空输入时替代发送键；PTT 录音中保持可见
     /// （避免手势中途 liveText 回填导致 text 非空、按钮被换掉、手势中断）。
+    /// G线：用 transcribingEffective —— 准备期 transcribing 入参会变 true，
+    /// 若直接用它，麦克风键在按住中途被换成发送键 → 手势宿主消失 → 上滑取消失灵（主 bug）。
     private var showMicButton: Bool {
-        (text.isEmpty || pttActive) && !streaming && !voiceMode && !transcribing && voiceEnabled
+        (text.isEmpty || pttActive) && !streaming && !voiceMode && !transcribingEffective && voiceEnabled
     }
 
     /// v4.1.0 E路：按住说话按钮。DragGesture(minimumDistance: 0) 按下瞬间即触发 onPTTStart；
@@ -595,14 +623,13 @@ struct ChatInputBar: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        if !pttGestureActive {
-                            pttGestureActive = true
-                            onPTTStart()
-                        }
+                        // G线：每次 onChanged 都调 onPTTStart —— startPTT 自带 `!pttActive` 幂等 guard，
+                        // 重复调用直接返回，无害。不用本地旗标判定"新按压"：手势若中途被撕，
+                        // onEnded 不触发、旗标会僵死，导致下次按压永远调不到启动（pttPressDate 陈旧）。
+                        onPTTStart()
                         onPTTUpdate(value.translation.height < -60)
                     }
                     .onEnded { value in
-                        pttGestureActive = false
                         onPTTEnd(value.translation.height < -60)
                     }
             )

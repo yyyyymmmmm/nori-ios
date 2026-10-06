@@ -1,4 +1,4 @@
-// MARK: - v4.1.0 E路：按住说话（Push-to-Talk，对标 Today）
+// MARK: - v4.1.0 E路 / G线返工：按住说话（Push-to-Talk，对标 Today）
 //
 // 交互层重写，不动转写引擎（LiveSpeechTranscriber）：
 //   · 输入框右侧麦克风键（空输入时替代发送键）→ 按下即录音（DragGesture minimumDistance: 0）
@@ -6,6 +6,13 @@
 //   · 松手 → 定稿 → 非空直接发送（走 ChatView.send()）；上滑超 60pt → "松手取消"
 //   · 旧 voiceMode 入口（发送键长按 / 输入框长按）已摘除，一个功能一个入口；
 //     toggleVoiceMode / exitVoiceMode 函数体保留备查，不再有调用方。
+//
+// G线返工（2026-10-06，用户真机报"上滑取消不生效、bug 多"）：
+//   ① 主根因：startPTT → liveSpeech.start() 置 isPreparing=true → ChatView 传给 ChatInputBar 的
+//      transcribing 入参变 true → showMicButton 变 false → 麦克风键（手势宿主）在按住中途被换成
+//      发送键 → 进行中的 DragGesture 被撕掉 → onChanged/onEnded 不再触发 → 取消失灵、状态卡死。
+//      修法在 ChatInputBar：showMicButton 用 PTT 感知的 transcribingEffective。
+//   ② 面板定位不再引用 GrayCapsuleTabBar（F 线正在删）→ 改走 PTTPanelAnchor 实测锚点。
 
 import SwiftUI
 
@@ -130,7 +137,9 @@ extension ChatView {
                     level: { liveSpeech.currentInputLevel() }
                 )
                 .padding(.horizontal, 16)
-                .padding(.bottom, GrayCapsuleTabBar.bodyHeight + GrayCapsuleTabBar.bottomGap + safeAreaBottom + 8)
+                // G线：面板坐输入框正上方 —— bottom padding = 输入框顶部到屏幕底部的实测距离 + 12pt 呼吸。
+                // 不再引用 GrayCapsuleTabBar（F 线正在删除悬浮胶囊），不写死任何高度。
+                .padding(.bottom, PTTPanelAnchor.shared.panelBottomPadding(fallback: safeAreaBottom))
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             .ignoresSafeArea()
@@ -150,6 +159,27 @@ extension ChatView {
             .allowsHitTesting(false)
             .transition(.opacity)
         }
+    }
+}
+
+// MARK: - G线：录音面板锚点（替代 GrayCapsuleTabBar 高度数学）
+
+/// G线：输入框顶部到屏幕底部的实测距离（pt），进程内单例共享。
+///   · 写：ChatInputBar.body 的背景 GeometryReader（输入框 frame 变化 / 键盘升降实时更新）
+///   · 读：pttOverlay（面板 bottom padding 用）
+/// `@Observable` 订阅：pttOverlay 的 body 里读到 `topFromBottom` 即自动订阅，值变自动重排面板位置。
+@Observable
+final class PTTPanelAnchor {
+    static let shared = PTTPanelAnchor()
+
+    /// 输入框顶部到屏幕底部的距离。≤0 = 尚未实测。
+    var topFromBottom: CGFloat = 0
+
+    private init() {}
+
+    /// 面板 bottom padding：实测值 + 12pt 呼吸；未实测时用兜底（安全区 + 140）。
+    func panelBottomPadding(fallback safeAreaBottom: CGFloat) -> CGFloat {
+        topFromBottom > 0 ? topFromBottom + 12 : safeAreaBottom + 140
     }
 }
 
