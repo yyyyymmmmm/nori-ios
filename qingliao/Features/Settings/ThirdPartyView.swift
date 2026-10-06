@@ -145,7 +145,7 @@ struct ThirdPartyView: View {
         loading = true
         loadError = false
         defer { loading = false }
-        guard let j = try? await auth.json("/api/hermes/platforms"),
+        guard let j = try? await auth.json("/api/agent/hermes/platforms"),
               let arr = j["platforms"] as? [[String: Any]] else {
             loadError = true
             return
@@ -158,7 +158,7 @@ struct ThirdPartyView: View {
         busyID = p.id
         defer { busyID = nil }
         // 先试 OAuth
-        if let j = try? await auth.json("/api/hermes/oauth/start", method: "POST",
+        if let j = try? await auth.json("/api/agent/hermes/oauth/start", method: "POST",
                                         body: ["vendor_id": p.id]),
            let url = j["auth_url"] as? String, !url.isEmpty,
            let u = URL(string: url) {
@@ -175,10 +175,10 @@ struct ThirdPartyView: View {
         defer { busyID = nil }
         // 先试 OAuth 断开（云厂商），再走平台开关
         if !on {
-            _ = try? await auth.json("/api/hermes/oauth/disconnect", method: "POST",
+            _ = try? await auth.json("/api/agent/hermes/oauth/disconnect", method: "POST",
                                      body: ["vendor_id": p.id])
         }
-        if let j = try? await auth.json("/api/hermes/platforms", method: "POST",
+        if let j = try? await auth.json("/api/agent/hermes/platforms", method: "POST",
                                         body: ["platform": p.id, "enabled": on]),
            (j["ok"] as? Bool) == true {
             await load()

@@ -94,7 +94,7 @@ final class AITopCapsuleState {
             return
         }
         // 2) Hermes 引擎就绪吗（复用 /api/hermes/models 的 error 字段；服务端 60s 缓存，不打爆上游）
-        let hermesOK = await hermesReady(urlString: s + "/api/hermes/models", token: auth.token)
+        let hermesOK = await hermesReady(urlString: s + "/api/agent/hermes/models", token: auth.token)
         consecutiveFailures = 0
         connState = hermesOK ? .ready : .aiNotReady
 

@@ -28,8 +28,9 @@ struct ConnSettingsView: View {
     @State private var showServerSheet = false
     @State private var showSessionLocSheet = false
     @State private var showUploadDirSheet = false   // v2.0.85 文件上传位置
-    // J 线 2026-10-06：模型切换并入连接设置（模型管理独立页已删，一个功能一个入口）
-    @State private var showModelPicker = false
+    // v4.4.x：连接中心——服务状态（后端 /api/connections）
+    @State private var connections: [ConnectionInfo] = []
+    @State private var showHADetail = false
 
     private var currentHermesModel: String {
         UserDefaults.standard.string(forKey: "qingliao_model") ?? ""
@@ -87,6 +88,56 @@ struct ConnSettingsView: View {
                             }
                     }
                     .glassListCard()
+
+                    // v4.4.x：连接中心——服务状态（Hermes 只读，HA 可点进配置）
+                    Text("服务")
+                        .font(.system(size: Typography.subhead, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, Spacing.xs)
+                        .padding(.top, Spacing.sm)
+                    VStack(spacing: 0) {
+                        ForEach(connections) { conn in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(conn.name)
+                                        .font(.system(size: Typography.body))
+                                        .foregroundStyle(.primary)
+                                    if let note = conn.note, !note.isEmpty {
+                                        Text(note)
+                                            .font(.system(size: Typography.caption))
+                                            .foregroundStyle(.tertiary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                Spacer(minLength: 8)
+                                ConnStatusDot(configured: conn.configured)
+                                if conn.editable {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: Typography.subhead, weight: .semibold))
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            .padding(.horizontal, Spacing.xxl)
+                            .padding(.vertical, Spacing.lg)
+                            .background(Color(uiColor: .secondarySystemGroupedBackground))
+                            .onTapGesture {
+                                if conn.id == "homeassistant" {
+                                    Haptics.tap()
+                                    showHADetail = true
+                                }
+                            }
+                            if conn.id != connections.last?.id {
+                                Divider().padding(.leading, Spacing.rowDividerInset)
+                            }
+                        }
+                    }
+                    .glassListCard()
+                    .task {
+                        await loadConnections()
+                    }
+                    .sheet(isPresented: $showHADetail) {
+                        HomeAssistantDetailView()
+                    }
 
                     Text("服务器")
                         .font(.system(size: Typography.subhead, weight: .semibold))
@@ -206,6 +257,22 @@ struct ConnSettingsView: View {
             } catch {
                 testResult = "❌ 无法连接：\(shortServer)"
             }
+        }
+    }
+
+    // v4.4.x：连接中心——加载服务状态
+    @MainActor
+    private func loadConnections() async {
+        do {
+            let (data, _) = try await auth.request("/api/connections", method: "GET")
+            if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let list = obj["connections"] as? [[String: Any]] {
+                let decoder = JSONDecoder()
+                let jsonData = try JSONSerialization.data(withJSONObject: list)
+                connections = (try? decoder.decode([ConnectionInfo].self, from: jsonData)) ?? []
+            }
+        } catch {
+            connections = []
         }
     }
 }
@@ -1560,7 +1627,7 @@ struct HermesModelPickerSheet: View {
         loading = true
         loadError = false
         defer { loading = false }
-        guard let j = try? await auth.json("/api/hermes/models"),
+        guard let j = try? await auth.json("/api/agent/hermes/models"),
               let arr = j["models"] as? [[String: Any]] else {
             loadError = true
             return
@@ -1572,7 +1639,7 @@ struct HermesModelPickerSheet: View {
         guard busyID == nil else { return }
         busyID = m.id
         defer { busyID = nil }
-        guard let j = try? await auth.json("/api/hermes/model", method: "POST",
+        guard let j = try? await auth.json("/api/agent/hermes/model", method: "POST",
                                            body: ["model_id": m.id]),
               (j["ok"] as? Bool) == true else { return }
         // App 内兼容口径：本地也存一份（聊天页兜底读 UserDefaults）
