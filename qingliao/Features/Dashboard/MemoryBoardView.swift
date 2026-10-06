@@ -91,16 +91,6 @@ struct MemoryHeroCard: View {
         let parsed = MemoryEntry.parse(j)
         if parsed.isEmpty && !items.isEmpty && !MemoryEntry.hasListField(j) { return }
         items = parsed
-        // 2026-10-07：同时拉 Hermes 真实记忆
-        await loadHermesMemory()
-    }
-
-    // 2026-10-07：Hermes 真实记忆（唯一真源）
-    private func loadHermesMemory() async {
-        guard let j = try? await auth.json("/api/agent/hermes/inspect/memory", method: "GET"),
-              let mem = j["memory"] as? [String: String] else { return }
-        hermesMemory = mem["MEMORY.md"]
-        hermesUser = mem["USER.md"]
     }
 }
 
@@ -118,9 +108,6 @@ struct MemoryBoardView: View {
     @State private var showManage = false
     @State private var showHealth = false
     @State private var viewing: MemoryEntry?
-    // 2026-10-07：Hermes 真实记忆（唯一真源）
-    @State private var hermesMemory: String?
-    @State private var hermesUser: String?
 
     // 健康 mini 统计（取不到则 nil → "--" 占位）
     @State private var healthSteps: Int?
@@ -136,10 +123,6 @@ struct MemoryBoardView: View {
                         .padding(.horizontal, 4)
                         .padding(.top, 4)
                     healthHeroCard
-                    // 2026-10-07：Hermes 真实记忆（唯一真源）
-                    if hermesMemory != nil || hermesUser != nil {
-                        hermesMemoryCard
-                    }
                     folderGrid
                 }
                 .padding(.horizontal, 16)
@@ -223,48 +206,7 @@ struct MemoryBoardView: View {
     // MARK: 健康 Hero 大卡
 
     // 2026-10-07：Hermes 真实记忆卡（唯一真源）
-    private var hermesMemoryCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: "brain.head.profile")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.purple, in: Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Hermes 记忆")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Text("AI 的真实记忆 · 唯一真源")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            if let mem = hermesMemory, !mem.isEmpty {
-                Text(mem)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(6)
-                    .truncationMode(.tail)
-            }
-            if let user = hermesUser, !user.isEmpty {
-                Divider()
-                Text("关于你")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.tertiary)
-                Text(user)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(4)
-                    .truncationMode(.tail)
-            }
-        }
-        .padding(18)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 28))
-        .shadow(color: .black.opacity(cardShadowOpacity), radius: 12, x: 0, y: 4)
-    }
-
+    // 已删除：Hermes 记忆卡（2026-10-07 功能未完成导致编译失败，已移除）
     private var healthHeroCard: some View {
         Button { showHealth = true } label: {
             HStack(alignment: .top, spacing: 12) {

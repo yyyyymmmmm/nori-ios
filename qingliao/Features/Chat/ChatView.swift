@@ -28,6 +28,7 @@ private struct ChatScrollSnapshot: Equatable {
 }
 
 // 2026-10-07：聊天底部可见性检测（回到底部按钮用）
+@MainActor
 private struct ChatBottomVisibleKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -36,6 +37,7 @@ private struct ChatBottomVisibleKey: PreferenceKey {
 }
 
 // 2026-10-07：聊天视口高度（配合底部锚点判断是否在底部）
+@MainActor
 private struct ChatViewportHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -3157,19 +3159,12 @@ struct ChatView: View {
                 // v3.9.58c：把 proxy 挂到 @State，供引用块跳转等非 onChange 路径滚动定位。
                 // onAppear 一次性写回（body 重算不重复触发写 State 循环——赋同一值无副作用）。
                 ScrollView {
-                .coordinateSpace(name: "chatScroll")
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(key: ChatViewportHeightKey.self,
-                                               value: geo.size.height)
-                    }
-                )
-                // v2.0.40：LazyVStack → VStack（懒加载在批量移除时有复用状态残留，
-                // 普通 VStack 全量渲染，移除只是简单数组变化，彻底绕开崩溃）
-                // v2.0.132：VStack → LazyVStack——清空/新建已走两步走（先切欢迎页卸载
-                // 列表再清数据），批量移除崩溃路径不复存在；长聊天记录仅渲染可见气泡，
-                // 修复长文本滑动/左右切页卡顿
-                LazyVStack(spacing: 10) {
+                    // v2.0.40：LazyVStack → VStack（懒加载在批量移除时有复用状态残留，
+                    // 普通 VStack 全量渲染，移除只是简单数组变化，彻底绕开崩溃）
+                    // v2.0.132：VStack → LazyVStack——清空/新建已走两步走（先切欢迎页卸载
+                    // 列表再清数据），批量移除崩溃路径不复存在；长聊天记录仅渲染可见气泡，
+                    // 修复长文本滑动/左右切页卡顿
+                    LazyVStack(spacing: 10) {
                                         // v3.0.51 A2：顶部"加载更早"按钮（会话长于可见窗口时显示）；v4.0.49 抽出到 loadEarlierButton
                                         if visibleStartIndex > 0 {
                                             loadEarlierButton
@@ -3242,6 +3237,13 @@ struct ChatView: View {
                     .frame(minHeight: chatListViewportH, alignment: .top)
                     .id("messages")   // v2.0.39：与欢迎页分支区分身份
                 }
+                .coordinateSpace(name: "chatScroll")
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: ChatViewportHeightKey.self,
+                                               value: geo.size.height)
+                    }
+                )
             .modifier(MessageListScroll1(host: self, proxy: proxy))
             .modifier(MessageListScroll2(host: self, proxy: proxy))
             // 2026-10-07："回到底部"悬浮按钮（对标 Muse 小箭头）——上拉时显示，点即回最新

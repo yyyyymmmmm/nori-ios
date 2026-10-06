@@ -74,7 +74,7 @@ struct SkillsView: View {
                             Spacer()
                             if let enabled = skill.enabled {
                                 Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(enabled ? .green : .tertiary)
+                                    .foregroundStyle(enabled ? .green : Color.secondary)
                             }
                         }
                         .padding(.vertical, 4)
