@@ -603,8 +603,6 @@ extension SettingsView {
             GraySettingsRow(icon: "square.grid.3x3", title: "桌面快捷方式",
                             value: "已选 \(HomeShortcutStore.ids(from: homeShortcutsRaw).count)/\(HomeShortcut.maxCount)") { showHomeShortcuts = true }
             MuseRowDivider()
-            GraySettingsRow(icon: "rectangle.stack", title: "生活卡片", subtitle: "股票 / 资讯 / 快递") { showLifeCards = true }
-            MuseRowDivider()
             GraySettingsRow(icon: "folder", title: "文件管理", subtitle: "上传目录里的文件") { showFilesManager = true }
         }
     }

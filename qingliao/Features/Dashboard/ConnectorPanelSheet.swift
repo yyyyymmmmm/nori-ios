@@ -72,7 +72,6 @@ struct ConnectorPanelSheet: View {
                     calendarCard
                     mcpCard
                     smartHomeCard
-                    lifeCardsCard
                     hintFooter
                 }
                 .padding(.horizontal, Spacing.xl)
