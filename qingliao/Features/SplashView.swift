@@ -43,10 +43,9 @@ struct SplashView: View {
                     Text("Nori")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.primary)
-                    Text("QINGLIAO · AI Agent")
+                    Text("让 AI 真正替你做事。")
                         .font(.system(size: Typography.subhead, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .tracking(3)
                 }
                 .offset(y: appeared ? 0 : 10)
                 .opacity(appeared ? 1 : 0)
