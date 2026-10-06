@@ -1742,21 +1742,22 @@ struct HermesModelPickerSheet: View {
         loading = true
         loadError = false
         defer { loading = false }
-        guard let j = try? await auth.json("/api/agent/hermes/models"),
-              let arr = j["providers"] as? [[String: Any]] else {
-            // 兼容老格式 {models: [...]}
-            if let j = try? await auth.json("/api/agent/hermes/models"),
-               let arr = j["models"] as? [[String: Any]] {
-                let opts = arr.compactMap(HermesModelOption.init(json:))
-                groups = [HermesProviderGroup(json: ["id": "default", "name": "默认",
-                    "models": arr])].compactMap { $0 }
-                _ = opts
-                return
-            }
+        // 2026-10-07：用 Hermes 真实配置（/api/agent/hermes/inspect/models），
+        // 不再用上游服务商列表（那是 DeepSeek-V4 这类，和 Hermes 实际用的不是一份）
+        guard let j = try? await auth.json("/api/agent/hermes/inspect/models"),
+              let arr = j["models"] as? [[String: Any]] else {
             loadError = true
             return
         }
-        groups = arr.compactMap(HermesProviderGroup.init(json:))
+        // 按 provider 分组，转成 UI 要的格式
+        var groups: [String: [[String: Any]]] = [:]
+        for m in arr {
+            let p = (m["provider"] as? String) ?? "hermes"
+            groups[p, default: []].append(m)
+        }
+        self.groups = groups.map { pid, models in
+            HermesProviderGroup(json: ["id": pid, "name": pid, "models": models])
+        }.compactMap { $0 }
     }
 
     private func select(provider pid: String, _ m: HermesModelOption) async {
