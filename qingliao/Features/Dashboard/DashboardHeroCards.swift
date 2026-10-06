@@ -203,7 +203,22 @@ struct TodaySuggestionCard: View {
         loading = true
         defer { loading = false }
         do {
-            let (data, _) = try await auth.request("/api/agent/suggestions", method: "GET")
+            // 2026-10-07：健康 AI 联动 —— 把健康摘要 POST 给后端，AI 基于真实数据给建议
+            var health: String?
+            let steps = await HealthStore.shared.todaySteps()
+            let sleep = await HealthStore.shared.lastNightSleepHours()
+            if steps != nil || sleep != nil {
+                var parts: [String] = []
+                if let s = steps { parts.append("今日步数 \(Int(s))") }
+                if let h = sleep { parts.append(String(format: "昨晚睡眠 %.1f 小时", h)) }
+                health = parts.joined(separator: "，")
+            }
+            let (data, _): (Data, Int)
+            if let h = health {
+                (data, _) = try await auth.request("/api/agent/suggestions", method: "POST", body: ["health": h])
+            } else {
+                (data, _) = try await auth.request("/api/agent/suggestions", method: "GET")
+            }
             guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let arr = obj["suggestions"] as? [[String: Any]] else {
                 throw SuggestionError.badJSON
