@@ -111,7 +111,7 @@ jobs:
 
       - name: Archive (unsigned)
         run: |
-          xcodebuild -project 轻聊.xcodeproj \
+          xcodebuild -project Nori.xcodeproj \
             -scheme Qingliao \
             -configuration Release \
             -destination generic/platform=iOS \
@@ -263,7 +263,7 @@ jobs:
         run: |
           gh release create qingliao-ipa-2 build/qingliao-2.0-unsigned.ipa \
             --repo ${{ github.repository }} \
-            --title "轻聊 2.0 IPA (native, unsigned)" \
+            --title "Nori IPA (native, unsigned)" \
             --notes "原生 SwiftUI · iOS 27 液态玻璃 · SideStore 导入安装" \
             || gh release upload qingliao-ipa-2 build/qingliao-2.0-unsigned.ipa \
                --repo ${{ github.repository }} --clobber
