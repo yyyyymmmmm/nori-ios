@@ -41,6 +41,7 @@ struct MuseRowDivider: View {
 
 struct GraySettingsRow: View {
     var icon: String? = nil
+    var colorful: Bool = false   // K 线：连接应用页用多彩图标（SF Symbol multicolor）
     let title: String
     var subtitle: String? = nil
     var value: String? = nil
@@ -54,10 +55,17 @@ struct GraySettingsRow: View {
         } label: {
             HStack(spacing: 12) {
                 if let icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 20))
-                        .foregroundStyle(.primary)
-                        .frame(width: 28)
+                    Group {
+                        if colorful {
+                            Image(systemName: icon)
+                                .symbolRenderingMode(.multicolor)
+                        } else {
+                            Image(systemName: icon)
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    .font(.system(size: 22))
+                    .frame(width: 30)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
@@ -84,7 +92,7 @@ struct GraySettingsRow: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -102,9 +110,9 @@ struct GraySettingsStaticRow: View {
         HStack(spacing: 12) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
+                    .font(.system(size: 22))
                     .foregroundStyle(.primary)
-                    .frame(width: 28)
+                    .frame(width: 30)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
@@ -120,7 +128,7 @@ struct GraySettingsStaticRow: View {
             Spacer(minLength: 8)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
     }
 }
 
@@ -136,9 +144,9 @@ struct GraySettingsToggleRow: View {
         HStack(spacing: 12) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
+                    .font(.system(size: 22))
                     .foregroundStyle(.primary)
-                    .frame(width: 28)
+                    .frame(width: 30)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
@@ -155,6 +163,6 @@ struct GraySettingsToggleRow: View {
             Toggle("", isOn: $isOn).qingliaoSwitch()
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
     }
 }

@@ -1495,7 +1495,7 @@ struct ChatView: View {
         .confirmationDialog("聊天操作", isPresented: $showMoreMenu, titleVisibility: .visible) {
             chatActionDialogContent
         } message: {
-            Text("上下文：约 \(chat.contextInfo.tokens) tokens · \(chat.contextInfo.count) 条")
+            Text("上下文：约 \(chat.contextInfo.tokens) 字 · \(chat.contextInfo.count) 条")
         }
         // v3.4.24：任务中心全屏页（入口已迁入侧边栏「工具」分组）
         .fullScreenCover(isPresented: $showTaskCenter) {
@@ -2908,7 +2908,7 @@ struct ChatView: View {
                     Text("\(percent)%")
                         .font(.system(size: Typography.caption))
                         .foregroundStyle(.secondary)
-                    Text("\(chat.contextInfo.tokens) tokens")
+                    Text("\(chat.contextInfo.tokens) 字")
                         .font(.system(size: Typography.caption))
                         .foregroundStyle(.tertiary)
                 }

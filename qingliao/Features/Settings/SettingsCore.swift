@@ -77,6 +77,9 @@ struct SettingsView: View {
     // v3.0.9：外观下天气城市已移除（天气城市设定在看板 WeatherBadge 点按处），相关状态一并清理
     // v2.0.101：Agent 使用说明内联展开
     @State var showAgentHelp = false
+    // K 线 2026-10-06：智能路由/上下文压缩二级页（行内展开收进二级页）
+    @State var showRoutingSettings = false
+    @State var showContextCompress = false
     // v4.0.11：主动 Agent 设置弹窗（后端 proactive_agent：总开关/预算/静默/事件源/复盘）
     @State var showProactive = false
     // v2.0.105：Agent 关键词管理弹窗
@@ -95,14 +98,7 @@ struct SettingsView: View {
     // v3.6.0：原独立「崩溃日志」弹窗整合进「诊断」页（DiagnosticsView 内含崩溃日志分组），
     //         避免两个重复又可能互相矛盾的入口；本页不再单独持有该弹窗状态。
     @State var showDiagnostics = false
-    // v2.0.117：本地模型（Ollama 断网兜底）
-    @AppStorage("qingliao_local_model") var localModelOn = false
-    @State var localModelSyncing = false   // v-review fix：程序化回写开关时抑制 onChange 回声 POST
-    @State var localStatusText = "未开启"
-    @State var localUpdateText = "断网兜底用本地模型"
-    @State var localChecking = false
-    // v2.0.118：本地模型管理弹窗
-    @State var showLocalModels = false
+    // K 线 2026-10-06：本地模型整套删除（Hermes 是唯一后端，端侧模型是第二套模型体系）。
     // J 线 2026-10-06：能力示例（卡片画廊）整行删掉；微信推送开关删掉。
     // v3.0.81：上下文管理（v4.0.x：默认值与真源 ContextTuning.defaultThreshold 同源，勿再写字面量）
     @AppStorage("qingliao_context_auto_compress") var contextAutoCompress = false
@@ -413,9 +409,21 @@ struct SettingsView: View {
             DiagnosticsView()
                 .presentationDetents([.medium, .large])
         }
-        // v2.0.118：本地模型管理弹窗
-        .sheet(isPresented: $showLocalModels) {
-            LocalModelsSheet()
+        // K 线 2026-10-06：本地模型管理弹窗已删。
+        // K 线 2026-10-06：智能路由/上下文压缩/使用说明二级页（行内展开收进二级页）
+        .sheet(isPresented: $showRoutingSettings) {
+            routingSettingsPage
+                .presentationDetents([.medium, .large])
+                .scrollContentBackground(.hidden)
+        }
+        .sheet(isPresented: $showContextCompress) {
+            contextCompressPage
+                .presentationDetents([.medium, .large])
+                .scrollContentBackground(.hidden)
+        }
+        .sheet(isPresented: $showAgentHelp) {
+            agentHelpPage
+                .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
         // v3.9.26：能力示例（5 种卡片形态展示，零后端、纯 App 内样例数据）
@@ -431,7 +439,6 @@ struct SettingsView: View {
         .onAppear { Task { await loadCounts() } }
         .task {
             await loadCounts()
-            await loadLocalStatus()   // v-review fix：进入设置页即以后端 /api/local/status 校准本地模型开关
             await loadTypesafeRouting()   // v3.9.56：进设置页即读后端真实路由开关/熔断状态
         }
     }
@@ -461,7 +468,6 @@ struct SettingsView: View {
         case "mail": showMailSettings = true
         case "cloudDrive": showCloudDrive = true
         case "appPermissions": showConnectApps = true
-        case "localModels": showLocalModels = true
         case "kb": showKB = true
         case "memory": showMemory = true
         case "cardGallery": break
@@ -516,62 +522,24 @@ extension SettingsView {
             GraySettingsRow(icon: "list.bullet.rectangle", title: "Agent 记忆",
                             value: agentRuleCount > 0 ? "\(agentRuleCount) 条规则" : "暂无") { showAgentMemory = true }
             MuseRowDivider()
-            GraySettingsRow(icon: "tag", title: "Agent 关键词", subtitle: "分流匹配词管理") { showAgentKeywords = true }
+            GraySettingsRow(icon: "tag", title: "Agent 关键词", subtitle: "关键词触发规则") { showAgentKeywords = true }
             MuseRowDivider()
-            GraySettingsRow(icon: "bolt", title: "主动 Agent", subtitle: "AI 主动开口 · 预算/静默/复盘") { showProactive = true }
+            GraySettingsRow(icon: "bolt", title: "主动 Agent", subtitle: "AI 主动提醒 · 额度/免打扰/每日复盘") { showProactive = true }
             MuseRowDivider()
-            GraySettingsRow(icon: "timer", title: "定时任务") { showTasks = true }
+            GraySettingsRow(icon: "timer", title: "定时任务", subtitle: "智能体按计划自动执行") { showTasks = true }
             MuseRowDivider()
-            GraySettingsRow(icon: "clock.arrow.circlepath", title: "执行历史", subtitle: "自动化/场景执行记录") { showHistory = true }
+            GraySettingsRow(icon: "clock.arrow.circlepath", title: "任务记录", subtitle: "自动任务的执行记录") { showHistory = true }
             MuseRowDivider()
             GraySettingsRow(icon: "book.closed", title: "知识库", subtitle: "文档检索问答") { showKB = true }
             MuseRowDivider()
-            GraySettingsToggleRow(icon: "arrow.triangle.branch", title: "智能路由", subtitle: tsRouting.subtitleText, isOn: tsEnabledBinding)
-            if tsRouting.enabled {
-                tsRoutingParams
-            }
+            // K 线 2026-10-06：判定参数区收进二级页（分流方式/灵敏度/等待超时），列表不再展开
+            GraySettingsRow(icon: "arrow.triangle.branch", title: "智能路由",
+                            subtitle: tsRouting.subtitleText,
+                            value: tsRouting.enabled ? "已开启" : "已关闭") { showRoutingSettings = true }
             MuseRowDivider()
-            GraySettingsToggleRow(icon: "rectangle.compress.vertical", title: "上下文自动压缩",
-                                  subtitle: "token超限时AI摘要压缩历史消息", isOn: $contextAutoCompress)
-                .onChange(of: contextAutoCompress) { _, new in
-                    UserDefaults.standard.set(new, forKey: "qingliao_context_auto_compress")
-                }
-            MuseRowDivider()
-            if contextAutoCompress {
-                HStack {
-                    Text("压缩阈值")
-                        .font(.system(size: 17))
-                    Spacer()
-                    Text("\(contextThreshold) tokens")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.secondary)
-                    Stepper("", value: $contextThreshold, in: 1000...16000, step: 500)
-                        .labelsHidden()
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .onChange(of: contextThreshold) { _, new in
-                    UserDefaults.standard.set(new, forKey: "qingliao_context_threshold")
-                }
-                MuseRowDivider()
-            }
-            GraySettingsRow(icon: "questionmark.circle", title: "使用说明", chevron: false) {
-                withAnimation(Motion.snap) { showAgentHelp.toggle() }
-            }
-            if showAgentHelp {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Agent 回复恒走 Hermes 智能体：查磁盘/内存、控制设备等自动调用工具")
-                    Text("▸ 直接问：查磁盘/内存/温度、控制设备、执行场景，自动调用工具回复")
-                    Text("▸ 记忆规则：说「以后XX都用agent」，下次同类问题直接 Agent 处理")
-                    Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
-                    Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考轻聊记忆与规则")
-                }
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 14)
-            }
+            // K 线 2026-10-06：阈值区收进二级页，列表不再展开
+            GraySettingsRow(icon: "rectangle.compress.vertical", title: "上下文自动压缩",
+                            subtitle: contextAutoCompress ? "已开启 · 约 \(contextThreshold) 字" : "token超限时AI摘要压缩历史消息") { showContextCompress = true }
         }
     }
 
@@ -584,54 +552,9 @@ extension SettingsView {
             GraySettingsRow(icon: "square.grid.2x2", title: "连接应用",
                             subtitle: "本机权限与云端服务，点按授权") { showConnectApps = true }
             MuseRowDivider()
-            GraySettingsRow(icon: "hammer", title: "MCP 工具服务") { showMCPSettings = true }
+            // K 线 2026-10-06：本地模型整套删除（Hermes 是唯一后端）。
+            GraySettingsRow(icon: "hammer", title: "工具服务", subtitle: "可接入外部工具") { showMCPSettings = true }
             MuseRowDivider()
-            GraySettingsToggleRow(icon: "internaldrive", title: "本地模型", subtitle: localStatusText, isOn: $localModelOn)
-                .onChange(of: localModelOn) { _, new in
-                    guard !localModelSyncing else { return }
-                    Task {
-                        do {
-                            _ = try await auth.json("/api/local/toggle", method: "POST", body: ["on": new])
-                            await loadLocalStatus()
-                        } catch {
-                            // v-review fix：切换失败回滚开关（防「开关 ON 但后端未启动/超时」脱钩）
-                            if localModelOn == new {
-                                localModelSyncing = true
-                                localModelOn = !new
-                                localModelSyncing = false
-                                localStatusText = "切换失败，请检查连接后重试"
-                            }
-                        }
-                    }
-                }
-            MuseRowDivider()
-            if localModelOn {
-                GraySettingsRow(icon: "tray.and.arrow.down", title: "管理模型", subtitle: "已装列表 / 拉取新模型") { showLocalModels = true }
-                MuseRowDivider()
-                Button { Task { await checkLocalUpdate() } } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.primary)
-                            .frame(width: 28)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("检查模型更新")
-                                .font(.system(size: 17))
-                                .foregroundStyle(.primary)
-                            Text(localUpdateText)
-                                .font(.system(size: 14))
-                                .foregroundStyle(.tertiary)
-                        }
-                        Spacer()
-                        if localChecking { ProgressView().controlSize(.small) }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                MuseRowDivider()
-            }
             BackendUpdateRow()
         }
     }
@@ -648,7 +571,7 @@ extension SettingsView {
             MuseRowDivider()
             GraySettingsToggleRow(icon: "iphone.radiowaves.left.and.right", title: "震动反馈", isOn: $hapticsOn)
             MuseRowDivider()
-            GraySettingsToggleRow(icon: "rectangle.grid.2x2", title: "首页快捷卡片", isOn: $homeCardsOn)
+            GraySettingsToggleRow(icon: "rectangle.grid.2x2", title: "首页卡片", isOn: $homeCardsOn)
             MuseRowDivider()
             GraySettingsRow(icon: "square.grid.3x3", title: "桌面快捷方式",
                             value: "已选 \(HomeShortcutStore.ids(from: homeShortcutsRaw).count)/\(HomeShortcut.maxCount)") { showHomeShortcuts = true }
@@ -687,7 +610,7 @@ extension SettingsView {
                     Text("未通过系统 Face ID 验证，App 锁不可用。")
                 }
             MuseRowDivider()
-            GraySettingsRow(icon: "lock.rectangle.stack", title: "密码管理", value: "\(secretCount) 条凭据") { showSecrets = true }
+            GraySettingsRow(icon: "lock.rectangle.stack", title: "密码管理", value: "\(secretCount) 条密码") { showSecrets = true }
         }
     }
 
@@ -695,7 +618,7 @@ extension SettingsView {
 
     @ViewBuilder var notificationSection: some View {
         GraySettingsGroup(title: "通知") {
-            GraySettingsRow(icon: "bell.badge", title: "定时提醒", subtitle: "一句话定时间") { showQuickReminder = true }
+            GraySettingsRow(icon: "bell.badge", title: "本地提醒", subtitle: "一句话定时间 · 离线可用") { showQuickReminder = true }
         }
     }
 
@@ -709,6 +632,9 @@ extension SettingsView {
             MuseRowDivider()
             GraySettingsRow(icon: "stethoscope", title: "诊断",
                             value: CrashReporter.hasPendingLog() ? "有待查看" : "设备/网络/崩溃记录") { showDiagnostics = true }
+            MuseRowDivider()
+            // K 线 2026-10-06：使用说明从智能体组移到关于组（静态帮助）
+            GraySettingsRow(icon: "questionmark.circle", title: "使用说明") { showAgentHelp = true }
             MuseRowDivider()
             // v3.0.5 review fix：退出登录二次确认（与云端一致）
             Button {
@@ -725,7 +651,7 @@ extension SettingsView {
                 Button("退出登录", role: .destructive) { auth.logout() }
                 Button("取消", role: .cancel) {}
             } message: {
-                Text("退出后回到登录页，可切换本地 AI / 云端 AI 模式。云端配置（API Key）仍保留在手机本地。")
+                Text("退出后回到登录页。云端配置（API Key）仍保留在手机本地。")
             }
         }
     }
@@ -733,9 +659,9 @@ extension SettingsView {
     /// v3.9.56：智能路由「就地展开」参数区。
     /// 灰度重做 B 路：去分割线，行距对标新行组件；判定/回写逻辑原样保留。
     @ViewBuilder var tsRoutingParams: some View {
-        // 判定模式：两枚胶囊。没有「关闭」档 —— 关掉上面那个开关就是不判定
+        // 分流方式：两枚胶囊。没有「关闭」档 —— 关掉上面那个开关就是不判定
         HStack(spacing: 12) {
-            Text("判定模式").font(.system(size: 17))
+            Text("分流方式").font(.system(size: 17))
             Spacer(minLength: 12)
             tsCapsule("智能分流", on: tsRouting.mode == "smart") {
                 Task { await saveTypesafeRouting(["mode": "smart"]) }
@@ -752,9 +678,9 @@ extension SettingsView {
             tsParamNote(TypesafeRouting.modeOffHint, warn: true)
         }
 
-        // 判定阈值：概率 ≥ 该值 → 判「要干活」。后端允许 0~1，UI 收窄到有意义的区间
+        // 灵敏度：概率 ≥ 该值 → 判「要干活」。后端允许 0~1，UI 收窄到有意义的区间
         HStack(spacing: 12) {
-            Text("判定阈值").font(.system(size: 17))
+            Text("灵敏度").font(.system(size: 17))
             Spacer(minLength: 12)
             Text(tsRouting.thresholdText)
                 .font(.system(size: 15))
@@ -764,9 +690,9 @@ extension SettingsView {
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
 
-        // 判定超时：超时即回退关键词规则（不让用户等判定）
+        // 等待超时：超时即回退关键词规则（不让用户等判定）
         HStack(spacing: 12) {
-            Text("判定超时").font(.system(size: 17))
+            Text("等待超时").font(.system(size: 17))
             Spacer(minLength: 12)
             Text(tsRouting.timeoutText)
                 .font(.system(size: 15))
@@ -828,6 +754,93 @@ extension SettingsView {
         .padding(.bottom, 12)
     }
 
+    // MARK: - K 线二级页：智能路由 / 上下文压缩 / 使用说明
+
+    /// 智能路由二级页（K 线：判定参数区从列表行内展开收进此页）
+    @ViewBuilder var routingSettingsPage: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Toggle(isOn: tsEnabledBinding) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("智能路由").font(.system(size: 17))
+                            Text("自动判断是否需要 AI 干活")
+                                .font(.system(size: 14)).foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                if tsRouting.enabled {
+                    Section {
+                        tsRoutingParams
+                    }
+                }
+            }
+            .navigationTitle("智能路由")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    /// 上下文自动压缩二级页（K 线：阈值区从列表行内展开收进此页）
+    @ViewBuilder var contextCompressPage: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Toggle(isOn: $contextAutoCompress) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("上下文自动压缩").font(.system(size: 17))
+                            Text("token超限时AI摘要压缩历史消息")
+                                .font(.system(size: 14)).foregroundStyle(.tertiary)
+                        }
+                    }
+                    .onChange(of: contextAutoCompress) { _, new in
+                        UserDefaults.standard.set(new, forKey: "qingliao_context_auto_compress")
+                    }
+                }
+                if contextAutoCompress {
+                    Section {
+                        HStack {
+                            Text("压缩阈值").font(.system(size: 17))
+                            Spacer()
+                            Text("\(contextThreshold) 字")
+                                .font(.system(size: 15)).foregroundStyle(.secondary)
+                            Stepper("", value: $contextThreshold, in: 1000...16000, step: 500)
+                                .labelsHidden()
+                        }
+                        .onChange(of: contextThreshold) { _, new in
+                            UserDefaults.standard.set(new, forKey: "qingliao_context_threshold")
+                        }
+                    } footer: {
+                        Text("历史消息超过该字数时，自动用 AI 摘要压缩后再发送。")
+                    }
+                }
+            }
+            .navigationTitle("上下文自动压缩")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    /// 使用说明二级页（K 线：从智能体组移到关于组，行内展开改为二级页）
+    @ViewBuilder var agentHelpPage: some View {
+        NavigationStack {
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Agent 回复恒走 Hermes 智能体：查磁盘/内存、控制设备等自动调用工具")
+                        Text("▸ 直接问：查磁盘/内存/温度、控制设备、执行场景，自动调用工具回复")
+                        Text("▸ 记忆规则：说「以后XX都用agent」，下次同类问题直接 Agent 处理")
+                        Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
+                        Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考轻聊记忆与规则")
+                    }
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 6)
+                }
+            }
+            .navigationTitle("使用说明")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
     /// 行尾摘要：形象 + 表情 + 动作数（一行说完，别让人点进去才发现是空的）
     private var petSummary: String {
         let on = PetKeys.enabledQuirks().count
@@ -838,40 +851,6 @@ extension SettingsView {
 // MARK: - 辅助函数
 
 extension SettingsView {
-
-    /// v2.0.117：加载本地模型状态（容器 + 已装模型）——后端为源：
-    /// v-review fix：依据 /api/local/status 的 container 状态回写开关，防 UI 与后端脱钩
-    func loadLocalStatus() async {
-        if let j = try? await auth.json("/api/local/status") {
-            let up = (j["container"] as? String) == "up"
-            let models = (j["models"] as? [[String: Any]] ?? []).map { $0["name"] as? String ?? "" }
-            if up {
-                localStatusText = "运行中" + (models.isEmpty ? "" : " · " + models.prefix(2).joined(separator: " / "))
-            } else {
-                localStatusText = "已停止（点开关开启）"
-            }
-            // 回写开关（加守卫防 onChange 回声 POST 循环）
-            if localModelOn != up {
-                localModelSyncing = true
-                localModelOn = up
-                localModelSyncing = false
-            }
-        } else {
-            localStatusText = "状态获取失败"
-        }
-    }
-
-    /// v2.0.117：检查模型更新
-    func checkLocalUpdate() async {
-        guard !localChecking else { return }
-        localChecking = true
-        defer { localChecking = false }
-        if let j = try? await auth.json("/api/local/check-update") {
-            localUpdateText = (j["message"] as? String) ?? "检查完成"
-        } else {
-            localUpdateText = "检查失败，请稍后重试"
-        }
-    }
 
     /// v2.0.102：加载凭据/记忆计数（设置页行尾显示）
     func loadCounts() async {

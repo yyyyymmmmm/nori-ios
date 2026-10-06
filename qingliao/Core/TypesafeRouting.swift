@@ -76,7 +76,7 @@ struct TypesafeRouting: Equatable {
 
     /// 开关行副标题（模式在展开区里，行内只说开关状态）
     var subtitleText: String {
-        enabled ? "判定是否要干活 · 已开启" : "已关闭 · 全走原关键词规则"
+        enabled ? "自动判断是否需要 AI 干活 · 已开启" : "已关闭 · 全走原关键词规则"
     }
 
     var timeoutText: String { "\(timeoutMs) ms" }

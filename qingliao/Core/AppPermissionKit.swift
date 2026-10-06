@@ -96,7 +96,7 @@ enum AppCapability: String, CaseIterable, Identifiable, Sendable {
         case .mail:          return "envelope"
         case .homekit:       return "house"
         case .todoList:      return "checkmark.circle"
-        case .health:        return "heart.text.square"
+        case .health:        return "heart.fill"   // K 线：多彩渲染用红心（连接应用页）
         }
     }
 

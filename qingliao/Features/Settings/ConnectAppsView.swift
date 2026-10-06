@@ -137,21 +137,21 @@ struct ConnectAppsView: View {
     @ViewBuilder
     private func deviceRow(_ cap: AppCapability) -> some View {
         let st = states[cap] ?? .notDetermined
-        GraySettingsRow(icon: cap.sfSymbol, title: cap.displayName,
+        GraySettingsRow(icon: cap.sfSymbol, colorful: true, title: cap.displayName,
                         subtitle: cap.blurb, value: st.label, chevron: false) {
             Task { await tapCapability(cap, state: st) }
         }
     }
 
     private var musicRow: some View {
-        GraySettingsRow(icon: "music.note", title: "音乐",
+        GraySettingsRow(icon: "music.note", colorful: true, title: "音乐",
                         subtitle: "读取媒体库，为你播放音乐", value: musicState.label, chevron: false) {
             Task { await tapMusic() }
         }
     }
 
     private var micRow: some View {
-        GraySettingsRow(icon: "mic", title: "麦克风",
+        GraySettingsRow(icon: "mic", colorful: true, title: "麦克风",
                         subtitle: "语音输入与语音对话", value: micState.label, chevron: false) {
             Task { await tapMic() }
         }

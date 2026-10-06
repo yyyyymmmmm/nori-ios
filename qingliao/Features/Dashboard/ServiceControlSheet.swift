@@ -6,7 +6,7 @@ enum QLServiceKind: String {
     var title: String {
         switch self {
         case .qingliao: return "轻聊后端"
-        case .hermes: return "Hermes 网关"
+        case .hermes: return "智能体服务"
         }
     }
 
@@ -20,7 +20,7 @@ enum QLServiceKind: String {
     var subtitle: String {
         switch self {
         case .qingliao: return "轻聊后端服务"
-        case .hermes: return "Hermes 网关服务"
+        case .hermes: return "智能体服务"
         }
     }
 
@@ -40,7 +40,7 @@ struct ServiceControlSheet: View {
 
     init(service: QLServiceKind) {
         self.service = service
-        _info = State(initialValue: service == .qingliao ? "管理轻聊后端服务" : "管理 Hermes 网关服务")
+        _info = State(initialValue: service == .qingliao ? "管理轻聊后端服务" : "管理智能体服务")
     }
 
     var body: some View {
@@ -155,7 +155,7 @@ struct ServiceControlSheet: View {
                 Text("重试服务")
                     .font(.system(size: Typography.body, weight: .semibold))
                     .foregroundStyle(.primary)
-                Text(service == .qingliao ? "重启轻聊后端进程" : "重启 Hermes 网关进程")
+                Text(service == .qingliao ? "重启轻聊后端进程" : "重启智能体服务")
                     .font(.system(size: Typography.caption))
                     .foregroundStyle(.secondary)
             }

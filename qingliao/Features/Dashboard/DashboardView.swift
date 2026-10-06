@@ -454,7 +454,7 @@ struct DashboardView: View {
             ServiceCard(name: "轻聊后端", icon: "server.rack", running: nas.qingliaoAlive, detail: "Docker 内存 \(nas.qingliaoDockerMemText)")
                 .tapButton { activeSheet = .service }
                 .matchedTransitionSource(id: DashboardSheet.service.id, in: sheetZoomNS)   // v3.9.0：卡片→详情 zoom
-            ServiceCard(name: "Hermes 网关", icon: "sparkles", running: nas.hermesAlive, detail: nas.hermesMemText)
+            ServiceCard(name: "智能体服务", icon: "sparkles", running: nas.hermesAlive, detail: nas.hermesMemText)
                 .tapButton { activeSheet = .serviceHermes }
                 .matchedTransitionSource(id: DashboardSheet.serviceHermes.id, in: sheetZoomNS)   // v3.9.0：卡片→详情 zoom
             // v2.0.72：Docker 管理卡片（点击弹部署弹窗）
