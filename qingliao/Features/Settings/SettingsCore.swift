@@ -36,6 +36,7 @@ struct SettingsView: View {
     @State var showSecrets = false
     // v2.0.81：知识库页面
     @State var showKB = false
+    @State var showSkills = false
     // v2.0.87：AI 记忆
     @State var showMemory = false
     @State var memoryCount = 0
@@ -306,6 +307,12 @@ struct SettingsView: View {
                 .presentationDetents([.medium, .large])
                 .scrollContentBackground(.hidden)
         }
+        // 2026-10-07：技能管理
+        .sheet(isPresented: $showSkills) {
+            SkillsView()
+                .presentationDetents([.medium, .large])
+                .scrollContentBackground(.hidden)
+        }
         // v2.0.87：AI 记忆
     }
 
@@ -537,6 +544,8 @@ extension SettingsView {
             GraySettingsRow(icon: "clock.arrow.circlepath", title: "任务记录", subtitle: "自动任务的执行记录") { showHistory = true }
             MuseRowDivider()
             GraySettingsRow(icon: "book.closed", title: "知识库", subtitle: "文档检索问答") { showKB = true }
+            MuseRowDivider()
+            GraySettingsRow(icon: "puzzlepiece.extension", title: "技能", subtitle: "给 AI 装上领域能力") { showSkills = true }
             MuseRowDivider()
             // K 线 2026-10-06：判定参数区收进二级页（分流方式/灵敏度/等待超时），列表不再展开
             GraySettingsRow(icon: "arrow.triangle.branch", title: "智能路由",
