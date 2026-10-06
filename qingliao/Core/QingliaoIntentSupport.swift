@@ -26,7 +26,8 @@ enum QingliaoDeepLink {
 
     enum Route: String, CaseIterable {
         // tab 页：必须与 DockTab 的 case 一字不差
-        case chat, sessions, dashboard, life, settings
+        // 灰度重做 2026-10-06：5 Tab IA（对话/资讯/点子/目标/看板）
+        case chat, feed, ideas, goals, dashboard
 
         /// 非 tab 路由：打开智慧球快捷动作菜单（8 颗胶囊），**不切页**。
         /// 🚨 加这个 case 会让 `applyRoute` 里的 `DockTab(rawValue:)` 落空（静默返回）——

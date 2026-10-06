@@ -48,18 +48,19 @@ struct GlassListCard: ViewModifier {
 // MARK: - 聊天气泡色值（集中管理，消除 ChatComponents.swift 内硬编码 RGB）
 
 struct BubbleTheme {
-    /// 用户气泡蓝色（深色/浅色模式 × 正常/高亮状态）
+    /// 用户气泡灰（灰度重做 2026-10-06，对标 TodayAI 参考：浅灰底+深色字）
+    /// 深色/浅色模式 × 正常/高亮状态
     static func userBubble(scheme: ColorScheme, highlighted: Bool = false) -> Color {
         highlighted
-            ? (scheme == .dark ? Color(red: 0.20, green: 0.32, blue: 0.62) : Color(red: 0.38, green: 0.55, blue: 0.92))
-            : (scheme == .dark ? Color(red: 0.13, green: 0.22, blue: 0.45) : Color(red: 0.27, green: 0.47, blue: 0.88))
+            ? (scheme == .dark ? Color(uiColor: .systemGray3) : Color(uiColor: .systemGray4))
+            : (scheme == .dark ? Color(uiColor: .systemGray4) : Color(uiColor: .systemGray5))
     }
 
-    /// AI 气泡灰色（深色 systemGray5 / 浅色 systemGray6）
+    /// AI 气泡（灰度重做：浅色纯白+柔和阴影 / 深色 systemGray5）
     static func aiBubble(scheme: ColorScheme, highlighted: Bool = false) -> Color {
         highlighted
             ? Color.accentColor.opacity(Tint.subtle)
-            : (scheme == .dark ? Color(uiColor: .systemGray5) : Color(uiColor: .systemGray6))
+            : (scheme == .dark ? Color(uiColor: .systemGray5) : .white)
     }
 }
 

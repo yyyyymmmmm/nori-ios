@@ -333,23 +333,23 @@ struct SettingRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: Typography.subhead, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 28, height: 28)
-                .background(iconColor, in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
-            Text(title)
-                .font(.system(size: Typography.body))
-                .foregroundStyle(.primary)
-            Spacer(minLength: 8)   // 与 SettingsModelSheets 的音色行同口径（显式留最小间距）
-            if let value {
-                // v3.9.80：行尾值钉单行——值折成两行时左标题会被垂直居中夹住 = 真机报过的
-                // 「系统音色文字错位」同款（那一行已修；这里是共用的行组件，一处修覆盖设置页所有行）
-                Text(value)
-                    .font(.system(size: Typography.subhead))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            // 灰度重做 2026-10-06 晚：行去图标（对标 iOS 26 设置参考：只有文字+右箭头）。
+            // icon/iconColor 参数保留（几十处调用点，改签名风险高），此处不再渲染。
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: Typography.body))
+                    .foregroundStyle(.primary)
+                if let value {
+                    // v3.9.80：行尾值钉单行——值折成两行时左标题会被垂直居中夹住 = 真机报过的
+                    // 「系统音色文字错位」同款（那一行已修；这里是共用的行组件，一处修覆盖设置页所有行）
+                    // 灰度重做：值改为灰色副标题（对标参考：标题+灰色副标题）
+                    Text(value)
+                        .font(.system(size: Typography.caption))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
             }
+            Spacer(minLength: 8)   // 与 SettingsModelSheets 的音色行同口径（显式留最小间距）
             if chevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: Typography.subhead, weight: .semibold))

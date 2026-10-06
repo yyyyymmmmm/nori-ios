@@ -16,6 +16,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(AuthStore.self) var auth
+    @Environment(\.dismiss) private var dismiss
     // v3.4.28：横屏限宽
     @Environment(\.horizontalSizeClass) private var hSizeSettings
     @AppStorage("qingliao_appearance") var appearance = "system"   // dark/light/system（默认跟随系统）
@@ -131,7 +132,31 @@ struct SettingsView: View {
     @AppStorage(PetKeys.face) var petFace: PetFace = .calm
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: "设置")
+            // 灰度重做 2026-10-06 晚：设置页顶栏（对标 iOS 26 设置参考）。
+            // 左上圆形返回键 + 居中标题「设置」；原 PageHeader 大标题已干掉。
+            HStack {
+                Button {
+                    dismissSettings()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .background(.regularMaterial, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("返回")
+                Spacer()
+                Text("设置")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                Spacer()
+                // 右侧占位，保持标题居中（与左侧按钮等宽）
+                Color.clear.frame(width: 44, height: 44)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
             // v4.0.22：设置项越堆越多，顶部给一行搜索框（索引与匹配见 Core/SettingsSearchIndex.swift）
             SettingsSearchBar(text: $settingsQuery)
             ScrollView {
@@ -175,6 +200,11 @@ struct SettingsView: View {
         .background(settingsCold6())
         .background(settingsCold7())
         .background(settingsCold8())
+    }
+
+    /// 灰度重做 2026-10-06 晚：设置页返回（sheet 场景 dismiss；导航栈场景靠系统返回）
+    private func dismissSettings() {
+        dismiss()
     }
 
     /// 深度治理：行为型深层修饰器下沉背景层（.background 不影响布局，语义等价）
@@ -923,11 +953,8 @@ extension SettingsView {
 
     func toggleRow(icon: String, iconColor: Color, title: String, subtitle: String? = nil, isOn: Binding<Bool>) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: Typography.subhead, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 28, height: 28)
-                .background(iconColor, in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
+            // 灰度重做 2026-10-06 晚：行去图标（对标 iOS 26 设置参考）。
+            // icon/iconColor 参数保留（多处调用，改签名风险高），此处不再渲染。
             if let subtitle {
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Text(title).font(.system(size: Typography.body, weight: .medium))

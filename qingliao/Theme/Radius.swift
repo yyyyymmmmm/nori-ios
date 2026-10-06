@@ -41,4 +41,6 @@ enum Radius {
     static let card: CGFloat = 16
     /// hero 卡 / 大面板 / 登录页大块
     static let hero: CGFloat = 22
+    /// 聊天气泡（灰度重做 2026-10-06，对标 TodayAI 参考：圆角约 18）
+    static let bubble: CGFloat = 18
 }

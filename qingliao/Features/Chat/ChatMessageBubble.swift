@@ -314,7 +314,7 @@ struct MessageBubble: View {
                 .padding(.vertical, 9)
                 .frame(maxWidth: AdaptiveLayout.bubbleMaxWidth(hSize), alignment: .leading)
                 .background(
-                    RoundedRectangle(cornerRadius: Radius.field, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
                         .fill(aiBubbleColor)   // v2.0.92：与撤回统一灰
                 )
             bubbleTrailingAccessory
@@ -355,19 +355,22 @@ struct MessageBubble: View {
                     bubblePushTag
                     bubbleProactiveFeedback
                 }
-                .padding(.horizontal, isMultiBubbleAI ? 2 : 13)
-                .padding(.vertical, isMultiBubbleAI ? 2 : 9)
+                // 灰度重做 2026-10-06：padding 舒展（13/9 → 16/12），对标 TodayAI 参考
+                .padding(.horizontal, isMultiBubbleAI ? 2 : 16)
+                .padding(.vertical, isMultiBubbleAI ? 2 : 12)
                 // v3.0.51：多气泡段落时外层不画整块气泡（每段各自带圆角底），否则段与段被外层包围成一大块
                 .background(
                     Group {
                         if isMultiBubbleAI {
                             Color.clear
                         } else {
-                            RoundedRectangle(cornerRadius: Radius.field, style: .continuous)
+                            RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
                                 .fill(message.withdrawn ? aiBubbleColor : (message.isUser ? userBubbleColor : aiBubbleColor))   // v2.0.92：撤回统一灰
                         }
                     }
                 )
+                // 灰度重做：AI 白泡加柔和阴影（参考 TodayAI；用户灰泡/多段模式不加）
+                .shadow(color: Color.black.opacity(isMultiBubbleAI || message.isUser || message.withdrawn ? 0 : 0.06), radius: 8, x: 0, y: 2)
                 // v2.0.43 搜索定位高亮边框
                 // v3.4.25：错误占位 → 红描边分层（错误一眼可辨，不再与正常回复同观感）
                 .overlay(
@@ -375,10 +378,10 @@ struct MessageBubble: View {
                         if isMultiBubbleAI {
                             Color.clear
                         } else if message.isErrorPlaceholder {
-                            RoundedRectangle(cornerRadius: Radius.field, style: .continuous)
+                            RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
                                 .strokeBorder(Color.red.opacity(0.55), lineWidth: 1.2)
                         } else {
-                            RoundedRectangle(cornerRadius: Radius.field, style: .continuous)
+                            RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
                                 .strokeBorder(isHighlighted ? Color.accentColor : .clear, lineWidth: 2)
                         }
                     }
@@ -518,12 +521,13 @@ struct MessageBubble: View {
                 .contextMenu { cardMenu }
         } else {
             // v2.0.125：UITextView 渲染 —— 长按弹菜单（复制/引用/分享/大爆炸/选择文本/撤回/删除）
+            // 灰度重做 2026-10-06：用户泡改浅灰底，文字同步改深色（原白色是配蓝底的）
             SelectableTextLabel(
                 attributedText: NSAttributedString(string: message.content, attributes: [
                     .font: UIFont.systemFont(ofSize: CGFloat(fontSize)),
-                    .foregroundColor: UIColor.white
+                    .foregroundColor: UIColor.label
                 ]),
-                fallbackColor: .white,
+                fallbackColor: .primary,
                 lineSpacing: LineSpacing.compact,
                 onCopy: { UIPasteboard.general.string = message.content; Haptics.success() },   // v3.9.30：复制触感
                 onQuote: onQuote,
@@ -1069,7 +1073,7 @@ struct MessageBubble: View {
         .padding(.horizontal, Spacing.xl)
         .padding(.vertical, Spacing.md)
         .background(
-            RoundedRectangle(cornerRadius: Radius.field, style: .continuous)
+            RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
                 .fill(aiBubbleColor)
         )
         .frame(maxWidth: AdaptiveLayout.bubbleMaxWidth(hSize), alignment: .leading)

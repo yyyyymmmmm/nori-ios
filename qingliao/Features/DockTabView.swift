@@ -3,37 +3,44 @@ import CoreLocation
 import UIKit
 
 enum DockTab: String, CaseIterable, Identifiable {
-    // v3.6.2：dock 顺序重排 = 会话 → 看板 → 聊天 → 生活 → 设置
+    // 灰度重做 2026-10-06：5 Tab IA（对话/资讯/点子/目标/看板）。
+    // 2026-10-06 晚用户硬性要求：资讯=动态feed页，看板=Dashboard，我的tab删除、
+    // 设置收进侧边栏唯一入口（一个功能一个入口）。
     // （enum 声明序与 TabView 内声明序一致，便于对照；TabView 顺序由视图插入序决定）
-    // v4.0.x：dock 图标换 B 组（用户选定）：看板 chart.pie / 生活 heart / 设置 gearshape（空心）；
-    // 会话 clock 保留。语义直白风，每个图标一眼看出页面用途；智慧球槽位（chat）不受影响。
-    case sessions, dashboard, chat, life, settings
+    case chat, feed, ideas, goals, dashboard
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .sessions: "会话"
+        case .chat: "对话"
+        case .feed: "资讯"
+        case .ideas: "点子"
+        case .goals: "目标"
         case .dashboard: "看板"
-        case .chat: "聊天"
-        case .life: "生活"
-        case .settings: "设置"
         }
     }
 
+    /// 灰度线条图标（SF Symbols 统一用非 fill 线条版，选中态靠灰色胶囊区分，不用颜色区分）
     var icon: String {
         switch self {
-        case .sessions: "clock"
-        case .dashboard: "chart.pie"
-        case .chat: "message.fill"
-        case .life: "heart"
-        case .settings: "gearshape"
+        case .chat: "message"
+        case .feed: "newspaper"
+        case .ideas: "lightbulb"
+        case .goals: "target"
+        case .dashboard: "rectangle.grid.2x2"
         }
     }
 }
 
 struct DockTabView: View {
     @State private var selected: DockTab = .chat
+    // 灰度重做 2026-10-06 晚：Muse 风格侧边栏（用户硬性要求 2）
+    @State private var sidebarOpen = false
+    // 设置页唯一入口：侧边栏齿轮 → sheet 弹出（原「我的」tab 已删）
+    @State private var showSettingsSheet = false
+    // 会话搜索：顶栏/侧边栏搜索 → SessionsView sheet（自带搜索框）
+    @State private var showSessionSearch = false
     // v3.6.2：dock 智能球点击 → 全屏粒子爆发（原由聊天页智能球展开触发，球迁到 dock 后跟随迁移）
     @State private var showDockBurst = false
     /// v4.0.7：烟花粒子特效开关（设置 → 外观 → 交互；与「输入框流光」同一排）。默认开，关掉后点球不放烟花。
@@ -98,34 +105,30 @@ struct DockTabView: View {
             // 各页自带背景，tab bar 玻璃改为采样真实滚动内容。
 
             TabView(selection: $selected) {
-                // v4.0.7：程序化切页与其他路径同口径——已在聊天页就不跳过（白置标志会吞掉真点击烟花），
-                // 否则从会话 tab 点开会话会放满屏烟花（v3.6.2 同类回归）
-                SessionsView(onOpenSession: {
-                    if selected != .chat { skipBurstOnce() }
-                    selected = .chat
-                })
-                    .tabTransition(for: .sessions, selected: $selected)
+                // 灰度重做 2026-10-06：5 Tab IA（对话/资讯/点子/目标/看板）。
+                // 系统 tab bar 藏掉（见下方 .toolbar），用自绘灰胶囊 tab bar。
+                chatTab
+                // 资讯：动态 feed 页（信息流，对标 Muse「动态」）
+                FeedTabView()
+                    .tag(DockTab.feed)
+                    .tabTransition(for: .feed, selected: $selected)
+                // 点子：备忘录（灵感记录）
+                IdeasTabView()
+                    .tag(DockTab.ideas)
+                    .tabTransition(for: .ideas, selected: $selected)
+                // 目标：长期目标
+                GoalsTabView()
+                    .tag(DockTab.goals)
+                    .tabTransition(for: .goals, selected: $selected)
+                // 看板：官方 Dashboard 内容（原「我的」tab 已删，设置收进侧边栏唯一入口）
                 // v3.4.26：isActive 参数直传（selected==.dashboard），替代 qingliaoDashboardLeave/Refresh 通知——
                 // 轮询暂停/恢复收进 DashboardView 自身生命周期，去隐式耦合
                 DashboardView(isActive: selected == .dashboard)
+                    .tag(DockTab.dashboard)
                     .tabTransition(for: .dashboard, selected: $selected)
-                chatTab
-                // v3.6.2：生活页（原看板「生活数据」栏目迁入）
-                LifeView(isActive: selected == .life)
-                    .tabTransition(for: .life, selected: $selected)
-                // v4.0.0：设置页大类 → 明细的二级页需要 NavigationStack 才有返回栈
-                // （TabView 里裸放 NavigationLink 点了不推、也不显示返回键）。
-                // 只包设置 tab —— 其他 tab 的层级结构一行不动。
-                NavigationStack {
-                    SettingsView()
-                        // 🚨 审查 F7：iOS 26 的 NavigationStack 在无 navigationTitle 时仍保留
-                        //   导航栏占位 → 顶部多一段空白/空返回槽。本页用自绘 PageHeader（不占系统栏），
-                        //   故显式藏掉。参考同仓同款：RecordSection:236 / MemoSection:235 / TodoSection:224。
-                        //   二级页仍要系统侧滑返回，但它的 PageHeader 已自绘返回键，不靠系统栏。
-                        .toolbar(.hidden, for: .navigationBar)
-                }
-                    .tabTransition(for: .settings, selected: $selected)
             }
+            // 灰度重做：藏系统 tab bar，用自绘悬浮灰胶囊（GrayCapsuleTabBar）
+            .toolbar(.hidden, for: .tabBar)
             // v4.0.49x：启动链折叠（防 demangler 栈溢出）——原 24 条顶层修饰器按序折进 4 个具名分组，
             // body 这里只留 4 个 .modifier(…) 泛型调用。事故/手法同 ChatView.v4.0.49：
             // 巨型链把 body 编译后类型名撑到 2574 字符（全 App 最长），Swift 运行时按嵌套层数递归
@@ -136,6 +139,55 @@ struct DockTabView: View {
             .modifier(DockTabChrome2(host: self))
             .modifier(DockTabChrome3(host: self))
             .modifier(DockTabChrome4(host: self))
+
+            // 灰度重做 2026-10-06：悬浮胶囊 tab bar（对标 TodayAI 参考）。
+            // 系统 tab bar 已藏（见上方 .toolbar），这里自绘 5 tab 胶囊。
+            // 用 VStack+Spacer 贴底，不挡内容触摸（旧版"点不动"教训）。
+            VStack {
+                Spacer()
+                GrayCapsuleTabBar(selected: $selected)
+                    .padding(.bottom, 10)
+            }
+
+            // 灰度重做 2026-10-06 晚：Muse 风格侧边栏抽屉（用户硬性要求 2）。
+            // 盖在最上层；打开方式由聊天页顶栏按钮触发（见 ChatView）。
+            QingliaoSidebar(
+                isOpen: $sidebarOpen,
+                selectedTab: $selected,
+                onOpenSettings: { showSettingsSheet = true },
+                onNewChat: {
+                    chat.newSession()
+                    selected = .chat
+                },
+                onSearch: {
+                    // 会话搜索：弹出 SessionsView（自带搜索框）
+                    showSessionSearch = true
+                }
+            )
+        }
+        // 设置页唯一入口（侧边栏齿轮）
+        .sheet(isPresented: $showSettingsSheet) {
+            NavigationStack {
+                SettingsView()
+                    .toolbar(.hidden, for: .navigationBar)
+            }
+        }
+        // 会话搜索
+        .sheet(isPresented: $showSessionSearch) {
+            NavigationStack {
+                SessionsView()
+                    .toolbar(.hidden, for: .navigationBar)
+            }
+        }
+        // 灰度重做 2026-10-06 晚：侧边栏开关（聊天页顶栏按钮发通知）
+        .onReceive(NotificationCenter.default.publisher(for: .qingliaoToggleSidebar)) { _ in
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                sidebarOpen.toggle()
+            }
+        }
+        // 会话搜索（聊天页顶栏搜索按钮发通知）
+        .onReceive(NotificationCenter.default.publisher(for: .qingliaoOpenChatSearch)) { _ in
+            showSessionSearch = true
         }
     }
 

@@ -328,17 +328,42 @@ struct OpenChatIntent: AppIntent {
 }
 
 struct OpenSessionsIntent: AppIntent {
-    static var title: LocalizedStringResource { "打开轻聊会话列表" }
-    static var description: IntentDescription { IntentDescription("打开轻聊并切到会话列表") }
+    static var title: LocalizedStringResource { "打开轻聊对话" }
+    static var description: IntentDescription { IntentDescription("打开轻聊并切到对话页") }
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        QingliaoRouteHandoff.request(.sessions)
+        QingliaoRouteHandoff.request(.chat)
         return .result()
     }
 }
 
+struct OpenFeedIntent: AppIntent {
+    static var title: LocalizedStringResource { "打开轻聊资讯" }
+    static var description: IntentDescription { IntentDescription("打开轻聊并切到资讯页") }
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        QingliaoRouteHandoff.request(.feed)
+        return .result()
+    }
+}
+
+struct OpenLifeIntent: AppIntent {
+    static var title: LocalizedStringResource { "打开轻聊点子" }
+    static var description: IntentDescription { IntentDescription("打开轻聊并切到点子页（备忘灵感）") }
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        QingliaoRouteHandoff.request(.ideas)
+        return .result()
+    }
+}
+
+// 灰度重做 2026-10-06：看板 tab（原「我的」已删）。快捷指令/深链入口。
 struct OpenDashboardIntent: AppIntent {
     static var title: LocalizedStringResource { "打开轻聊看板" }
     static var description: IntentDescription { IntentDescription("打开轻聊并切到看板页") }
@@ -347,18 +372,6 @@ struct OpenDashboardIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         QingliaoRouteHandoff.request(.dashboard)
-        return .result()
-    }
-}
-
-struct OpenLifeIntent: AppIntent {
-    static var title: LocalizedStringResource { "打开轻聊生活页" }
-    static var description: IntentDescription { IntentDescription("打开轻聊并切到生活页（备忘 / 待办 / 股票 · 资讯 / 快递）") }
-    static var supportedModes: IntentModes { .foreground(.immediate) }
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        QingliaoRouteHandoff.request(.life)
         return .result()
     }
 }
@@ -446,11 +459,29 @@ struct QingliaoAppShortcuts: AppShortcutsProvider {
             AppShortcut(
                 intent: OpenSessionsIntent(),
                 phrases: [
-                    "\(.applicationName)会话列表",
-                    "看\(.applicationName)的历史会话",
+                    "\(.applicationName)对话",
+                    "和\(.applicationName)聊天",
                 ],
-                shortTitle: "会话列表",
-                systemImageName: "clock"
+                shortTitle: "对话",
+                systemImageName: "message"
+            )
+            AppShortcut(
+                intent: OpenFeedIntent(),
+                phrases: [
+                    "打开\(.applicationName)资讯",
+                    "\(.applicationName)资讯",
+                ],
+                shortTitle: "打开资讯",
+                systemImageName: "newspaper"
+            )
+            AppShortcut(
+                intent: OpenLifeIntent(),
+                phrases: [
+                    "打开\(.applicationName)点子",
+                    "看\(.applicationName)的备忘",
+                ],
+                shortTitle: "点子",
+                systemImageName: "lightbulb"
             )
             AppShortcut(
                 intent: OpenDashboardIntent(),
@@ -458,17 +489,8 @@ struct QingliaoAppShortcuts: AppShortcutsProvider {
                     "打开\(.applicationName)看板",
                     "\(.applicationName)看板",
                 ],
-                shortTitle: "打开看板",
-                systemImageName: "square.grid.2x2"
-            )
-            AppShortcut(
-                intent: OpenLifeIntent(),
-                phrases: [
-                    "打开\(.applicationName)生活页",
-                    "看\(.applicationName)的备忘录",
-                ],
-                shortTitle: "生活页",
-                systemImageName: "sparkles"
+                shortTitle: "看板",
+                systemImageName: "rectangle.grid.2x2"
             )
             AppShortcut(
                 intent: OpenQuickActionsIntent(),

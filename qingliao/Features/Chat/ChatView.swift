@@ -1382,13 +1382,61 @@ struct ChatView: View {
     /// 页头 + 思考档位/聊天操作弹窗 + 任务中心全屏页
     @ViewBuilder
     private var chatHeaderBar: some View {
-        PageHeader(title: "聊天",
-                   subtitle: headerSubtitle,
-                   trailing: AnyView(headerTrailingItems),
-                   centerView: chat.messages.isEmpty ? nil : AnyView(chatHeaderPet),
-                   showStatus: true,
-                   statusColor: headerColor,
-                   busy: aiBusy)
+        // 灰度重做 2026-10-06 晚：顶栏精简（用户硬性要求）。
+        // 干掉：大标题「聊天」/ 红色离线点 / 药丸按钮组 / 中央宠物。
+        // 保留：侧边栏按钮（左）/ 搜索 + 更多（右，悬浮圆形）；离线弱化为小字（不断连逻辑不变）。
+        HStack(spacing: 12) {
+            Button {
+                NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
+            } label: {
+                Image(systemName: "sidebar.left")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .background(.regularMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("打开侧边栏")
+
+            Spacer()
+
+            // 离线弱化：不断连逻辑保留，只显示灰色小字（原红色圆点已干掉）
+            if !isOnlineForHeader {
+                Text("离线")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+
+            Button {
+                // 搜索：切到会话搜索（与侧边栏搜索同口径）
+                NotificationCenter.default.post(name: .qingliaoOpenChatSearch, object: nil)
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .background(.regularMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("搜索")
+
+            Button {
+                showMoreMenu = true
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .background(.regularMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("更多")
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
         // v4.0.31：本会话这轮回答结束（忙→闲）→ 庆祝动作（v4.0.27 口径回归）。
         // 用 thisSessionStreaming 而不是 aiBusy：别会话跑完不该庆祝（原注释同）。
         .onChange(of: thisSessionStreaming) { was, now in
@@ -1402,10 +1450,19 @@ struct ChatView: View {
         } message: {
             Text("上下文：约 \(chat.contextInfo.tokens) tokens · \(chat.contextInfo.count) 条")
         }
-        // v3.4.24：任务中心全屏页（header 三个点旁的常驻入口）
+        // v3.4.24：任务中心全屏页（入口已迁入侧边栏「工具」分组）
         .fullScreenCover(isPresented: $showTaskCenter) {
             TaskCenterView()
         }
+        // 灰度重做 2026-10-06 晚：侧边栏「工具 → 任务中心」通知
+        .onReceive(NotificationCenter.default.publisher(for: .qingliaoOpenTaskCenter)) { _ in
+            showTaskCenter = true
+        }
+    }
+
+    /// 顶栏离线判据（弱化显示用）：沿用原 headerColor 的在线逻辑，取反即离线
+    private var isOnlineForHeader: Bool {
+        headerColor == .green
     }
 
     /// 已送达提示 + 剪贴板地图提示条
@@ -2165,16 +2222,16 @@ struct ChatView: View {
             },
             onOpenLife: {
                 Haptics.tap()
-                QingliaoRouteHandoff.request(.life)      // 切生活页（待办/账目）
+                QingliaoRouteHandoff.request(.goals)      // 切目标页（待办/账目）——灰度重做：生活页拆分，待办归目标
             },
             onOpenWeather: {
                 Haptics.tap()
                 showHomeWeather = true
             },
-            // v4.0.29：新卡通道 —— 场景/设备切看板；备忘/提醒/云盘走弹窗
+            // v4.0.29：新卡通道 —— 场景/设备切资讯；备忘/提醒/云盘走弹窗
             onOpenBoard: {
                 Haptics.tap()
-                QingliaoRouteHandoff.request(.dashboard)
+                QingliaoRouteHandoff.request(.feed)
             },
             onOpenSheet: { kind in
                 Haptics.tap()

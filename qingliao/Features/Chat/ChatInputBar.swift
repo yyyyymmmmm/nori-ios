@@ -111,13 +111,14 @@ struct ChatInputBar: View {
     /// v3.9.42：「减弱动态效果」→ 不给关键帧喂新 trigger，发送反馈只剩图标 symbolEffect
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    // 发送按钮配色三态：语音模式=Siri 彩、空文本=淡灰、有字=蓝紫渐变
+    // 发送按钮配色（灰度重做 2026-10-06）：禁用系统蓝。
+    // 语音模式=深灰、有字=深灰、空文本=淡灰；上下文超 80% 仍用橙（功能性提醒，非装饰蓝）
     // v3.4.25：+第四态——上下文使用率超 80% 时有字状态变橙（轻提醒，不阻断发送）
     private var sendColors: [Color] {
-        if voiceMode { return [.blue, .indigo, .pink] }
+        if voiceMode { return [Color(uiColor: .systemGray), Color(uiColor: .systemGray2)] }
         if text.isEmpty { return [Color(uiColor: .systemGray4), Color(uiColor: .systemGray3)] }
         if contextUsage > 0.8 { return [.orange, .yellow.opacity(0.9)] }
-        return [.blue, .indigo]
+        return [Color(white: 0.25), Color(white: 0.35)]
     }
 
     // 发送触发：一次 tick 同时驱动图标弹动与按钮关键帧（长按转文字路径不走这里，不弹反馈）
@@ -220,6 +221,17 @@ struct ChatInputBar: View {
     /// `minHeight` 用常量不写死数字（用户放大系统字号时 42 不够会由内容顶上，不会裁字）。
     private var messageRow: some View {
         HStack(spacing: 8) {
+            // 灰度重做 2026-10-06：左侧 "+"（更多功能：附件/拍照等，对标 TodayAI 参考）
+            Button(action: onPickAttachment) {
+                Image(systemName: "plus")
+                    .font(.system(size: Typography.body, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(PressStyle())
+            .hitArea44(h: 6, v: 6)
+            .accessibilityLabel("更多功能")
             textArea
             // v3.9.68（用户：「输入框可以优化的精致一点视觉上更美观一点」）：
             // 文字区与发送键之间补一条 **0.8pt 淡分隔线**（Tint.faint 同全站描边口径）——
@@ -500,7 +512,7 @@ struct ChatInputBar: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .allowsHitTesting(false)
                         } else {
-                            Text("输入消息...")
+                            Text("点击输入或按住说话...")
                                 .font(.system(size: Typography.body))
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -661,11 +673,12 @@ extension ChatInputBar {
             // v4.0.61：走无障碍玻璃出口（容器本体无描边 —— 聚焦蓝边是下面独立的 overlay，保持不动）
             .a11yGlass(.regular, in: RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous),
                        stroke: .clear)
-            // v3.4.20：聚焦态光晕——输入框获得焦点时边缘亮起淡蓝细描边（0.8pt 与全站描边同参），失焦淡出。
+            // v3.4.20：聚焦态光晕——输入框获得焦点时边缘亮起细描边（0.8pt 与全站描边同参），失焦淡出。
+            // 灰度重做 2026-10-06：淡蓝 → 灰（禁用系统蓝）
             // 静态描边（非每帧重绘），无 shadow 叠加，不触碰 v3.2.3 渲染卡死红线。
             .overlay {
                 RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous)
-                    .strokeBorder(Color.blue.opacity(focused ? 0.45 : 0), lineWidth: 0.8)
+                    .strokeBorder(Color.primary.opacity(focused ? 0.25 : 0), lineWidth: 0.8)
                     .allowsHitTesting(false)
             }
             .animation(Motion.snap, value: focused)

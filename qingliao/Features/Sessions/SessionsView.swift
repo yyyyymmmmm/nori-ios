@@ -1350,20 +1350,16 @@ struct SessionRow: View {
     // MARK: - v3.4.25 会话头像个性化（id hash → 稳定的色系×图标组合）
 
     /// 8 组柔和渐变色系（深浅色都保证白图标可读：主色 0.75 + 辅色 0.55 透明度）
+    /// 灰度重做 2026-10-06 晚：会话头像去彩色（用户硬性要求：干掉彩色渐变图标）。
+    /// 原 8 色系 × 6 图标已废弃；统一中性灰（深浅两档区分固定会话与普通会话）。
     private var avatarColors: [Color] {
-        let palettes: [[Color]] = [
-            [.blue, .indigo], [.orange, .pink], [.green, .mint], [.purple, .indigo],
-            [.cyan, .blue], [.pink, .red], [.yellow, .orange], [.teal, .green]
-        ]
-        let idx = abs(avatarHash) % palettes.count
-        return [palettes[idx][0].opacity(0.75), palettes[idx][1].opacity(0.55)]
+        [Color(.systemGray4), Color(.systemGray5)]
     }
 
     /// 6 个语义图标（纯视觉映射，非关键词解析——hash 稳定即可）
+    /// 灰度重做：统一用 message 线条图标，不再按 hash 换图标（图标一致性要求）
     private var avatarIcon: String {
-        let icons = ["bubble.left.fill", "text.bubble.fill", "chevron.left.forwardslash.chevron.right",
-                     "sparkles", "lightbulb.fill", "book.fill"]
-        return icons[abs(avatarHash >> 3) % icons.count]
+        "message"
     }
 
     private var avatarHash: Int {
@@ -1382,29 +1378,31 @@ struct SessionRow: View {
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                 Image(systemName: avatarIcon)
                     .font(.system(size: Typography.body, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.92))
+                    // 灰度重做：灰底配深灰图标（原白字在浅灰上对比度不足）
+                    .foregroundStyle(.secondary)
             }
             .frame(width: 38, height: 38)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: Spacing.xs) {
                     // v4.0.20（#4）：固定会话锁形图标 —— 一眼看出「这是系统会话，删不掉、改不了名」
+                    // 灰度重做：统一 .tertiary（原 accentColor/橙/黄彩色已干掉）
                     if isFixed {
                         Image(systemName: "lock.fill")
                             .font(.system(size: Typography.tiny))
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(.tertiary)
                             .accessibilityLabel("固定会话")
                     }
                     if pinned {
                         Image(systemName: "pin.fill")
                             .font(.system(size: Typography.tiny))
-                            .foregroundStyle(Color.orange)
+                            .foregroundStyle(.tertiary)
                     }
                     // v2.0.60：收藏星标
                     if faved {
                         Image(systemName: "star.fill")
                             .font(.system(size: Typography.tiny))
-                            .foregroundStyle(Color.yellow)
+                            .foregroundStyle(.tertiary)
                     }
                     Text(session.title.isEmpty ? "新对话" : session.title)
                         .font(.system(size: Typography.body, weight: .semibold))
