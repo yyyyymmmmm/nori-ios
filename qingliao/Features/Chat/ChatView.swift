@@ -1494,10 +1494,28 @@ struct ChatView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("搜索")
+
+            // 2026-10-07：语音对话（电话图标）
+            Button {
+                Haptics.tap()
+                showVoiceDialog = true
+            } label: {
+                Image(systemName: "phone.fill")
+                    .font(.system(size: Typography.headline))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("语音对话")
         }
         .padding(.horizontal, Spacing.section)
         .padding(.top, Spacing.md)
         .padding(.bottom, Spacing.xs)
+        // 2026-10-07：语音对话全屏页
+        .sheet(isPresented: $showVoiceDialog) {
+            VoiceDialogView()
+        }
         // v4.0.31：本会话这轮回答结束（忙→闲）→ 庆祝动作（v4.0.27 口径回归）。
         // 用 thisSessionStreaming 而不是 aiBusy：别会话跑完不该庆祝（原注释同）。
         .onChange(of: thisSessionStreaming) { was, now in
@@ -2320,6 +2338,8 @@ struct ChatView: View {
     @State private var showHomeWeather = false
     // v4.0.29：新卡弹窗宿主（备忘录 / 云盘）
     @State private var showHomeMemoBrowser = false
+    // 2026-10-07：语音对话入口（用户要求：右上角电话图标）
+    @State private var showVoiceDialog = false
     @State private var showHomeCloudDrive = false
 
 
