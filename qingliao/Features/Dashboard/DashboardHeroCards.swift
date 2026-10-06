@@ -185,7 +185,8 @@ struct TodaySuggestionCard: View {
     }
 
     private func load(force: Bool = false) async {
-        // 每日缓存：同一天不重复生成
+        // v4.4.x：提示词收归后端（/api/agent/suggestions），iOS 只展示
+        // 每日缓存仍在 iOS 做（省流量），后端也做了缓存
         let dateKey = "nori_suggestion_date"
         let cacheKey = "nori_suggestion_cache"
         let today = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none)
@@ -202,52 +203,27 @@ struct TodaySuggestionCard: View {
         loading = true
         defer { loading = false }
         do {
-            let list = try await generate()
+            let (data, _) = try await auth.request("/api/agent/suggestions", method: "GET")
+            guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let arr = obj["suggestions"] as? [[String: Any]] else {
+                throw SuggestionError.badJSON
+            }
+            let list: [Suggestion] = arr.compactMap { d in
+                guard let t = d["title"] as? String, !t.isEmpty,
+                      let p = d["prompt"] as? String, !p.isEmpty else { return nil }
+                return Suggestion(title: t, reason: d["reason"] as? String ?? "", prompt: p)
+            }
+            guard !list.isEmpty else { throw SuggestionError.badJSON }
             suggestions = list
-            isFallback = false
+            isFallback = (obj["fallback"] as? Bool) ?? false
             let cached = list.map { CachedSuggestion(t: $0.title, r: $0.reason, p: $0.prompt) }
-            if let data = try? JSONEncoder().encode(cached) {
-                UserDefaults.standard.set(data, forKey: cacheKey)
+            if let cdata = try? JSONEncoder().encode(cached) {
+                UserDefaults.standard.set(cdata, forKey: cacheKey)
                 UserDefaults.standard.set(today, forKey: dateKey)
             }
         } catch {
             suggestions = fallbackSuggestions()
             isFallback = true
-        }
-    }
-
-    private func generate() async throws -> [Suggestion] {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let timeDesc: String
-        switch hour {
-        case 5..<9: timeDesc = "清晨"
-        case 9..<12: timeDesc = "上午"
-        case 12..<14: timeDesc = "中午"
-        case 14..<18: timeDesc = "下午"
-        case 18..<23: timeDesc = "晚上"
-        default: timeDesc = "深夜"
-        }
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "zh_CN")
-        df.dateFormat = "M月d日 EEEE"
-
-        let prompt = """
-        你是Nori的生活助手。现在是\(df.string(from: Date()))\(timeDesc)。请给出3条今日建议，每条都是具体的建议陈述句，不是提问。
-        要求：title（建议标题，10字内，如"下午带伞"）；reason（依据，1句话，如"天气预报下午有雨"）；prompt（用户点击后填入对话框的完整提示词，要具体可执行）。
-        只返回JSON数组：[{"title":"...","reason":"...","prompt":"..."}]
-        示例：{"title":"今晚早点休息","reason":"你连续3天睡眠不足7小时","prompt":"帮我制定一个今晚的作息计划，保证23点前入睡"}
-        """
-        let raw = try await QingliaoIntentClient.oneShot(prompt, auth: auth, timeout: 30)
-        guard let s = raw.firstIndex(of: "["),
-              let e = raw.lastIndex(of: "]"), s < e,
-              let data = Data(raw[s...e].utf8) as Data?,
-              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: String]] else {
-            throw SuggestionError.badJSON
-        }
-        return arr.compactMap { d in
-            guard let t = d["title"], !t.isEmpty,
-                  let p = d["prompt"], !p.isEmpty else { return nil }
-            return Suggestion(title: t, reason: d["reason"] ?? "", prompt: p)
         }
     }
 

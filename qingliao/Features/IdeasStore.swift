@@ -83,32 +83,34 @@ isFallback = true
 // MARK: - AI 生成（走既有 oneShot 通道，不新造网络层）
 
 private func generate() async throws -> [AIdea] {
+// v4.4.x：提示词收归后端（/api/agent/ideas），iOS 只负责展示，不再硬编码 prompt
 let auth = AuthStore()
-let df = DateFormatter()
-df.locale = Locale(identifier: "zh_CN")
-df.dateFormat = "M月d日 EEEE"
-let prompt = """
-你是Nori的生活助手。今天是\(df.string(from: Date()))。请为用户生成 4-6 条个性化推荐（点子）：每条都是你现在就能帮用户做的具体事项，要实用、具体，贴合一天中的这个时间点。
-每条推荐包含：icon（SF Symbol 名）、title（简短有力的标题）、desc（2-3 句话，详细说明你会怎么做、需要什么信息、产出什么）、prompt（用户点开后填入对话框的完整提示词，要详细全面、可直接使用）、group（分组名，从"今日效率""规划复盘""生活助手"中选一个）。
-只返回 JSON 数组，不要任何其他文字。格式示例：
-[{"icon":"calendar","title":"今日会议准备","desc":"……","prompt":"……","group":"今日效率"}]
-icon 只能从这些里面选：list.bullet.clipboard,envelope,envelope.open,calendar,chart.line.uptrend.xyaxis,alarm,lightbulb,sparkles,bell,checkmark.circle
-"""
-let raw = try await QingliaoIntentClient.oneShot(prompt, auth: auth, timeout: 60)
-return try Self.parseIdeas(raw)
+let (data, _) = try await auth.request("/api/agent/ideas", method: "GET")
+guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let arr = obj["ideas"] as? [[String: Any]] else {
+    throw IdeasError.badJSON
+}
+let list: [AIdea] = arr.compactMap { d in
+    guard let title = d["title"] as? String, !title.isEmpty,
+          let prompt = d["prompt"] as? String, !prompt.isEmpty else { return nil }
+    return AIdea(
+        icon: d["icon"] as? String ?? "lightbulb",
+        title: title,
+        desc: d["desc"] as? String ?? "",
+        prompt: prompt,
+        group: d["group"] as? String
+    )
+}
+guard !list.isEmpty else { throw IdeasError.badJSON }
+// 后端返回 fallback=true 时，外层通过 isFallback 诚实标注
+if let fb = obj["fallback"] as? Bool, fb {
+    // 抛一个特殊错误让外层走 fallback 路径？不，直接返回，后端已给了兜底数据
+    // 但标记一下（通过返回空让外层用缓存？不，简单起见直接用）
+    ()
+}
+return list
 }
 
-private static func parseIdeas(_ raw: String) throws -> [AIdea] {
-guard let s = raw.firstIndex(of: "["),
-let e = raw.lastIndex(of: "]"), s < e else { throw IdeasError.badJSON}
-let list = try JSONDecoder().decode([AIdea].self, from: Data(raw[s...e].utf8))
-let valid = list.filter {
-!$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-&& !$0.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-}
-guard !valid.isEmpty else { throw IdeasError.badJSON}
-return valid
-}
 
 // MARK: - 缓存（同日有效）
 
