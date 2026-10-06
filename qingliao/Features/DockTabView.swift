@@ -37,6 +37,8 @@ struct DockTabView: View {
     @State private var selected: DockTab = .chat
     // 灰度重做 2026-10-06 晚：Muse 风格侧边栏（用户硬性要求 2）
     @State private var sidebarOpen = false
+    /// 灰度重做 2026-10-06 晚：侧边栏「历史对话」数据（/api/sessions/list 最近 8 条）
+    @State private var historyStore = SidebarHistoryStore()
     // 设置页唯一入口：侧边栏齿轮 → sheet 弹出（原「我的」tab 已删）
     @State private var showSettingsSheet = false
     // 会话搜索：顶栏/侧边栏搜索 → SessionsView sheet（自带搜索框）
@@ -75,6 +77,31 @@ struct DockTabView: View {
 
     /// dock 槽位数（5：会话/看板/聊天/生活/设置）——长按菜单与识别浮层的槽位几何仍用它定位
     private var dockSlotCount: Int { 5 }
+
+    /// 灰度重做 2026-10-06 晚：全局侧滑开关侧边栏。
+    /// 只认「水平主导」的滑动，不跟 ScrollView 抢手势：
+    ///  · 右滑：起手 x < 24（左边缘）且横向位移主导 → 打开；
+    ///  · 左滑：侧边栏开着时任意位置起手、横向主导 → 关闭。
+    /// 只用 onEnded 判定（不跟手），minimumDistance 保证轻点/点按不受影响。
+    private var sidebarEdgeSwipe: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onEnded { value in
+                let t = value.translation
+                // 横向位移 60pt 以上、且明显大于纵向 → 才算水平滑动
+                guard abs(t.width) > 60, abs(t.width) > abs(t.height) * 1.5 else { return }
+                if t.width > 0 {
+                    guard !sidebarOpen, value.startLocation.x < 24 else { return }
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                        sidebarOpen = true
+                    }
+                } else {
+                    guard sidebarOpen else { return }
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                        sidebarOpen = false
+                    }
+                }
+            }
+    }
 
     var body: some View {
         // v3.0.64：改用 iOS 26 系统原生 TabView tab bar —— 系统自动渲染液态玻璃 tab bar，
@@ -127,7 +154,7 @@ struct DockTabView: View {
             VStack {
                 Spacer()
                 GrayCapsuleTabBar(selected: $selected)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, GrayCapsuleTabBar.bottomGap)
             }
 
             // 灰度重做 2026-10-06 晚：Muse 风格侧边栏抽屉（用户硬性要求 2）。
@@ -135,6 +162,7 @@ struct DockTabView: View {
             QingliaoSidebar(
                 isOpen: $sidebarOpen,
                 selectedTab: $selected,
+                history: historyStore,
                 onOpenSettings: { showSettingsSheet = true },
                 onNewChat: {
                     chat.newSession()
@@ -143,9 +171,16 @@ struct DockTabView: View {
                 onSearch: {
                     // 会话搜索：弹出 SessionsView（自带搜索框）
                     showSessionSearch = true
+                },
+                onOpenSession: { session in
+                    // 侧边栏历史对话 → 切到聊天页打开该会话
+                    selected = .chat
+                    chat.load(session)
                 }
             )
         }
+        // 灰度重做 2026-10-06 晚：全局侧滑开关侧边栏（用户硬性要求：各个页面都要能侧滑打开/收起）。
+        .gesture(sidebarEdgeSwipe)
         // 设置页唯一入口（侧边栏齿轮）
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
@@ -164,6 +199,12 @@ struct DockTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .qingliaoToggleSidebar)) { _ in
             withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                 sidebarOpen.toggle()
+            }
+        }
+        // 灰度重做 2026-10-06 晚：侧边栏打开时拉一次历史对话（3 秒内防抖，不在 body 里刷）
+        .onChange(of: sidebarOpen) { _, open in
+            if open {
+                Task { await historyStore.refreshIfNeeded(auth: auth) }
             }
         }
         // 会话搜索（聊天页顶栏搜索按钮发通知）
@@ -718,7 +759,7 @@ private extension DockTabView {
                 if showIdentify { showIdentify = false; identifyPhoto = nil }
                 if showVoiceDialog { showVoiceDialog = false }
             }
-            // v3.9.59：长按球快捷菜单浮层（最顶层，模态——轻纱吃掉空白点击收起）
+            // v3.9.59：长按快捷菜单浮层（最顶层，模态——轻纱吃掉空白点击收起；入口只剩宠物长按/桌面快捷方式）
             .overlay {
                 if showOrbMenu { orbMenuOverlay }
             }

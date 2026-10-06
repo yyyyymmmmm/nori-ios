@@ -33,6 +33,8 @@ struct ChatView: View {
     @Environment(StreamClient.self) var stream
     @Environment(InboxStore.self) var inbox   // v3.4.0：底部上拉手动拉取收件箱
     @Environment(KeyboardObserver.self) var kb
+    /// 灰度重做 2026-10-06 晚：悬浮 tab bar 避让 —— 输入框底部 inset 用（safeArea.bottom）
+    @Environment(\.safeAreaInsets) private var safeAreaInsets
     /// v3.9.79：横屏判据 —— iPhone 横屏的 `horizontalSizeClass` 仍是 `.compact`（只有 Plus/Max 变 `.regular`），
     /// 所以「矮屏」只认 `verticalSizeClass == .compact`。见 `AdaptiveLayout.isShort`。
     @Environment(\.verticalSizeClass) private var vSize
@@ -1624,7 +1626,10 @@ struct ChatView: View {
         // v3.9.68：用户原话「发送键上下到输入框都等高，所以底部要再往上收一点」——底部呼吸
         // 由 Spacing.lg(10) 收到 **Spacing.xs(4)**（收起贴 dock / 弹键盘都收紧 6pt）。
         // ⚠️ 只动这一个数：输入栏自身高度（v3.9.67 起 50）、水平 padding 都不动。
-        .padding(.bottom, Spacing.xs)   // v3.0.67 起留隙口径不变，仅收紧数值；见上一行 v3.9.68 记录
+        // 灰度重做 2026-10-06 晚：悬浮灰胶囊 tab bar 会盖住输入框（真机截图）→ 键盘收起时底部
+        // 再垫一个 tab bar 位，让输入框坐在 tab bar 上方（从下往上：tab bar、输入框、内容）；
+        // 键盘弹起时不垫 —— 键盘盖住 tab bar，输入框仍精确贴键盘（v2.0.140 红线，不动显隐逻辑）。
+        .padding(.bottom, Spacing.xs + (kb.isVisible ? 0 : GrayCapsuleTabBar.bodyHeight + GrayCapsuleTabBar.bottomGap + safeAreaInsets.bottom))
         // 🚨 v3.9.72（审查修正）：`layoutPriority(1)` 只挂**输入栏这一层**，不挂整个 chatComposerArea。
         // 整组里还有选图条/动作条/附件面板/引用条/上下文条（各自定高，合计 ≈380pt）：把整组抬到最高
         // 优先 = 键盘与动作条同开时输入栏本身仍会被顶出可见区，且空态欢迎页（非 ScrollView）被压到

@@ -1,5 +1,36 @@
 import SwiftUI
 
+// MARK: - 灰度重做 2026-10-06 晚：侧边栏「历史对话」数据
+//
+// 原「旁聊」占位 → 真实会话历史（用户硬性要求 4）。
+// 调 /api/sessions/list（与 SessionsView.load 同一口径：ChatSession.parse + 按 lastTime 倒序），
+// 取最近 8 条。侧边栏打开时触发一次加载（DockTabView 的 onChange(of: sidebarOpen)），
+// 3 秒内不重复拉；未登录 / 拉取失败诚实留空，不弹错误。
+@Observable
+final class SidebarHistoryStore {
+    var sessions: [ChatSession] = []
+    var isLoading = false
+    private var lastLoadAt: Date?
+
+    @MainActor
+    func refreshIfNeeded(auth: AuthStore) async {
+        if let last = lastLoadAt, Date().timeIntervalSince(last) < 3 { return }
+        guard auth.isLoggedIn else { return }
+        lastLoadAt = Date()
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let j = try await auth.json("/api/sessions/list")
+            let raw = j["sessions"] as? [Any] ?? []
+            sessions = Array(raw.compactMap { ChatSession.parse($0 as? [String: Any] ?? [:]) }
+                .sorted { ($0.lastTime ?? 0) > ($1.lastTime ?? 0) }
+                .prefix(8))
+        } catch {
+            // 诚实留空：侧边栏里不展开错误态
+        }
+    }
+}
+
 // MARK: - 侧边栏开关通知（聊天页顶栏按钮 → DockTabView）
 
 extension Notification.Name {
@@ -15,7 +46,7 @@ extension Notification.Name {
 // 对标 Muse app 侧边栏参考图：
 // 顶部 App 名 + 设置齿轮（圆形按钮）→ 设置页唯一入口；
 // 「选项卡」分组：5 tab（对话/资讯/点子/目标/看板），极简线条图标 + 文字，选中灰胶囊；
-// 「旁聊」分组：占位文案（本 App 暂无旁聊概念，诚实留白）；
+// 「历史对话」分组：最近 8 条会话（标题 + 相对时间），点一行进聊天页打开该会话；
 // 底部：搜索框 + 新建按钮。干净、克制、无彩色。
 //
 // 打开方式：聊天页顶栏 sidebar.left 按钮 / 左边缘右滑。
@@ -25,9 +56,12 @@ extension Notification.Name {
 struct QingliaoSidebar: View {
     @Binding var isOpen: Bool
     @Binding var selectedTab: DockTab
+    var history: SidebarHistoryStore
     var onOpenSettings: () -> Void
     var onNewChat: () -> Void
     var onSearch: () -> Void
+    /// 点历史会话 → 宿主切到聊天页并打开该会话（DockTabView：selected = .chat; chat.load(session)）
+    var onOpenSession: (ChatSession) -> Void
 
     var body: some View {
         GeometryReader { geo in
@@ -127,16 +161,41 @@ struct QingliaoSidebar: View {
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
 
-                    // 旁聊分组（暂无旁聊功能，诚实留白，对标参考文案口径）
-                    Text("旁聊")
+                    // 历史对话分组（原「旁聊」占位 → 真实会话历史；无头像、灰度）
+                    Text("历史对话")
                         .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
-                    Text("你发起的旁聊会显示在这里。")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 20)
+                    if history.sessions.isEmpty {
+                        Text(history.isLoading ? "加载中…" : "还没有对话")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 20)
+                    } else {
+                        ForEach(history.sessions) { session in
+                            Button {
+                                close()
+                                onOpenSession(session)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(session.title.isEmpty ? "新对话" : session.title)
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    if !session.relativeTime.isEmpty {
+                                        Text(session.relativeTime)
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
             }
 

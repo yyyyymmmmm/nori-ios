@@ -14,6 +14,13 @@ import SwiftUI
 struct GrayCapsuleTabBar: View {
     @Binding var selected: DockTab
 
+    /// 本体高度估算（图标 21 + 间距 3 + 文字 ~13 + 内边距 9*2 + 外边距 7*2 ≈ 70）。
+    /// 聊天页输入框避让用：inset = bodyHeight + bottomGap + safeArea.bottom。
+    /// ⚠️ 改这里的内外边距/字号时同步改这个数（真机以渲染为准，估算只用于避让）。
+    static let bodyHeight: CGFloat = 70
+    /// 胶囊下方的呼吸（DockTabView 的 VStack 里配套使用，改一处改两处）
+    static let bottomGap: CGFloat = 10
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(DockTab.allCases) { tab in
