@@ -31,6 +31,7 @@ struct ConnSettingsView: View {
     // v4.4.x：连接中心——服务状态（后端 /api/connections）
     @State private var connections: [ConnectionInfo] = []
     @State private var showHADetail = false
+    @State private var showNASDetail = false
     // v4.4.x：模型选择（后端 /api/agent/hermes/models）
     @State private var showModelPicker = false
 
@@ -126,6 +127,9 @@ struct ConnSettingsView: View {
                                 if conn.id == "homeassistant" {
                                     Haptics.tap()
                                     showHADetail = true
+                                } else if conn.id == "nas" {
+                                    Haptics.tap()
+                                    showNASDetail = true
                                 }
                             }
                             if conn.id != connections.last?.id {
@@ -139,6 +143,9 @@ struct ConnSettingsView: View {
                     }
                     .sheet(isPresented: $showHADetail) {
                         HomeAssistantDetailView()
+                    }
+                    .sheet(isPresented: $showNASDetail) {
+                        NASDetailView()
                     }
 
                     Text("服务器")
@@ -1736,7 +1743,7 @@ struct HermesModelPickerSheet: View {
         guard let j = try? await auth.json("/api/agent/hermes/model", method: "POST",
                                            body: ["provider": pid, "model_id": m.id]),
               (j["ok"] as? Bool) == true else { return }
-        UserDefaults.standard.set(m.id, forKey: "qingliao_model")
+        // v4.4.x：只认后端 selected，不再写 UserDefaults
         await load()
     }
 

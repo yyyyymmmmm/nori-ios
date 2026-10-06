@@ -21,18 +21,33 @@ struct FeedUnit: Identifiable, Codable, Sendable {
 
 @Observable @MainActor
 final class FeedStore {
-    static let promptKey = "qingliao_feed_prompt"
+    // v4.4.x：prompt 存后端（/api/agent/feed/prompt），换设备一致
     static let defaultPrompt = "我的兴趣动态版块，围绕三块内容：科技圈的新动态、AI 圈的进展、好玩的开源项目。"
 
-    var prompt: String {
-        didSet { UserDefaults.standard.set(prompt, forKey: Self.promptKey) }
+    var prompt: String = defaultPrompt {
+        didSet {
+            // 后端保存（异步，不阻塞 UI）
+            let p = prompt
+            Task { [weak self] in
+                guard let self else { return }
+                _ = try? await self.auth.json("/api/agent/feed/prompt", method: "POST",
+                                              body: ["prompt": p])
+            }
+        }
     }
     var units: [FeedUnit] = []
     private var likedIDs: Set<String> = []
+    private let auth = AuthStore()
 
     init() {
-        let saved = UserDefaults.standard.string(forKey: Self.promptKey)
-        self.prompt = (saved?.isEmpty == false) ? saved! : Self.defaultPrompt
+        // 启动时从后端拉 prompt
+        Task { [weak self] in
+            guard let self else { return }
+            if let j = try? await self.auth.json("/api/agent/feed/prompt", method: "GET"),
+               let p = j["prompt"] as? String, !p.isEmpty {
+                self.prompt = p
+            }
+        }
     }
 
     func isLiked(_ id: String) -> Bool { likedIDs.contains(id) }

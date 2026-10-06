@@ -223,3 +223,127 @@ struct HomeAssistantDetailView: View {
         }
     }
 }
+
+// MARK: - NAS 存储配置（v4.4.x 新增）
+
+struct NASDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AuthStore.self) private var auth
+
+    @State private var path = ""
+    @State private var configured = false
+    @State private var saving = false
+    @State private var message = ""
+    @State private var messageOK = false
+    @State private var loaded = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("设置 NAS 上的文件保存位置。App 发送的附件（PDF/文档等）将保存到该目录。")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+
+                    GraySettingsGroup(title: "") {
+                        HStack {
+                            Text("状态")
+                                .font(.system(size: 17))
+                            Spacer()
+                            ConnStatusDot(configured: configured)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                    }
+                    .padding(.horizontal, 16)
+
+                    GraySettingsGroup(title: "") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("NAS 路径")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            TextField("/vol1/1000/docker/uploads", text: $path)
+                                .textFieldStyle(.roundedBorder)
+                                .autocapitalization(.none)
+                                .disableAutocorrection(true)
+
+                            Button {
+                                Task { await save() }
+                            } label: {
+                                HStack {
+                                    if saving { ProgressView().scaleEffect(0.8) }
+                                    Text(saving ? "保存中…" : "保存")
+                                        .font(.system(size: 17, weight: .semibold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
+                                .foregroundStyle(.white)
+                            }
+                            .disabled(saving || path.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                            if !message.isEmpty {
+                                Text(message)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(messageOK ? .green : .red)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+            .navigationTitle("NAS 存储")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            .task {
+                if !loaded {
+                    loaded = true
+                    await load()
+                }
+            }
+        }
+    }
+
+    private func load() async {
+        do {
+            let (data, _) = try await auth.request("/api/connections", method: "GET")
+            if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let list = obj["connections"] as? [[String: Any]],
+               let nas = list.first(where: { ($0["id"] as? String) == "nas" }) {
+                configured = (nas["configured"] as? Bool) ?? false
+                path = (nas["url"] as? String) ?? ""
+            }
+        } catch {}
+    }
+
+    private func save() async {
+        saving = true
+        defer { saving = false }
+        message = ""
+        do {
+            let (data, _) = try await auth.request(
+                "/api/connections/nas", method: "POST",
+                body: ["path": path.trimmingCharacters(in: .whitespaces)])
+            if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               (obj["ok"] as? Bool) == true {
+                configured = true
+                message = "已保存"
+                messageOK = true
+            } else {
+                message = "保存失败"
+                messageOK = false
+            }
+        } catch {
+            message = "保存失败：网络不通"
+            messageOK = false
+        }
+    }
+}
