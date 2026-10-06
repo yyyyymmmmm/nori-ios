@@ -33,12 +33,12 @@ enum CodingKeys: String, CodingKey { case id, icon, title, desc, prompt, group}
 /// AI 只返回 JSON，不管有没有 id/group 都要解得出来
 init(from decoder: Decoder) throws {
 let c = try decoder.container(keyedBy: CodingKeys.self)
-id = (try? c.decode(String.self, forKey:.id))?? UUID().uuidString
-icon = (try? c.decode(String.self, forKey:.icon))?? "lightbulb"
-title = (try? c.decode(String.self, forKey:.title))?? ""
-desc = (try? c.decode(String.self, forKey:.desc))?? ""
-prompt = (try? c.decode(String.self, forKey:.prompt))?? ""
-group = try? c.decode(String.self, forKey:.group)
+id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+icon = (try? c.decode(String.self, forKey: .icon)) ?? "lightbulb"
+title = (try? c.decode(String.self, forKey: .title)) ?? ""
+desc = (try? c.decode(String.self, forKey: .desc)) ?? ""
+prompt = (try? c.decode(String.self, forKey: .prompt)) ?? ""
+group = try? c.decode(String.self, forKey: .group)
 }
 }
 
@@ -56,7 +56,7 @@ var isFallback = false
 
 /// 打开页时调：同日有缓存直接用；force = 下拉刷新
 func refresh(force: Bool = false) async {
-if!force, isCacheFresh, let cached = loadCache(),!cached.isEmpty {
+if !force, isCacheFresh, let cached = loadCache(), !cached.isEmpty {
 ideas = cached
 isFallback = false
 return
@@ -70,7 +70,7 @@ isFallback = false
 saveCache(list)
 } catch {
 // AI/后端不通：先吃旧缓存，再没有才用兜底模板（诚实，不编造"AI 生成"）
-if let cached = loadCache(),!cached.isEmpty {
+if let cached = loadCache(), !cached.isEmpty {
 ideas = cached
 isFallback = false
 } else {
@@ -103,10 +103,10 @@ guard let s = raw.firstIndex(of: "["),
 let e = raw.lastIndex(of: "]"), s < e else { throw IdeasError.badJSON}
 let list = try JSONDecoder().decode([AIdea].self, from: Data(raw[s...e].utf8))
 let valid = list.filter {
-!$0.title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
-&&!$0.prompt.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
+!$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+&& !$0.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }
-guard!valid.isEmpty else { throw IdeasError.badJSON}
+guard !valid.isEmpty else { throw IdeasError.badJSON}
 return valid
 }
 
