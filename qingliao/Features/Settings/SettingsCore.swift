@@ -187,6 +187,9 @@ struct SettingsView: View {
             }
             .padding(.horizontal, Spacing.section)
             .padding(.top, Spacing.xs)
+            // 2026-10-07 真机反馈：AI形象卡与搜索框间距偏小——卡下方加 6pt，
+            // 与搜索框拉开呼吸感（仍远小于分组行 28pt 间距）
+            .padding(.bottom, Spacing.sm)
             // v4.0.22：设置项越堆越多，顶部给一行搜索框（索引与匹配见 Core/SettingsSearchIndex.swift）
             SettingsSearchBar(text: $settingsQuery)
             ScrollView {

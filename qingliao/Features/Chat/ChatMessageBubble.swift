@@ -380,9 +380,16 @@ struct MessageBubble: View {
                         } else if message.isErrorPlaceholder {
                             RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
                                 .strokeBorder(Color.red.opacity(0.55), lineWidth: 1.2)
+                        } else if isHighlighted {
+                            RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
+                                .strokeBorder(Color.accentColor, lineWidth: 2)
+                        } else if !message.isUser && !message.withdrawn {
+                            // 2026-10-07：AI 白泡加 0.5pt 浅描边（Tint.line），从暖灰背景里浮出来
+                            RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
+                                .strokeBorder(Tint.line(scheme), lineWidth: 0.5)
                         } else {
                             RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
-                                .strokeBorder(isHighlighted ? Color.accentColor : .clear, lineWidth: 2)
+                                .strokeBorder(.clear, lineWidth: 2)
                         }
                     }
                 )
@@ -521,13 +528,13 @@ struct MessageBubble: View {
                 .contextMenu { cardMenu }
         } else {
             // v2.0.125：UITextView 渲染 —— 长按弹菜单（复制/引用/分享/大爆炸/选择文本/撤回/删除）
-            // 灰度重做 2026-10-06：用户泡改浅灰底，文字同步改深色（原白色是配蓝底的）
+            // 2026-10-07：用户泡改深色（暖黑 #2C2C2E），文字同步改白字（深色泡必须白字，对比度保底）
             SelectableTextLabel(
                 attributedText: NSAttributedString(string: message.content, attributes: [
                     .font: UIFont.systemFont(ofSize: CGFloat(fontSize)),
-                    .foregroundColor: UIColor.label
+                    .foregroundColor: UIColor.white
                 ]),
-                fallbackColor: .label,
+                fallbackColor: .white,
                 lineSpacing: LineSpacing.compact,
                 onCopy: { UIPasteboard.general.string = message.content; Haptics.success() },   // v3.9.30：复制触感
                 onQuote: onQuote,
@@ -1072,6 +1079,11 @@ struct MessageBubble: View {
         .background(
             RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
                 .fill(aiBubbleColor)
+        )
+        // 2026-10-07：多段 AI 白泡同样加 0.5pt 浅描边，与整块 AI 泡同口径
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.bubble, style: .continuous)
+                .strokeBorder(Tint.line(scheme), lineWidth: 0.5)
         )
         .frame(maxWidth: AdaptiveLayout.bubbleMaxWidth(hSize), alignment: .leading)
     }

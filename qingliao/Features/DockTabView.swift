@@ -136,7 +136,9 @@ struct DockTabView: View {
                     .tabTransition(for: .dashboard, selected: $selected)
             }
             // F线 2026-10-06：不再藏系统 tab bar（iOS 26 藏不干净导致双底栏，用户拍板直接用系统）。
-            // 选中态灰色见 applyDockTabChrome1 的 configureGrayTabBarAppearance。
+            // 2026-10-07：选中态原生 tint 保底（.primary 纯黑/纯白，不准蓝色）；未选中态走
+            // configureGrayTabBarAppearance（App init 最早时机）+ tabItem 显式前景色。
+            .tint(.primary)
             // v4.0.49x：启动链折叠（防 demangler 栈溢出）——原 24 条顶层修饰器按序折进 4 个具名分组，
             // body 这里只留 4 个 .modifier(…) 泛型调用。事故/手法同 ChatView.v4.0.49：
             // 巨型链把 body 编译后类型名撑到 2574 字符（全 App 最长），Swift 运行时按嵌套层数递归
@@ -564,7 +566,17 @@ private struct TabTransitionModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .tag(tab)
-            .tabItem { Label(tab.title, systemImage: tab.icon) }
+            .tabItem {
+                // 2026-10-07 真机反馈：未选中仍是黑色——SwiftUI 原生再保一层：
+                // 按选中态显式给 label 前景色（选中 .primary+semibold，未选中 .tertiary）
+                Label {
+                    Text(tab.title)
+                        .fontWeight(selected == tab ? .semibold : .regular)
+                } icon: {
+                    Image(systemName: tab.icon)
+                }
+                .foregroundStyle(selected == tab ? .primary : .tertiary)
+            }
             .scaleEffect(appeared ? 1 : 0.985, anchor: .center)   // v3.4.29：0.97→0.985，入场更细腻
             .animation(Motion.snap, value: appeared)
             .onAppear {
@@ -753,9 +765,8 @@ private extension DockTabView {
             // v3.4.30：装机实测后按用户要求关闭自动收缩——tab bar 常驻不缩，滚动时不再变窄
             // （v3.4.29 曾设为 .onScrollDown：向下滚动缩到角落只剩图标，用户不需要）
             .tabBarMinimizeBehavior(.never)
-            // F线 2026-10-06：系统 tab bar 选中态改灰色（灰度纪律：不准蓝色）。
-            // v3.9.47 判无效的是「改透明」，改选中色是常规外观定制，真机有效。
-            .onAppear { Self.configureGrayTabBarAppearance() }
+            // 2026-10-07：appearance 配置已移到 QingliaoApp.init 最早时机（.onAppear 太晚，真机未选中态不吃配置）；
+            // 这里不再重复调用。
             // v3.4.29：切 tab 触感——挂在一处（TabView），别挂进每个 tab 的 modifier（会响 4 次）
             .onChange(of: selected) { _, _ in
                 Haptics.tap()
@@ -777,7 +788,11 @@ private extension DockTabView {
     /// 三种 layoutAppearance 全配（iOS 26 横竖屏/紧凑模式走不同的 layout）。
     /// v4.x item4：选中标题加一档字重（semibold），未选中换更淡的 tertiaryLabel 拉开对比。
     /// 只改颜色，不动背景/玻璃（v3.9.47 透明化判无效的前车之鉴）。
-    private static func configureGrayTabBarAppearance() {
+    /// 2026-10-07 真机反馈：未选中仍是黑色——根因是本函数之前挂在 `.onAppear`，
+    /// 调用时机晚于 tab bar 创建，appearance 代理没吃上。改：App init 最早时机只执行一次
+    ///（见 QingliaoApp.init），并补 tintColor/unselectedItemTintColor 双保险。
+    /// 注意：所在 extension 是 private，必须显式标 internal，否则 App 入口调不到。
+    internal static func configureGrayTabBarAppearance() {
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
         let selected = UIColor.label
@@ -791,8 +806,11 @@ private extension DockTabView {
             layout.normal.iconColor = normal
             layout.normal.titleTextAttributes = [.foregroundColor: normal]
         }
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
+        let proxy = UITabBar.appearance()
+        proxy.standardAppearance = appearance
+        proxy.scrollEdgeAppearance = appearance
+        proxy.tintColor = selected               // 选中态双保险（SwiftUI .tint 同口径）
+        proxy.unselectedItemTintColor = normal   // 未选中态双保险
     }
 
     /// 折叠第 2 组（6 条）：菜单/识别浮层的动画 + 宠物菜单修饰符 + 识别浮层 + 语音对话/会话纪要两个全屏页。

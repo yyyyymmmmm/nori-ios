@@ -99,6 +99,7 @@ struct SettingsGroupLink<Destination: View>: View {
 struct SettingsSubpageView<Content: View>: View {
     let title: String
     let content: () -> Content
+    @Environment(\.dismiss) private var dismiss
 
     init(title: String, @ViewBuilder content: @escaping () -> Content) {
         self.title = title
@@ -106,21 +107,46 @@ struct SettingsSubpageView<Content: View>: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 28) {
-                content()
+        VStack(spacing: 0) {
+            // 2026-10-07 真机反馈：push 转场抖动——根因是一级页 toolbar hidden、
+            // 二级页 toolbar visible，导航栏显隐切换导致内容跳动。
+            // 改：二级页也保持 toolbar hidden，chrome 前后一致；返回用自定义左箭头
+            //（样式与一级页"标题+X 关闭"自定义头统一：44pt 触区、headline 居中标题）。
+            HStack {
+                Button {
+                    Haptics.tap()
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: Typography.title, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("返回")
+                Spacer()
+                Text(title)
+                    .font(.system(size: Typography.headline, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Color.clear.frame(width: 44, height: 44) // 与左箭头对称，标题真正居中
             }
-            .padding(.horizontal, Spacing.xxl)
+            .padding(.horizontal, Spacing.section)
             .padding(.top, Spacing.md)
-            .padding(.bottom, 100)
-            .frame(maxWidth: .infinity)
+            .padding(.bottom, Spacing.xs)
+            ScrollView {
+                VStack(spacing: 28) {
+                    content()
+                }
+                .padding(.horizontal, Spacing.xxl)
+                .padding(.top, Spacing.md)
+                .padding(.bottom, 100)
+                .frame(maxWidth: .infinity)
+            }
         }
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-        // 外层 sheet 的 NavigationStack 给一级页关了导航栏（toolbar hidden）；
-        // 二级页显式开回来，否则没有系统返回按钮
-        .toolbar(.visible, for: .navigationBar)
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 

@@ -48,19 +48,36 @@ struct GlassListCard: ViewModifier {
 // MARK: - 聊天气泡色值（集中管理，消除 ChatComponents.swift 内硬编码 RGB）
 
 struct BubbleTheme {
-    /// 用户气泡灰（灰度重做 2026-10-06，对标 TodayAI 参考：浅灰底+深色字）
+    /// 用户气泡（2026-10-07 真机反馈：浅灰泡与暖底糊在一起，无视觉锚点）——
+    /// 微信/iMessage 对比逻辑落在暖玻璃语言里：
+    /// 浅色 = 深泡（暖黑 #2C2C2E）做视觉锚点；深色 = 深灰（现有口径，不动）。
     /// 深色/浅色模式 × 正常/高亮状态
     static func userBubble(scheme: ColorScheme, highlighted: Bool = false) -> Color {
-        highlighted
-            ? (scheme == .dark ? Color(uiColor: .systemGray3) : Color(uiColor: .systemGray4))
-            : (scheme == .dark ? Color(uiColor: .systemGray4) : Color(uiColor: .systemGray5))
+        if scheme == .dark {
+            return highlighted ? Color(uiColor: .systemGray3) : Color(uiColor: .systemGray4)
+        }
+        return highlighted
+            ? Color(uiColor: .systemGray)
+            : Color(red: 0.173, green: 0.173, blue: 0.180) // #2C2C2E 暖黑
     }
 
-    /// AI 气泡（灰度重做：浅色纯白+柔和阴影 / 深色 systemGray5）
+    /// 用户气泡字色：深色泡一律白字（浅色暖黑泡 / 深色深灰泡），对比度保底。
+    /// 高亮态（浅色 systemGray 中灰）同样白字，不断层。
+    static func userText(scheme: ColorScheme) -> Color { .white }
+
+    /// AI 气泡（浅色纯白 + 柔和阴影 + 0.5pt 浅描边 / 深色 systemGray5 现有口径）
     static func aiBubble(scheme: ColorScheme, highlighted: Bool = false) -> Color {
         highlighted
             ? Color.accentColor.opacity(Tint.subtle)
             : (scheme == .dark ? Color(uiColor: .systemGray5) : .white)
+    }
+
+    /// 聊天背景：浅色暖灰压深半档（#F2F1EE），让白气泡浮出来；
+    /// 深色保持系统背景（已有对比，不动）。
+    static func chatBackground(scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(uiColor: .systemBackground)
+            : Color(red: 0.949, green: 0.945, blue: 0.933) // #F2F1EE 暖灰
     }
 }
 
