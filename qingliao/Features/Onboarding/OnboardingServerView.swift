@@ -60,11 +60,11 @@ struct OnboardingServerView: View {
 
                 // 发现的服务器卡片
                 ForEach(scanner.servers) { s in
-                    Button {
+                    Button(action: {
                         address = s.urlString
                         testOK = false
                         testMessage = nil
-                    } {
+                    }, label: {
                         HStack(spacing: 14) {
                             Image(systemName: "desktopcomputer")
                                 .font(.system(size: 22))
@@ -99,7 +99,7 @@ struct OnboardingServerView: View {
                                     lineWidth: 1.5
                                 )
                         )
-                    }
+                    })
                     .buttonStyle(.plain)
                     .padding(.top, 10)
                 }
