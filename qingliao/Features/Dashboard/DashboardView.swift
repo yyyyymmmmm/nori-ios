@@ -142,27 +142,13 @@ struct DashboardView: View {
                         .foregroundStyle(.primary)
                         .padding(.top, Spacing.lg)
 
-                    // w5-1：总览 Hero
-                    heroBlock
+                    // 2026-10 简化：只留三块——健康 Hero + 记忆 Hero + Nori 今日建议
+                    // 其他（快捷入口/服务状态/动态信息流）全砍
+                    HealthHeroCard()
 
-                    // w5 记忆一级入口：Hero 下方记忆大卡（自取数、sheet 进二级页，无需传参）
                     MemoryHeroCard()
 
-                    // w5-2：快捷入口
-                    groupTitle("快捷入口")
-                    suggestionBanner
-                    folderGrid
-
-                    // w5-3：服务状态（原 NAS 面板；路由器状态并入本区一行）
-                    groupTitle("服务状态")
-                    nasPanelBlock
-
-                    // w5-4：动态信息流（全宽卡按时间倒序）
-                    groupTitle("动态")
-                    taskFeedBlock
-                    rulesBlock
-                    connectorsBlock
-                    usageRowBlock
+                    TodaySuggestionCard()
                 }
                 .padding(.horizontal, Spacing.xxl)
                 .padding(.bottom, 100)
