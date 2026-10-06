@@ -205,6 +205,8 @@ struct ChatView: View {
     @State private var visibleMessagesCache: [MessageRowItem] = []
     // v3.0.86 fix：是否贴底（onScrollGeometryChange 实时维护）——流式自动滚底仅贴底时生效
     @State private var scrollPinState = ChatScrollPinState.pinnedAtBottom
+    // 2026-10-07：聊天背景浅色压深（暖灰 #F2F1EE）用——读当前深浅色
+    @Environment(\.colorScheme) private var colorScheme
     // v4.0.34：消息列表滚动容器的可视高度（GeometryReader 测量）——内容不满一屏时
     // 列表以它为 minHeight。
     // 🚨 v4.0.54：对齐口径由 `.bottom`（贴底）改为 **`.top`** —— 新会话第一条气泡在最上方，
@@ -1608,6 +1610,8 @@ struct ChatView: View {
     @ViewBuilder
     private var chatTranscriptArea: some View {
         messageList
+            // 2026-10-07：浅色暖灰压深半档（#F2F1EE），让 AI 白泡浮出来；深色保持系统背景
+            .background(BubbleTheme.chatBackground(scheme: colorScheme))
             // v4.0.64（用户 2026-10-05 真机复测第 2 条「聊天页的滚边玻璃也取消」）：
             // iOS 26 起 ScrollView / List 会自动带「滚动边缘效果」（内容滚到边缘被**模糊 + 变暗**，
             // 见 Apple `scrollEdgeEffectHidden(_:for:)` 文档原文 "content to be blurred and dimmed
@@ -2533,18 +2537,22 @@ struct ChatView: View {
     @ViewBuilder
     private func messageRow(entry: MessageRowItem) -> some View {
         let msg = entry.msg
-        // v2.0.60：跨天 → 日期分隔线（微信式：昨天/M月d日）
-        if let prevTs = entry.prevMsg?.timestamp,
-           let curTs = msg.timestamp,
-           !Calendar.current.isDate(Date(timeIntervalSince1970: curTs / 1000),
-                                   inSameDayAs: Date(timeIntervalSince1970: prevTs / 1000)) {
-            dateDivider(curTs)
-        }
-        // 相邻消息间隔 >5 分钟：插入居中时间分隔（微信式）
-        if let prevTs = entry.prevMsg?.timestamp,
-           let curTs = msg.timestamp,
-           curTs - prevTs > 300_000 {
-            timeDivider(curTs)
+        // 2026-10-07：微信式时间戳统一口径（AI/用户同一规则，不区分发送方）——
+        // 会话首条显示；与上一条间隔 > 5 分钟显示；跨天显示日期+时间；其余不显示。
+        // 替代旧的 dateDivider（跨天胶囊）+ timeDivider（5分钟分隔）两套样式，统一为居中小灰字。
+        if let curTs = msg.timestamp {
+            let showTime: Bool
+            if let prevTs = entry.prevMsg?.timestamp {
+                let sameDay = Calendar.current.isDate(
+                    Date(timeIntervalSince1970: curTs / 1000),
+                    inSameDayAs: Date(timeIntervalSince1970: prevTs / 1000))
+                showTime = !sameDay || curTs - prevTs > 300_000
+            } else {
+                showTime = true // 会话（可见窗口）首条
+            }
+            if showTime {
+                messageTimeDivider(curTs)
+            }
         }
         chatMessageBubble(msg)
             .id(msg.id)
@@ -3215,42 +3223,14 @@ struct ChatView: View {
     }
 
     /// 相邻消息间隔 >5 分钟的居中时间分隔
-    private func timeDivider(_ ts: Double) -> some View {
-        let d = Date(timeIntervalSince1970: ts / 1000)
-        let text: String
-        if Calendar.current.isDateInToday(d) {
-            text = d.formatted(date: .omitted, time: .shortened)
-        } else if Calendar.current.isDateInYesterday(d) {
-            text = "昨天 " + d.formatted(date: .omitted, time: .shortened)
-        } else {
-            text = d.formatted(date: .abbreviated, time: .shortened)
-        }
-        return Text(text)
-            .font(.system(size: Typography.caption))
-            .foregroundStyle(.secondary)
+    /// 2026-10-07：统一时间戳分隔（微信规则）——居中小灰字 footnote，上下各 8pt。
+    /// 文案走 RelativeTime.chatDividerText（今天 "14:32" / "昨天 14:32" / "10月6日 14:32"）。
+    private func messageTimeDivider(_ ts: Double) -> some View {
+        Text(RelativeTime.chatDividerText(since: ts / 1000))
+            .font(.footnote)
+            .foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.sm)
-    }
-
-    /// v2.0.60：跨天日期分隔线（灰色胶囊，微信式）
-    private func dateDivider(_ ts: Double) -> some View {
-        let d = Date(timeIntervalSince1970: ts / 1000)
-        let text: String
-        if Calendar.current.isDateInToday(d) {
-            text = "今天"
-        } else if Calendar.current.isDateInYesterday(d) {
-            text = "昨天"
-        } else {
-            text = d.formatted(date: .abbreviated, time: .omitted)
-        }
-        return Text(text)
-            .font(.system(size: Typography.caption, weight: .medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, Spacing.lg)
-            .padding(.vertical, Spacing.xs)
-            .background(Color.primary.opacity(Tint.faint), in: Capsule())
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.xs)
+            .padding(.vertical, Spacing.md)
     }
 
     /// v3.0.86 fix：滚底可关内层动画——流式高频 delta 下 withAnimation 每帧重启互相打断，

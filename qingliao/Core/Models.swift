@@ -298,6 +298,24 @@ enum RelativeTime {
         let df = DateFormatter(); df.dateFormat = "yyyy年M月d日"; return df
     }()
 
+    /// 聊天时间戳分隔文案（2026-10-07 微信规则统一口径）：
+    /// 今天 → "14:32"；昨天 → "昨天 14:32"；同年 → "10月6日 14:32"；跨年 → "2025年10月6日 14:32"
+    /// 复用本组件的三个 formatter，不另造第二套。
+    static func chatDividerText(since ts: TimeInterval, now: Date = Date()) -> String {
+        let date = Date(timeIntervalSince1970: ts)
+        let calendar = Calendar.current
+        let hm = dayTimeFormatter.string(from: date)
+        if calendar.isDate(date, inSameDayAs: now) { return hm }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            return "昨天 \(hm)"
+        }
+        if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
+            return "\(monthDayFormatter.string(from: date)) \(hm)"
+        }
+        return "\(fullDateFormatter.string(from: date)) \(hm)"
+    }
+
     /// 秒级时间戳 → 相对时间文案
     static func string(since ts: TimeInterval, now: Date = Date()) -> String {
         let date = Date(timeIntervalSince1970: ts)
