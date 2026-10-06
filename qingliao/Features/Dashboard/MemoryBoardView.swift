@@ -12,6 +12,7 @@ import SwiftUI
 
 struct MemoryHeroCard: View {
     @Environment(AuthStore.self) private var auth
+    @Environment(\.colorScheme) private var colorScheme
     @State private var items: [MemoryEntry] = []
     @State private var loaded = false
     @State private var showBoard = false
@@ -49,8 +50,11 @@ struct MemoryHeroCard: View {
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 28))
-            .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 4)
+            // 2026-10-07：卡片背景深色适配（之前写死白色）
+            .background(colorScheme == .dark ? Color(white: 0.14) : Color.white,
+                        in: RoundedRectangle(cornerRadius: 28))
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.06),
+                    radius: 12, x: 0, y: 4)
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $showBoard) {
@@ -95,6 +99,7 @@ struct MemoryHeroCard: View {
 struct MemoryBoardView: View {
     @Environment(AuthStore.self) private var auth
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var items: [MemoryEntry] = []
     @State private var loaded = false
     @State private var newText = ""
@@ -163,15 +168,38 @@ struct MemoryBoardView: View {
         .background(memoryGradient)
     }
 
+    // 2026-10-07：卡片背景色（深色/浅色自适应）
+    private var cardBackground: Color {
+        colorScheme == .dark ? Color(white: 0.14) : Color.white
+    }
+
+    private var cardShadowOpacity: Double {
+        colorScheme == .dark ? 0.3 : 0.06
+    }
+
     private var memoryGradient: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.90, green: 0.94, blue: 0.98),
-                Color(red: 0.96, green: 0.96, blue: 0.97),
-                Color(red: 0.985, green: 0.975, blue: 0.96)
-            ],
-            startPoint: .top, endPoint: .bottom
-        )
+        // 2026-10-07：深色/浅色自适应（之前写死浅色，深色模式下白字配浅底看不见）
+        Group {
+            if colorScheme == .dark {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.08, green: 0.09, blue: 0.12),
+                        Color(red: 0.10, green: 0.11, blue: 0.14),
+                        Color(red: 0.12, green: 0.12, blue: 0.14)
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.90, green: 0.94, blue: 0.98),
+                        Color(red: 0.96, green: 0.96, blue: 0.97),
+                        Color(red: 0.985, green: 0.975, blue: 0.96)
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+            }
+        }
         .ignoresSafeArea()
     }
 
@@ -209,7 +237,7 @@ struct MemoryBoardView: View {
             .padding(18)
         }
         .buttonStyle(.plain)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 28))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 28))
         .shadow(color: .black.opacity(0.06), radius: 14, x: 0, y: 5)
         .accessibilityLabel("健康，打开健康页")
     }
@@ -230,7 +258,7 @@ struct MemoryBoardView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 18))
         .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 
@@ -299,7 +327,7 @@ struct MemoryBoardView: View {
                     .padding(18)
                 }
                 .buttonStyle(.plain)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 20))
+                .background(cardBackground, in: RoundedRectangle(cornerRadius: 20))
                 .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 3)
             }
         }
@@ -333,7 +361,7 @@ struct MemoryBoardView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(Color.white, in: Capsule())
+        .background(cardBackground, in: Capsule())
         .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
