@@ -126,6 +126,9 @@ struct QingliaoApp: App {
     init() {
         // v2.0.43：崩溃捕获（写本地文件），登录后由 RootView 上报
         CrashReporter.install()
+        // 2026-10-07：底栏选中态外观必须在任何 UITabBar 创建之前配置（挂 .onAppear 太晚，
+        // 真机未选中态仍是黑色）。只执行一次。
+        DockTabView.configureGrayTabBarAppearance()
         // v4.0.x：老设备一次性把压缩阈值从历史旧默认 4000 迁到 6000。
         // 必须在 App 起来就做——@AppStorage 只在键不存在时才用新默认值，键还在就照旧值渲染设置页。
         ContextTuning.migrateIfNeeded()
