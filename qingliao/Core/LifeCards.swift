@@ -307,13 +307,13 @@ struct LifeCardsData {
         return d
     }
 
-    /// UTC ISO8601 → 相对时间（刚刚 / N 分钟前 / N 小时前 / N 天前 / MM-dd）
+    /// UTC ISO8601 → 相对时间（解析后口径走全站 RelativeTime；解析不出返回 ""）
     static func relativeTime(_ iso: String) -> String {
         guard !iso.isEmpty else { return "" }
         let isoFmt = ISO8601DateFormatter()
         isoFmt.formatOptions = [.withInternetDateTime]
         guard let d = isoFmt.date(from: iso) else { return "" }
-        return relativeFrom(d)
+        return RelativeTime.string(since: d.timeIntervalSince1970)
     }
 
     /// v3.9.32：上游时间串 → 相对时间；**解析不出时原样返回**（宁可显示原始时间，也不留空白）
@@ -322,19 +322,7 @@ struct LifeCardsData {
         let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { return "" }
         guard let d = parseUpstreamTime(s) else { return s }
-        return relativeFrom(d)
-    }
-
-    /// 相对时间正文（绝对值差 → 中文措辞；未来时间按「刚刚」处理）
-    private static func relativeFrom(_ d: Date) -> String {
-        let secs = Int(Date().timeIntervalSince(d))
-        if secs < 60 { return "刚刚" }
-        if secs < 3600 { return "\(secs / 60) 分钟前" }
-        if secs < 86400 { return "\(secs / 3600) 小时前" }
-        if secs < 86400 * 7 { return "\(secs / 86400) 天前" }
-        let df = DateFormatter()
-        df.dateFormat = "MM-dd"
-        return df.string(from: d)
+        return RelativeTime.string(since: d.timeIntervalSince1970)
     }
 
     /// 上游时间串容错解析：ISO8601（含毫秒）→ 东八区常见格式 → 无年份的「MM-dd HH:mm」

@@ -148,7 +148,7 @@ struct ChatRecordBar: View {
                 .font(.system(size: Typography.caption))
                 .foregroundStyle(.tertiary)
             Spacer(minLength: 0)
-            Text(MemoItem.relativeTime(item.createdAt))
+            Text(RelativeTime.string(since: item.createdAt.timeIntervalSince1970))
                 .font(.system(size: Typography.caption))
                 .foregroundStyle(.tertiary)
         }

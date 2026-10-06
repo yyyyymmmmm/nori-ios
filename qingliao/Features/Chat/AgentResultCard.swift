@@ -188,7 +188,7 @@ struct AgentResultCard: View {
                     .font(.system(size: Typography.subhead))
                     .foregroundStyle(done ? Color.green : Color.secondary.opacity(0.6))
                     .frame(width: 18, alignment: .leading)
-                    .padding(.top, 1)
+                    .padding(.top, Spacing.xxs)
             } else {
                 Circle()
                     .fill(toneColor(item.tone))

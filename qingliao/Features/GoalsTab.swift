@@ -37,11 +37,11 @@ struct GoalsTabView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     topBar
-                        .padding(.top, 12)
+                        .padding(.top, Spacing.xl)
                     Text("目标")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.primary)
-                        .padding(.top, 10)
+                        .padding(.top, Spacing.lg)
 
                     // 追踪分组（绿点 + 绿色「追踪」：语义色，保留）
                     HStack(spacing: 8) {
@@ -49,17 +49,17 @@ struct GoalsTabView: View {
                             .fill(Color.green)
                             .frame(width: 10, height: 10)
                         Text("追踪")
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.system(size: Typography.title, weight: .semibold))
                             .foregroundStyle(.green)
                     }
                     .padding(.top, 20)
-                    .padding(.bottom, 4)
+                    .padding(.bottom, Spacing.xs)
 
                     if visibleGoals.isEmpty {
                         Text("还没有目标，从下面的类别开始，或直接告诉 AI。")
-                            .font(.system(size: 15))
+                            .font(.system(size: Typography.body))
                             .foregroundStyle(.tertiary)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, Spacing.xl)
                     } else {
                         VStack(spacing: 0) {
                             ForEach(visibleGoals) { g in
@@ -75,9 +75,9 @@ struct GoalsTabView: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .medium))
+                                .font(.system(size: Typography.title, weight: .medium))
                             Text("创建目标")
-                                .font(.system(size: 17, weight: .medium))
+                                .font(.system(size: Typography.title, weight: .medium))
                         }
                         .foregroundStyle(.primary)
                     }
@@ -86,19 +86,19 @@ struct GoalsTabView: View {
                     .padding(.top, 22)
 
                     Text("选择一个类别，告诉我你想要的目标，我将为你量身定制一个计划，并随着你的成长不断改进。")
-                        .font(.system(size: 15))
+                        .font(.system(size: Typography.body))
                         .foregroundStyle(.secondary)
-                        .padding(.top, 8)
+                        .padding(.top, Spacing.md)
 
                     VStack(spacing: 0) {
                         ForEach(categories.indices, id: \.self) { i in
                             categoryRow(categories[i])
                         }
                     }
-                    .padding(.top, 12)
+                    .padding(.top, Spacing.xl)
                 }
                 .padding(.horizontal, Spacing.section)
-                .padding(.bottom, 12)
+                .padding(.bottom, Spacing.xl)
             }
             .toolbar(.hidden, for: .navigationBar)
             .task { await store.loadFromServer() }
@@ -115,7 +115,7 @@ struct GoalsTabView: View {
                 NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
             } label: {
                 Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 20))
+                    .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
                     .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -147,7 +147,7 @@ struct GoalsTabView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 20))
+                    .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
                     .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -178,22 +178,22 @@ struct GoalsTabView: View {
                     toggleFinished(g)
                 } label: {
                     Image(systemName: g.isFinished ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 26))
+                        .font(.system(size: Typography.display))
                         .foregroundStyle(g.isFinished ? Color.green : Color.secondary)
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 1)
+                .padding(.top, Spacing.xxs)
                 .accessibilityLabel(g.isFinished ? "标为未完成" : "标为已完成")
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(g.title)
-                        .font(.system(size: 17))
+                        .font(.system(size: Typography.title))
                         .foregroundStyle(.primary)
                     if showSubtitle {
                         let d = goalDesc(g)
                         if !d.isEmpty {
                             Text(d)
-                                .font(.system(size: 15))
+                                .font(.system(size: Typography.body))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -215,14 +215,14 @@ struct GoalsTabView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 18))
+                        .font(.system(size: Typography.title))
                         .foregroundStyle(.secondary)
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("目标操作")
             }
-            .padding(.vertical, 14)
+            .padding(.vertical, Spacing.xxl)
             Divider()
         }
     }
@@ -261,7 +261,7 @@ struct GoalsTabView: View {
                             .font(.system(size: 36))
                             .foregroundStyle(.tertiary)
                         Text("还没有已完成的目标")
-                            .font(.system(size: 15))
+                            .font(.system(size: Typography.body))
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -294,29 +294,29 @@ struct GoalsTabView: View {
                     toggleFinished(g)
                 } label: {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 26))
+                        .font(.system(size: Typography.display))
                         .foregroundStyle(Color.green)
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 1)
+                .padding(.top, Spacing.xxs)
                 .accessibilityLabel("标为未完成")
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(g.title)
-                        .font(.system(size: 17))
+                        .font(.system(size: Typography.title))
                         .foregroundStyle(.primary)
                     if showSubtitle {
                         let d = goalDesc(g)
                         if !d.isEmpty {
                             Text(d)
-                                .font(.system(size: 15))
+                                .font(.system(size: Typography.body))
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 14)
+            .padding(.vertical, Spacing.xxl)
             Divider()
         }
     }
@@ -326,11 +326,11 @@ struct GoalsTabView: View {
     private func categoryRow(_ c: (icon: String, name: String, prompt: String)) -> some View {
         HStack(spacing: 12) {
             Image(systemName: c.icon)
-                .font(.system(size: 20))
+                .font(.system(size: Typography.headline))
                 .foregroundStyle(.secondary)
                 .frame(width: 30)
             Text(c.name)
-                .font(.system(size: 17))
+                .font(.system(size: Typography.title))
                 .foregroundStyle(.primary)
             Spacer(minLength: 0)
             Button {
@@ -338,7 +338,7 @@ struct GoalsTabView: View {
                 onFillInput(c.prompt)
             } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: 18))
+                    .font(.system(size: Typography.title))
                     .foregroundStyle(.secondary)
                     .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
@@ -346,6 +346,6 @@ struct GoalsTabView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("创建\(c.name)目标")
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, Spacing.xl)
     }
 }

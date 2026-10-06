@@ -27,6 +27,8 @@ struct ROTAvatarView: View {
     var size: CGFloat = 56
 
     @ObservedObject private var speech = PetSpeechDrive.shared
+    // v4.x item7：reduceMotion 开启时渲染静止帧（t=0：呼吸中性、双眼睁开、位姿归零），不循环
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // 头部方形裁切（单位坐标，经 muse.visual_grounding 核对）：
     // 脸心 ≈(0.623, 0.328)，取边长 0.59 的正方形，含耳尖 + 耳机 + 下巴。
@@ -43,7 +45,7 @@ struct ROTAvatarView: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
+            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
             let breathe: CGFloat = 1 + 0.025 * CGFloat(sin(t * 2 * .pi / 3.2))
             let blink = Self.blinkScale(at: t)
             let speakAmount: CGFloat = speech.isSpeaking ? CGFloat(speech.amount) : 0

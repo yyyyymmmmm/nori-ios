@@ -355,7 +355,7 @@ struct OrbQuickMenuLayer: View {
     /// 单颗胶囊入场动画：正常运行按 index 错峰 50ms；减弱动态效果下退化为瞬时节奏（只留透明度过渡）
     private func pillAnimation(index: Int) -> Animation {
         reduceMotion ? Motion.tap
-                     : .spring(response: 0.45, dampingFraction: 0.68).delay(Double(index) * 0.05)
+                     : Motion.emerge.delay(Double(index) * 0.05)
     }
 
     var body: some View {
@@ -386,7 +386,7 @@ struct OrbQuickMenuLayer: View {
         }
         .onAppear {
             if reduceMotion { shown = true }   // 减弱动态效果：不做弹簧入场，直接落位淡入
-            else { withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) { shown = true } }
+            else { withAnimation(Motion.emerge) { shown = true } }
         }
     }
 

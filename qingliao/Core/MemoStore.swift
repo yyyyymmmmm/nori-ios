@@ -80,36 +80,13 @@ struct MemoItem: Identifiable, Codable, Equatable, Sendable {
     /// 卡片副标题：来源 + 相对时间
     var subtitle: String { "\(sourceLabel) · \(timeText)" }
 
-    /// 相对时间文案（v3.9.14）：刚刚 / 12 分钟前 / 今天 14:30 / 昨天 09:05 / 3月8日 / 2025年12月3日
-    var timeText: String { MemoItem.relativeTime(updatedAt) }
+    /// 相对时间文案（v3.9.14）：刚刚 / 12分钟前 / 今天 14:30 / 昨天 09:05 / 3月8日 / 2025年12月3日
+    var timeText: String { RelativeTime.string(since: updatedAt.timeIntervalSince1970) }
 
-    // formatter 建一次就够（原来每渲染一行就 new 一个 DateFormatter，滚动时是白开销）
-    nonisolated(unsafe) private static let dayTimeFormatter: DateFormatter = {
-        let df = DateFormatter(); df.dateFormat = "HH:mm"; return df
-    }()
-    nonisolated(unsafe) private static let monthDayFormatter: DateFormatter = {
-        let df = DateFormatter(); df.dateFormat = "M月d日"; return df
-    }()
-    nonisolated(unsafe) private static let fullDateFormatter: DateFormatter = {
-        let df = DateFormatter(); df.dateFormat = "yyyy年M月d日"; return df
-    }()
-
-    /// 纯函数，便于真值表验证（本机无 iOS SDK 也能跑）
+    /// v4.x：实现已收敛到 `RelativeTime`（Models.swift），此处仅为 ChatView 等外部调用点保留的兼容壳。
+    /// （`calendar` 参数保留签名兼容，实际不再使用。）
     static func relativeTime(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
-        if calendar.isDate(date, inSameDayAs: now) {
-            let mins = Int(now.timeIntervalSince(date) / 60)
-            if mins < 1 { return "刚刚" }
-            if mins < 60 { return "\(mins) 分钟前" }
-            return "今天 \(dayTimeFormatter.string(from: date))"
-        }
-        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
-           calendar.isDate(date, inSameDayAs: yesterday) {
-            return "昨天 \(dayTimeFormatter.string(from: date))"
-        }
-        if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
-            return monthDayFormatter.string(from: date)
-        }
-        return fullDateFormatter.string(from: date)
+        RelativeTime.string(since: date.timeIntervalSince1970, now: now)
     }
 }
 

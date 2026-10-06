@@ -205,11 +205,13 @@ struct OrbCanvasView: View {
     /// v3.9.1：帧率可调——原来写死 30fps，导致 dock 空闲传 fps:15 只省了外层光晕，最贵的 Canvas 层仍 30fps
     var fps: Double = 30
     @Environment(\.colorScheme) private var colorScheme
+    // v4.x item7：reduceMotion 开启时渲染静止帧（t=0 取中间态），不循环
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let schedule: AnimationTimelineSchedule = .animation(minimumInterval: 1.0 / fps)
         TimelineView(schedule) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
+            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
             let speed: CGFloat = mode == .orbits ? 1.885 : 3.24
             let colors = dotColors
             Canvas { gfx, sz in

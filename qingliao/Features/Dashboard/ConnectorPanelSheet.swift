@@ -262,11 +262,11 @@ struct ConnectorPanelSheet: View {
         }
     }
 
-    // MARK: - MCP 工具服务
+    // MARK: - 工具服务
     private var mcpCard: some View {
         connectorCard(
             icon: "puzzlepiece.extension.fill", tint: .teal,
-            title: "MCP 工具服务",
+            title: "工具服务",
             status: mcpLoading ? "加载中…"
                 : mcpError ? "状态未知（点开查看）"
                 : mcpServers.isEmpty ? "未配置 · 点开添加"
@@ -331,6 +331,7 @@ struct ConnectorPanelSheet: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(title)，\(status)")
     }
 
     private var hintFooter: some View {

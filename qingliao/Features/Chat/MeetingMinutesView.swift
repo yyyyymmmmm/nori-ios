@@ -275,7 +275,7 @@ struct MeetingMinutesView: View {
                 .foregroundStyle(.tertiary)
                 .monospacedDigit()
                 .frame(width: 20, alignment: .trailing)
-                .padding(.top, 2)
+                .padding(.top, Spacing.xxs)
             Text(text)
                 .font(.system(size: Typography.body))
                 .foregroundStyle(isOpen ? Color.accentColor : Color.primary)

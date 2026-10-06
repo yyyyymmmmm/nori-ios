@@ -117,7 +117,7 @@ struct IntentActionBar: View {
                     .accessibilityLabel(actionLabel(action))
                 }
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, Spacing.xxs)
         }
     }
 

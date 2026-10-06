@@ -25,13 +25,13 @@ struct LinkPreviewCard: View {
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: Typography.tiny, weight: .bold))
                     .foregroundStyle(.tertiary)
                     .padding(5)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(2)
+            .padding(Spacing.xxs)
             .accessibilityLabel("关闭链接预览")
         }
         .contextMenu {
@@ -48,20 +48,20 @@ struct LinkPreviewCard: View {
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(preview.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: Typography.body, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 if !preview.desc.isEmpty {
                     Text(preview.desc)
-                        .font(.system(size: 12.5))
+                        .font(.system(size: Typography.subhead))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
                 if !siteLabel.isEmpty {
                     Text(siteLabel)
-                        .font(.system(size: 11))
+                        .font(.system(size: Typography.caption))
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
@@ -82,7 +82,7 @@ struct LinkPreviewCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
-        .padding(10)
+        .padding(Spacing.lg)
         .frame(maxWidth: 300, alignment: .leading)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(

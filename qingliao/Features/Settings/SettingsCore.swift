@@ -135,7 +135,7 @@ struct SettingsView: View {
                 Color.clear.frame(width: 44, height: 44)
                 Spacer()
                 Text("设置")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: Typography.headline, weight: .semibold))
                     .foregroundStyle(.primary)
                 Spacer()
                 Button {
@@ -143,7 +143,7 @@ struct SettingsView: View {
                     dismissSettings()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: Typography.title, weight: .semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 44, height: 44)
                         .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -151,9 +151,9 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("关闭")
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
+            .padding(.horizontal, Spacing.section)
+            .padding(.top, Spacing.md)
+            .padding(.bottom, Spacing.xs)
             // J 线 2026-10-06：顶部紧凑 AI 头像区（PetAvatar +「Nori」+ 状态小字），
             // 点按进 AI 形象设置（复用 PetStudioSheet 链路）；原「AI形象」行删掉。
             Button {
@@ -164,27 +164,27 @@ struct SettingsView: View {
                     ROTAvatarView(state: .idle, size: 52)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Nori")
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.system(size: Typography.title, weight: .semibold))
                             .foregroundStyle(.primary)
                         Text(petSummary)
-                            .font(.system(size: 13))
+                            .font(.system(size: Typography.subhead))
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: Typography.subhead, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, Spacing.section)
+                .padding(.vertical, Spacing.lg)
                 .background(Color(uiColor: .secondarySystemGroupedBackground),
                             in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
+            .padding(.horizontal, Spacing.section)
+            .padding(.top, Spacing.xs)
             // v4.0.22：设置项越堆越多，顶部给一行搜索框（索引与匹配见 Core/SettingsSearchIndex.swift）
             SettingsSearchBar(text: $settingsQuery)
             ScrollView {
@@ -641,10 +641,10 @@ extension SettingsView {
                 confirmLogout = true
             } label: {
                 Text("退出登录")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: Typography.title, weight: .semibold))
                     .foregroundStyle(.red)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
+                    .padding(.vertical, Spacing.xxl)
             }
             .buttonStyle(.plain)
             .confirmationDialog("退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
@@ -661,7 +661,7 @@ extension SettingsView {
     @ViewBuilder var tsRoutingParams: some View {
         // 分流方式：两枚胶囊。没有「关闭」档 —— 关掉上面那个开关就是不判定
         HStack(spacing: 12) {
-            Text("分流方式").font(.system(size: 17))
+            Text("分流方式").font(.system(size: Typography.title))
             Spacer(minLength: 12)
             tsCapsule("智能分流", on: tsRouting.mode == "smart") {
                 Task { await saveTypesafeRouting(["mode": "smart"]) }
@@ -671,7 +671,7 @@ extension SettingsView {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, Spacing.xl)
 
         // 后端被 CLI 设成 mode=off 时如实说明（App 里设不出这一档，但读得到）
         if tsRouting.mode == "off" {
@@ -680,26 +680,26 @@ extension SettingsView {
 
         // 灵敏度：概率 ≥ 该值 → 判「要干活」。后端允许 0~1，UI 收窄到有意义的区间
         HStack(spacing: 12) {
-            Text("灵敏度").font(.system(size: 17))
+            Text("灵敏度").font(.system(size: Typography.title))
             Spacer(minLength: 12)
             Text(tsRouting.thresholdText)
-                .font(.system(size: 15))
+                .font(.system(size: Typography.body))
                 .foregroundStyle(.secondary)
             Stepper("", value: tsThresholdBinding, in: 0.30...0.95, step: 0.05).labelsHidden()
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, Spacing.xl)
 
         // 等待超时：超时即回退关键词规则（不让用户等判定）
         HStack(spacing: 12) {
-            Text("等待超时").font(.system(size: 17))
+            Text("等待超时").font(.system(size: Typography.title))
             Spacer(minLength: 12)
             Text(tsRouting.timeoutText)
-                .font(.system(size: 15))
+                .font(.system(size: Typography.body))
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, Spacing.xl)
 
         // 熔断状态：key 失效/上游挂掉连续失败 → 判定自动停 X 秒，期间零上游调用（不再白等）
         HStack(spacing: 8) {
@@ -707,13 +707,13 @@ extension SettingsView {
                 .fill(tsBreaker.open ? Color.red : Color.secondary.opacity(Tint.soft))
                 .frame(width: 6, height: 6)
             Text(tsBreaker.statusText(tsRouting))
-                .font(.system(size: 13))
+                .font(.system(size: Typography.subhead))
                 .foregroundStyle(tsBreaker.open ? AnyShapeStyle(Color.red) : AnyShapeStyle(.secondary))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, Spacing.xl)
         // 熔断期间每 5 秒跟一次后端：倒计时会走，后端半开重试成功后状态自己翻回来
         .task(id: tsBreaker.open) {
             guard tsBreaker.open else { return }
@@ -733,7 +733,7 @@ extension SettingsView {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 12)
+        .padding(.bottom, Spacing.xl)
 
         if !tsError.isEmpty {
             tsParamNote(tsError, warn: true)
@@ -745,13 +745,13 @@ extension SettingsView {
     @ViewBuilder func tsParamNote(_ text: String, warn: Bool) -> some View {
         HStack {
             Text(text)
-                .font(.system(size: 13))
+                .font(.system(size: Typography.subhead))
                 .foregroundStyle(warn ? AnyShapeStyle(Color.red) : AnyShapeStyle(.tertiary))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 12)
+        .padding(.bottom, Spacing.xl)
     }
 
     // MARK: - K 线二级页：智能路由 / 上下文压缩 / 使用说明
@@ -763,9 +763,9 @@ extension SettingsView {
                 Section {
                     Toggle(isOn: tsEnabledBinding) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("智能路由").font(.system(size: 17))
+                            Text("智能路由").font(.system(size: Typography.title))
                             Text("自动判断是否需要 AI 干活")
-                                .font(.system(size: 14)).foregroundStyle(.tertiary)
+                                .font(.system(size: Typography.subhead)).foregroundStyle(.tertiary)
                         }
                     }
                 }
@@ -787,9 +787,9 @@ extension SettingsView {
                 Section {
                     Toggle(isOn: $contextAutoCompress) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("上下文自动压缩").font(.system(size: 17))
+                            Text("上下文自动压缩").font(.system(size: Typography.title))
                             Text("token超限时AI摘要压缩历史消息")
-                                .font(.system(size: 14)).foregroundStyle(.tertiary)
+                                .font(.system(size: Typography.subhead)).foregroundStyle(.tertiary)
                         }
                     }
                     .onChange(of: contextAutoCompress) { _, new in
@@ -799,10 +799,10 @@ extension SettingsView {
                 if contextAutoCompress {
                     Section {
                         HStack {
-                            Text("压缩阈值").font(.system(size: 17))
+                            Text("压缩阈值").font(.system(size: Typography.title))
                             Spacer()
                             Text("\(contextThreshold) 字")
-                                .font(.system(size: 15)).foregroundStyle(.secondary)
+                                .font(.system(size: Typography.body)).foregroundStyle(.secondary)
                             Stepper("", value: $contextThreshold, in: 1000...16000, step: 500)
                                 .labelsHidden()
                         }
@@ -831,9 +831,9 @@ extension SettingsView {
                         Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
                         Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考Nori记忆与规则")
                     }
-                    .font(.system(size: 15))
+                    .font(.system(size: Typography.body))
                     .foregroundStyle(.secondary)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, Spacing.sm)
                 }
             }
             .navigationTitle("使用说明")

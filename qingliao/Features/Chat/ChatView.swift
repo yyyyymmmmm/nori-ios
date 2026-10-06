@@ -1285,7 +1285,7 @@ struct ChatView: View {
             guard let newItem else { return }
             Task {
                 if let data = try? await newItem.loadTransferable(type: Data.self),
-                   let img = UIImage(data: data) {
+                   let img = await Task.detached(priority: .userInitiated) { UIImage(data: data) }.value {
                     pendingImage = img
                     pendingImageData = compressImage(img)
                 }
@@ -1445,7 +1445,7 @@ struct ChatView: View {
                 NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
             } label: {
                 Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 20))
+                    .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
                     .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -1465,7 +1465,7 @@ struct ChatView: View {
                 NotificationCenter.default.post(name: .qingliaoOpenChatSearch, object: nil)
             } label: {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 18))
+                    .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
                     .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -1473,9 +1473,9 @@ struct ChatView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("搜索")
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        .padding(.horizontal, Spacing.section)
+        .padding(.top, Spacing.md)
+        .padding(.bottom, Spacing.xs)
         // v4.0.31：本会话这轮回答结束（忙→闲）→ 庆祝动作（v4.0.27 口径回归）。
         // 用 thisSessionStreaming 而不是 aiBusy：别会话跑完不该庆祝（原注释同）。
         .onChange(of: thisSessionStreaming) { was, now in
@@ -2818,8 +2818,8 @@ struct ChatView: View {
                 .disabled(suggestLoadingAnchor != nil)
                 .opacity(suggestLoadingAnchor != nil ? 0.5 : 1)
             }
-            .padding(.leading, 6)   // 与气泡文本左缘对齐（气泡自身不留白，见 v4.0.38）
-            .padding(.bottom, 6)
+            .padding(.leading, Spacing.sm)   // 与气泡文本左缘对齐（气泡自身不留白，见 v4.0.38）
+            .padding(.bottom, Spacing.sm)
         }
     }
 
@@ -2842,8 +2842,8 @@ struct ChatView: View {
                             Task { await linkPreviews.load(id: msg.id, text: text, auth: auth, force: true) }
                         }
                     )
-                    .padding(.leading, 6)
-                    .padding(.bottom, 6)
+                    .padding(.leading, Spacing.sm)
+                    .padding(.bottom, Spacing.sm)
                 }
             }
             // 行进入可见区才抓；结果按消息 id 缓存（load 对已有状态短路 → 不会反复打后端）
@@ -4307,7 +4307,7 @@ struct ChatView: View {
     private static func downloadImage(url: String, u: URL) async -> UIImage? {
         if let cached = cachedRemoteImage(url) { return cached }
         if let (data, _) = try? await URLSession.shared.data(from: u),
-           let img = UIImage(data: data) {
+           let img = await Task.detached(priority: .userInitiated) { UIImage(data: data) }.value {
             setRemoteImageCache(url, img, cost: data.count, sourceData: data)
             return img
         }
@@ -4320,7 +4320,7 @@ struct ChatView: View {
                                     method: "GET", path: path, headers: [:], body: nil, timeout: 15)
             }.value
             if let (data, code) = result, (200..<300).contains(code),
-               let img = UIImage(data: data) {
+               let img = await Task.detached(priority: .userInitiated) { UIImage(data: data) }.value {
                 setRemoteImageCache(url, img, cost: data.count, sourceData: data)
                 return img
             }

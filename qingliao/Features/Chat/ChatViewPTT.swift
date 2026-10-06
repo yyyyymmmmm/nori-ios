@@ -151,7 +151,7 @@ extension ChatView {
                     preparing: liveSpeech.isPreparing,
                     level: { liveSpeech.currentInputLevel() }
                 )
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.section)
                 // G线：面板坐输入框正上方 —— bottom padding = 输入框顶部到屏幕底部的实测距离 + 12pt 呼吸。
                 // 不再引用 GrayCapsuleTabBar（F 线正在删除悬浮胶囊），不写死任何高度。
                 .padding(.bottom, PTTPanelAnchor.shared.panelBottomPadding(fallback: safeAreaBottom))
@@ -163,10 +163,10 @@ extension ChatView {
         if let msg = pttToastMessage {
             VStack {
                 Text(msg)
-                    .font(.system(size: 15))
+                    .font(.system(size: Typography.body))
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, Spacing.lg)
                     .a11yGlass(.regular, in: Capsule(), stroke: Color.primary.opacity(0.08))
                 Spacer()
             }
@@ -216,15 +216,15 @@ struct PTTRecordingPanel: View {
                     Image(systemName: "trash.fill")
                         .font(.system(size: 15, weight: .semibold))
                     Text("松手取消")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: Typography.title, weight: .semibold))
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 20)
-                .padding(.vertical, 10)
+                .padding(.vertical, Spacing.lg)
                 .background(Color.red, in: Capsule())
             } else {
                 Text(preparing ? "语音模型准备中…" : "松手发送，上滑取消")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: Typography.title, weight: .medium))
                     .foregroundStyle(.primary)
             }
             PTTWaveform(level: level)

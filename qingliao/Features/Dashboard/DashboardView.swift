@@ -126,7 +126,7 @@ struct DashboardView: View {
                     Text("看板")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.primary)
-                        .padding(.top, 10)
+                        .padding(.top, Spacing.lg)
                     // v3.9.40（#15）：10 个栏目由写死顺序改为按用户自定义顺序渲染（可隐藏）
                     // v4.0.20：每个栏目量高（列高不等 → 落位几何必须喂实测高度）+ 拖动中的
                     //          位移/放大/阴影反馈。
@@ -160,7 +160,7 @@ struct DashboardView: View {
                         NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
                     } label: {
                         Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 20))
+                            .font(.system(size: Typography.headline))
                             .foregroundStyle(.primary)
                             .frame(width: 44, height: 44)
                             .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -1110,7 +1110,7 @@ struct DashboardView: View {
                     .font(.system(size: Typography.title))
                     .foregroundStyle(.teal)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("MCP 工具 · 智能家居 · 生活卡片")
+                    Text("工具服务 · 智能家居 · 生活卡片")
                         .font(.system(size: Typography.body, weight: .semibold))
                         .foregroundStyle(.primary)
                     Text("AI 已接入的数字生活总览与入口")

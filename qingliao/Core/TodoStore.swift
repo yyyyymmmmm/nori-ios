@@ -67,7 +67,7 @@ struct TodoItem: Identifiable, Codable, Equatable, Sendable {
         }
     }
 
-    var timeText: String { MemoItem.relativeTime(updatedAt) }
+    var timeText: String { RelativeTime.string(since: updatedAt.timeIntervalSince1970) }
 
     /// v3.9.75：AI 输出的 ql-card 卡片条目 → 候选待办行。
     /// 只认两类卡：`plan`（提示词定义 = 多步骤任务的步骤，天然就是待办）；

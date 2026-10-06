@@ -324,7 +324,7 @@ struct RecordSection: View {
                     chip(c, RecordKit.categoryLabel(c))
                 }
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, Spacing.xxs)
         }
         .listRowInsets(EdgeInsets(top: 0, leading: Spacing.section,
                                   bottom: Spacing.md, trailing: 0))
@@ -348,8 +348,8 @@ struct RecordSection: View {
             }
             .font(.system(size: Typography.caption, weight: on ? .semibold : .regular))
             .foregroundStyle(on ? Color.white : Color.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Spacing.xl)
+            .padding(.vertical, Spacing.sm)
                 .background(Capsule().fill(on ? Color.accentColor
                                                : Color(uiColor: .secondarySystemGroupedBackground)))
         }
@@ -388,7 +388,7 @@ struct RecordSection: View {
         }
         .padding(.horizontal, Spacing.section)
         .padding(.top, Spacing.md)
-        .padding(.bottom, 4)
+        .padding(.bottom, Spacing.xs)
         .textCase(nil)
         .listRowBackground(Color.clear)
     }
@@ -510,7 +510,7 @@ private struct RecordRowCard: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                 HStack(spacing: 6) {
-                    Text(MemoItem.relativeTime(item.updatedAt))
+                    Text(RelativeTime.string(since: item.updatedAt.timeIntervalSince1970))
                         .font(.system(size: Typography.caption))
                         .foregroundStyle(.tertiary)
                     if !item.category.isEmpty {
@@ -873,7 +873,7 @@ private struct RecordTrendBars: View {
             ForEach(stats) { s in
                 VStack(spacing: 4) {
                     Text(String(format: "%.0f", s.expense))
-                        .font(.system(size: 10))
+                        .font(.system(size: Typography.tiny))
                         .foregroundStyle(.tertiary)
                         .monospacedDigit()
                     RoundedRectangle(cornerRadius: 4, style: .continuous)

@@ -220,7 +220,7 @@ private struct OrbNoticeDot: View {
             .frame(width: d, height: d)
             .overlay(Circle().strokeBorder(.white.opacity(0.92), lineWidth: 1.2))
             .shadow(color: Color.orange.opacity(0.55), radius: 3)
-            .padding(2)
+            .padding(Spacing.xxs)
             .opacity(pulse)
     }
 }

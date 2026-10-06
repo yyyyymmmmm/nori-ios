@@ -129,15 +129,26 @@ struct ChatInputBar: View {
     @State private var sendBounceTick = 0
     /// v3.9.42：「减弱动态效果」→ 不给关键帧喂新 trigger，发送反馈只剩图标 symbolEffect
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// v4.x item3：发送键深浅色自适应（sendColors 默认态深色取浅底，图标同步判断）
+    @Environment(\.colorScheme) private var colorScheme
 
     // 发送按钮配色（灰度重做 2026-10-06）：禁用系统蓝。
     // 语音模式=深灰、有字=深灰、空文本=淡灰；上下文超 80% 仍用橙（功能性提醒，非装饰蓝）
     // v3.4.25：+第四态——上下文使用率超 80% 时有字状态变橙（轻提醒，不阻断发送）
+    // v4.x item3：默认态深灰底（white 0.25/0.35）在深色输入栏上对比度不足 → 深色取浅底（0.85/0.75）
     private var sendColors: [Color] {
         if voiceMode { return [Color(uiColor: .systemGray), Color(uiColor: .systemGray2)] }
         if text.isEmpty { return [Color(uiColor: .systemGray4), Color(uiColor: .systemGray3)] }
         if contextUsage > 0.8 { return [.orange, .yellow.opacity(0.9)] }
+        if colorScheme == .dark { return [Color(white: 0.85), Color(white: 0.75)] }
         return [Color(white: 0.25), Color(white: 0.35)]
+    }
+
+    /// v4.x item3：发送键图标色——仅深色模式默认态（浅底）切深色图标；
+    /// 其余态（语音/空态 systemGray 自适应仍偏深、橙态）白色图标对比度充足，保持白色
+    private var sendIconColor: Color {
+        let lightBackground = colorScheme == .dark && !voiceMode && !text.isEmpty && contextUsage <= 0.8
+        return lightBackground ? Color(white: 0.2) : .white
     }
 
     // 发送触发：一次 tick 同时驱动图标弹动与按钮关键帧（长按转文字路径不走这里，不弹反馈）
@@ -505,7 +516,7 @@ struct ChatInputBar: View {
                 // 排查价值保留（V/F 识别计数、T/D/Y 音频三级计数），但不再挤占正常录音时的文本区
                 if recordingStalled, !recordingDiag.isEmpty {
                     Text(recordingDiag)
-                        .font(.system(size: 9))
+                        .font(.system(size: Typography.tiny))
                         .foregroundStyle(.tertiary)
                         .allowsHitTesting(false)
                 }
@@ -677,7 +688,7 @@ struct ChatInputBar: View {
                 }
             }
             .font(.system(size: Typography.body, weight: .bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(sendIconColor)
             .frame(width: 32, height: 32)
             .contentShape(Circle())
             // v3.4.19：发送回弹缩放（长按转文字路径已摘除，只剩轻点发送）

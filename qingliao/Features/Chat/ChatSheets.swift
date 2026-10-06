@@ -171,7 +171,7 @@ struct ComposerModelSheet: View {
                 if groups.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "cube.box")
-                            .font(.system(size: 30, weight: .light))
+                            .font(.system(size: Typography.display, weight: .light))
                             .foregroundStyle(.tertiary)
                         Text("还没有可选的模型")
                             .font(.system(size: Typography.subhead))

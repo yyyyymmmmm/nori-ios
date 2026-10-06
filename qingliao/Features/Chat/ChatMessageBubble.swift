@@ -310,7 +310,7 @@ struct MessageBubble: View {
             Text(MessageEditKit.editedLabel)
                 .font(.system(size: CGFloat(fontSize)))
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 13)
+                .padding(.horizontal, Spacing.xl)
                 .padding(.vertical, 9)
                 .frame(maxWidth: AdaptiveLayout.bubbleMaxWidth(hSize), alignment: .leading)
                 .background(
@@ -1299,7 +1299,7 @@ struct AIImageView: View {
         }
         // 1) URLSession（外部公开图，Ats 允许 https）
         if let (data, _) = try? await URLSession.shared.data(from: u),
-           let img = UIImage(data: data) {
+           let img = await Task.detached(priority: .userInitiated) { UIImage(data: data) }.value {
             setRemoteImageCache(url, img, cost: data.count, sourceData: data)
             revealImage(img, animated: true)
             return
@@ -1314,7 +1314,7 @@ struct AIImageView: View {
                                     method: "GET", path: path, headers: [:], body: nil, timeout: 15)
             }.value
             if let (data, code) = result, (200..<300).contains(code),
-               let img = UIImage(data: data) {
+               let img = await Task.detached(priority: .userInitiated) { UIImage(data: data) }.value {
                 setRemoteImageCache(url, img, cost: data.count, sourceData: data)
                 revealImage(img, animated: true)
                 return

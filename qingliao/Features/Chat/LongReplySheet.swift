@@ -110,7 +110,7 @@ struct LongReplySheet: View {
                 ForEach(sections) { sec in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(sec.title)
-                            .font(.system(size: sec.level <= 1 ? 19 : 16,
+                            .font(.system(size: sec.level <= 1 ? Typography.headline : Typography.title,
                                           weight: sec.level <= 2 ? .bold : .semibold))
                             .foregroundStyle(.primary)
                             .id(sec.id)
@@ -157,8 +157,8 @@ struct LongReplySheet: View {
                       systemImage: "list.bullet.indent")
                     .font(.system(size: Typography.caption, weight: .medium))
                     .fixedSize()
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, Spacing.xl)
+                    .padding(.vertical, Spacing.sm)
                     .background(Color.primary.opacity(Tint.subtle), in: Capsule())
             }
             .buttonStyle(.plain)
@@ -184,7 +184,7 @@ struct LongReplySheet: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 18)
-            .padding(.vertical, 12)
+            .padding(.vertical, Spacing.xl)
             Divider()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
@@ -200,7 +200,7 @@ struct LongReplySheet: View {
                                 Circle().fill(Color.accentColor.opacity(0.6))
                                     .frame(width: 6, height: 6)
                                 Text(sec.title)
-                                    .font(.system(size: sec.level <= 1 ? 15 : 13,
+                                    .font(.system(size: sec.level <= 1 ? Typography.body : Typography.subhead,
                                                   weight: sec.level <= 1 ? .semibold : .regular))
                                     .foregroundStyle(.primary)
                                 Spacer()
@@ -212,7 +212,7 @@ struct LongReplySheet: View {
                     }
                 }
                 .padding(.horizontal, 18)
-                .padding(.bottom, 16)
+                .padding(.bottom, Spacing.section)
             }
         }
         // 大纲层用 ultraThinMaterial（不是 secondarySystemBackground——那是不透明实底，
@@ -243,17 +243,17 @@ struct LongReplySheet: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Spacing.xl)
+        .padding(.vertical, Spacing.lg)
     }
 
     private func actionPill(_ title: String, _ icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: Typography.subhead, weight: .medium))
                 .fixedSize()          // 文字不许被压没（v3.9.72 胶囊空字根因：压缩时字被吃成 0 宽）
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Spacing.xl)
+                .padding(.vertical, Spacing.md)
                 .background(Color.primary.opacity(Tint.subtle), in: Capsule())
         }
         .buttonStyle(.plain)

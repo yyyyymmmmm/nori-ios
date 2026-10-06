@@ -135,7 +135,7 @@ struct OrbIdentifyOverlay: View {
                                        // ⚠️ 这行必须排在上面那句之后，否则刚存的原图被当场清掉
             }
             if reduceMotion { appeared = true }
-            else { withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) { appeared = true } }
+            else { withAnimation(Motion.emerge) { appeared = true } }
         }
         .onChange(of: phase) { _, _ in
             // 识别中 / 翻译中都算「忙」：环继续转（否则取字完到 AI 回译文这段环会突然停一下）

@@ -76,7 +76,6 @@ struct QingliaoSidebar: View {
     @State private var renameTarget: ChatSession?
     @State private var renameText = ""
     @State private var confirmDelete: ChatSession?
-    @State private var opError: String?
 
     var body: some View {
         GeometryReader { geo in
@@ -95,13 +94,13 @@ struct QingliaoSidebar: View {
                         .transition(.move(edge: .leading))
                 }
             }
-            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isOpen)
+            .animation(Motion.settle, value: isOpen)
         }
         .ignoresSafeArea()
     }
 
     private func close() {
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+        withAnimation(Motion.settle) {
             isOpen = false
         }
     }
@@ -111,7 +110,7 @@ struct QingliaoSidebar: View {
             // 顶部：App 名 + 设置齿轮（设置页唯一入口）
             HStack {
                 Text("Nori")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: Typography.display, weight: .bold))
                     .foregroundStyle(.primary)
                 Spacer()
                 Button {
@@ -120,7 +119,7 @@ struct QingliaoSidebar: View {
                     onOpenSettings()
                 } label: {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 18))
+                        .font(.system(size: Typography.title))
                         .foregroundStyle(.primary)
                         .frame(width: 44, height: 44)
                         .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -134,58 +133,58 @@ struct QingliaoSidebar: View {
                 VStack(alignment: .leading, spacing: 0) {
                     // 选项卡分组
                     Text("选项卡")
-                        .font(.system(size: 13))
+                        .font(.system(size: Typography.subhead))
                         .foregroundStyle(.tertiary)
                         .padding(.top, 28)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, Spacing.md)
                     ForEach(DockTab.allCases) { tab in
                         sidebarTabRow(tab)
                     }
 
                     Divider()
                         .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
+                        .padding(.vertical, Spacing.section)
 
                     // 工具分组：任务中心（原顶栏药丸按钮已干掉，迁入此处）
                     Text("工具")
-                        .font(.system(size: 13))
+                        .font(.system(size: Typography.subhead))
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, Spacing.md)
                     Button {
                         close()
                         NotificationCenter.default.post(name: .qingliaoOpenTaskCenter, object: nil)
                     } label: {
                         HStack(spacing: 14) {
                             Image(systemName: "list.bullet.circle")
-                                .font(.system(size: 20))
+                                .font(.system(size: Typography.headline))
                                 .foregroundStyle(.primary)
                                 .frame(width: 28)
                             Text("任务中心")
-                                .font(.system(size: 17))
+                                .font(.system(size: Typography.title))
                                 .foregroundStyle(.primary)
                             Spacer()
                         }
                         .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 12)
+                        .padding(.vertical, Spacing.xl)
+                        .padding(.horizontal, Spacing.xl)
                     }
                     .buttonStyle(.plain)
 
                     Divider()
                         .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
+                        .padding(.vertical, Spacing.section)
 
                     // 历史对话分组（原「旁聊」占位 → 真实会话历史；无头像、灰度）
                     Text("历史对话")
-                        .font(.system(size: 13))
+                        .font(.system(size: Typography.subhead))
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, Spacing.md)
                     if history.sessions.isEmpty {
                         Text(history.isLoading ? "加载中…" : "还没有对话")
-                            .font(.system(size: 15))
+                            .font(.system(size: Typography.body))
                             .foregroundStyle(.tertiary)
                             .padding(.horizontal, 20)
                     } else {
@@ -207,7 +206,7 @@ struct QingliaoSidebar: View {
                 } label: {
                     HStack {
                         Text("搜索")
-                            .font(.system(size: 16))
+                            .font(.system(size: Typography.title))
                             .foregroundStyle(.tertiary)
                         Spacer()
                     }
@@ -222,7 +221,7 @@ struct QingliaoSidebar: View {
                     onNewChat()
                 } label: {
                     Image(systemName: "square.and.pencil")
-                        .font(.system(size: 20))
+                        .font(.system(size: Typography.headline))
                         .foregroundStyle(.primary)
                         .frame(width: 52, height: 52)
                         .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -237,7 +236,7 @@ struct QingliaoSidebar: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.trailing, 60)   // 右侧露出一点底页，暗示可滑回
         .shadow(color: .black.opacity(0.15), radius: 24, x: 8, y: 0)
-        // v4.4：历史会话长按菜单的改名/删除/失败提示
+        // v4.4：历史会话长按菜单（改名输入/删除确认框；失败提示走 ToastCenter）
         .alert("重命名会话", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
             TextField("会话名称", text: $renameText)
             Button("取消", role: .cancel) { renameTarget = nil }
@@ -251,11 +250,6 @@ struct QingliaoSidebar: View {
         } message: {
             Text("将删除「\(confirmDelete?.title ?? "")」及其全部消息，此操作不可恢复")
         }
-        .alert("操作失败", isPresented: Binding(get: { opError != nil }, set: { if !$0 { opError = nil } })) {
-            Button("好", role: .cancel) { opError = nil }
-        } message: {
-            Text(opError ?? "")
-        }
     }
 
     /// 选项卡行：线条图标 + 文字；选中 = 灰胶囊底
@@ -267,24 +261,26 @@ struct QingliaoSidebar: View {
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 20))
+                    .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 28)
                 Text(tab.title)
-                    .font(.system(size: 17))
+                    .font(.system(size: Typography.title))
                     .foregroundStyle(.primary)
                 Spacer()
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(.vertical, Spacing.xl)
             .background(
                 isSelected ? Color(.systemGray5) : Color.clear,
                 in: RoundedRectangle(cornerRadius: 14, style: .continuous)
             )
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.xl)
             .contentShape(Rectangle())   // v4.4：整行都是热区（含胶囊外 12pt 边距），点行缝也有反应
         }
         .buttonStyle(.plain)
+        // item4：VoiceOver 读选项卡名
+        .accessibilityLabel(tab.title)
     }
 
     /// v4.4：置顶优先 + 按时间倒序（置顶 key 与 SessionsView 同源）
@@ -311,26 +307,29 @@ struct QingliaoSidebar: View {
                 HStack(spacing: 6) {
                     if pinnedIDs.contains(session.id) {
                         Image(systemName: "pin.fill")
-                            .font(.system(size: 12))
+                            .font(.system(size: Typography.caption))
                             .foregroundStyle(.tertiary)
                     }
                     Text(session.title.isEmpty ? "新对话" : session.title)
-                        .font(.system(size: 16))
+                        .font(.system(size: Typography.title))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                 }
                 if !session.relativeTime.isEmpty {
                     Text(session.relativeTime)
-                        .font(.system(size: 13))
+                        .font(.system(size: Typography.subhead))
                         .foregroundStyle(.tertiary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
-            .padding(.vertical, 12)   // v4.4：10→12，热区 ≥44pt
+            .padding(.vertical, Spacing.xl)   // v4.4：10→12，热区 ≥44pt
             .contentShape(Rectangle())   // v4.4：整行热区
         }
         .buttonStyle(.plain)
+        // item4：VoiceOver 行标签（标题）+ 提示（打开会话）
+        .accessibilityLabel(session.title.isEmpty ? "新对话" : session.title)
+        .accessibilityHint("打开会话")
         .contextMenu {
             // 固定会话（投递/主动）不给操作入口：点了后端也会拒绝
             if !isFixedSession(session.id) {
@@ -382,11 +381,11 @@ struct QingliaoSidebar: View {
                 if (j["ok"] as? Bool) == true {
                     Haptics.success()
                 } else {
-                    opError = "改名未同步到服务器，请检查网络后重试"
+                    ToastCenter.shared.show("改名未同步到服务器，请检查网络后重试")
                 }
                 await history.refreshNow(auth: auth)
             } catch {
-                opError = "改名未同步到服务器：\(error.localizedDescription)"
+                ToastCenter.shared.show("改名未同步到服务器：\(error.localizedDescription)")
                 await history.refreshNow(auth: auth)
             }
         }
@@ -402,11 +401,11 @@ struct QingliaoSidebar: View {
                 if (j["ok"] as? Bool) == true {
                     Haptics.success()
                 } else {
-                    opError = "删除未同步到服务器，请检查网络后重试"
+                    ToastCenter.shared.show("删除未同步到服务器，请检查网络后重试")
                 }
                 await history.refreshNow(auth: auth)
             } catch {
-                opError = "删除未同步到服务器：\(error.localizedDescription)"
+                ToastCenter.shared.show("删除未同步到服务器：\(error.localizedDescription)")
                 await history.refreshNow(auth: auth)
             }
         }

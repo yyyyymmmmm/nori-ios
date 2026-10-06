@@ -806,7 +806,7 @@ struct MCPSettingsSheet: View {
                     hintSection
                 }
             }
-            .navigationTitle("MCP 工具服务")
+            .navigationTitle("工具服务")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1022,7 +1022,7 @@ struct MCPAddSheet: View {
                         }
                     }
                     if picked == nil {
-                        TextField("https://... (MCP HTTP 端点)", text: $customURL)
+                        TextField("https://...（工具服务地址）", text: $customURL)
                             .keyboardType(.URL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -1037,7 +1037,7 @@ struct MCPAddSheet: View {
                     }
                 }
             }
-            .navigationTitle("添加 MCP 服务")
+            .navigationTitle("添加工具服务")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

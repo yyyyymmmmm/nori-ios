@@ -71,13 +71,13 @@ struct FeedTabView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     topBar
-                        .padding(.top, 12)
+                        .padding(.top, Spacing.xl)
                     Text("动态")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.primary)
-                        .padding(.top, 10)
+                        .padding(.top, Spacing.lg)
                     promptBox
-                        .padding(.top, 12)
+                        .padding(.top, Spacing.xl)
                     if store.units.isEmpty {
                         feedEmptyState
                     } else {
@@ -92,7 +92,7 @@ struct FeedTabView: View {
                                 Divider()
                             }
                         }
-                        .padding(.top, 4)
+                        .padding(.top, Spacing.xs)
                     }
                 }
                 .padding(.horizontal, Spacing.section)
@@ -113,7 +113,7 @@ struct FeedTabView: View {
                 NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
             } label: {
                 Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 20))
+                    .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
                     .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -130,7 +130,7 @@ struct FeedTabView: View {
 
             Button { Haptics.tap(); showPrompt = true } label: {
                 Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 20))
+                    .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
                     .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -145,13 +145,13 @@ struct FeedTabView: View {
     private var promptBox: some View {
         Button { showPrompt = true } label: {
             Text(store.prompt)
-                .font(.system(size: 15))
+                .font(.system(size: Typography.body))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 18)
-                .padding(.vertical, 16)
+                .padding(.vertical, Spacing.section)
                 .background(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .fill(Color.primary.opacity(0.04))
@@ -172,10 +172,14 @@ struct FeedTabView: View {
                 .font(.system(size: 36))
                 .foregroundStyle(.tertiary)
             Text("动态版块由上面的提示词驱动")
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: Typography.body, weight: .medium))
                 .foregroundStyle(.secondary)
             Text("feed 内容服务暂未连接")
-                .font(.system(size: 13))
+                .font(.system(size: Typography.subhead))
+                .foregroundStyle(.tertiary)
+            // v4.x item5：空态加指引。暂无到「连接设置」的现成导航路径，不发明导航，只给文案。
+            Text("连接 Hermes 后，这里会按你的提示词生成动态")
+                .font(.system(size: Typography.subhead))
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
@@ -188,20 +192,20 @@ struct FeedTabView: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("动态版块说明")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: Typography.titleXL, weight: .bold))
                     .foregroundStyle(.white)
                 Text("你的动态版块由以下指示驱动。你对此提示做出的任何编辑都将应用于今后的动态版块帖子。")
-                    .font(.system(size: 15))
+                    .font(.system(size: Typography.body))
                     .foregroundStyle(.white.opacity(0.65))
                     .lineSpacing(3)
                 Divider()
                     .background(.white.opacity(0.12))
                 TextEditor(text: $draftPrompt)
-                    .font(.system(size: 17))
+                    .font(.system(size: Typography.title))
                     .foregroundStyle(.white)
                     .lineSpacing(4)
                     .scrollContentBackground(.hidden)
-                    .padding(12)
+                    .padding(Spacing.xl)
                     .frame(minHeight: 200)
                     .background(
                         RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
@@ -210,7 +214,7 @@ struct FeedTabView: View {
                 HStack(spacing: 12) {
                     Button { showPrompt = false } label: {
                         Text("取消")
-                            .font(.system(size: 17, weight: .medium))
+                            .font(.system(size: Typography.title, weight: .medium))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
@@ -222,7 +226,7 @@ struct FeedTabView: View {
                         showPrompt = false
                     } label: {
                         Text("保存")
-                            .font(.system(size: 17, weight: .medium))
+                            .font(.system(size: Typography.title, weight: .medium))
                             .foregroundStyle(draftPrompt == store.prompt ? .white.opacity(0.4) : .white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
@@ -234,7 +238,7 @@ struct FeedTabView: View {
                     .buttonStyle(.plain)
                     .disabled(draftPrompt == store.prompt)
                 }
-                .padding(.top, 4)
+                .padding(.top, Spacing.xs)
             }
             .padding(24)
         }
@@ -265,11 +269,11 @@ private struct FeedUnitCard: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(unit.title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: Typography.title, weight: .semibold))
                     .foregroundStyle(.primary)
 
                 linkedBody(unit.bodyMarkdown)
-                    .font(.system(size: 15))
+                    .font(.system(size: Typography.body))
                     .foregroundStyle(.primary)
                     .lineSpacing(4)
 
@@ -287,7 +291,7 @@ private struct FeedUnitCard: View {
                 HStack(spacing: 18) {
                     Button(action: onLike) {
                         Image(systemName: liked ? "heart.fill" : "heart")
-                            .font(.system(size: 20))
+                            .font(.system(size: Typography.headline))
                             .foregroundStyle(.primary)
                     }
                     .buttonStyle(.plain)
@@ -295,24 +299,24 @@ private struct FeedUnitCard: View {
 
                     Button(action: onDiscuss) {
                         Text("讨论")
-                            .font(.system(size: 15))
+                            .font(.system(size: Typography.body))
                             .foregroundStyle(.primary)
                     }
                     .buttonStyle(.plain)
 
                     Spacer(minLength: 0)
 
-                    Text(relativeTime(unit.publishedAt))
-                        .font(.system(size: 13))
+                    Text(RelativeTime.string(since: unit.publishedAt.timeIntervalSince1970))
+                        .font(.system(size: Typography.subhead))
                         .foregroundStyle(.secondary)
                     Image(systemName: "info.circle")
-                        .font(.system(size: 16))
+                        .font(.system(size: Typography.title))
                         .foregroundStyle(.secondary)
                 }
-                .padding(.top, 4)
+                .padding(.top, Spacing.xs)
             }
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, Spacing.section)
     }
 
     private func categoryIcon(_ c: String) -> String {
@@ -332,16 +336,4 @@ private struct FeedUnitCard: View {
         return Text(markdown)
     }
 
-    private func relativeTime(_ date: Date) -> String {
-        let mins = Int(Date().timeIntervalSince(date) / 60)
-        if mins < 1 { return "刚刚" }
-        if mins < 60 { return "\(mins) 分钟前" }
-        let hours = mins / 60
-        if hours < 24 { return "\(hours) 小时前" }
-        let days = hours / 24
-        if days < 30 { return "\(days) 天前" }
-        let f = DateFormatter()
-        f.dateFormat = "M月d日"
-        return f.string(from: date)
-    }
 }

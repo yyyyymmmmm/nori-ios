@@ -22,7 +22,7 @@ struct TOCSheet: View {
                             .fill(Color.accentColor.opacity(0.6))
                             .frame(width: 6, height: 6)
                         Text(item.title)
-                            .font(.system(size: item.level == 1 ? 16 : (item.level == 2 ? 14 : 13),
+                            .font(.system(size: item.level == 1 ? Typography.title : (item.level == 2 ? Typography.body : Typography.subhead),
                                           weight: item.level == 1 ? .bold : .medium))
                             .foregroundStyle(.primary)
                         Spacer()

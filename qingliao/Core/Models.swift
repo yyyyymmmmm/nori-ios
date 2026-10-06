@@ -281,6 +281,44 @@ struct ChatSession: Identifiable, Sendable {
     }
 }
 
+// MARK: - 全站相对时间唯一实现（v4.x：各处 relativeTime 收敛到此）
+//
+// 口径（取原 MemoItem.relativeTime 最完备一版）：刚刚 / N分钟前 / 今天 HH:mm / 昨天 HH:mm /
+// M月d日 / yyyy年M月d日。
+// 注意：ChatSession.relativeTime（上）是会话列表的旧口径（"N 分钟"不带"前"、M/d），按任务要求保留不动。
+enum RelativeTime {
+    // formatter 建一次就够（原 MemoItem 那份搬过来，原每渲染一行就 new 一个是白开销）
+    nonisolated(unsafe) private static let dayTimeFormatter: DateFormatter = {
+        let df = DateFormatter(); df.dateFormat = "HH:mm"; return df
+    }()
+    nonisolated(unsafe) private static let monthDayFormatter: DateFormatter = {
+        let df = DateFormatter(); df.dateFormat = "M月d日"; return df
+    }()
+    nonisolated(unsafe) private static let fullDateFormatter: DateFormatter = {
+        let df = DateFormatter(); df.dateFormat = "yyyy年M月d日"; return df
+    }()
+
+    /// 秒级时间戳 → 相对时间文案
+    static func string(since ts: TimeInterval, now: Date = Date()) -> String {
+        let date = Date(timeIntervalSince1970: ts)
+        let calendar = Calendar.current
+        if calendar.isDate(date, inSameDayAs: now) {
+            let mins = Int(now.timeIntervalSince(date) / 60)
+            if mins < 1 { return "刚刚" }
+            if mins < 60 { return "\(mins)分钟前" }
+            return "今天 \(dayTimeFormatter.string(from: date))"
+        }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            return "昨天 \(dayTimeFormatter.string(from: date))"
+        }
+        if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
+            return monthDayFormatter.string(from: date)
+        }
+        return fullDateFormatter.string(from: date)
+    }
+}
+
 // MARK: - 模型使用量（/api/nas/providers-usage，v3.0.36）
 
 /// v3.0.36：看板「模型使用量」栏数据

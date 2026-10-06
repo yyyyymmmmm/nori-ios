@@ -16,7 +16,6 @@ struct SessionsView: View {
     @State private var isLoading = false
     @State private var errorText: String?
     @State private var scrollPos = ScrollPosition()
-    @State private var deleteError: String?
     // v2.0.36：搜索 + 置顶
     @State private var searchText = ""
     // v3.9.33：远端全史搜索——冷启动缓存只有最近 100 会话 × 每会话 50 条消息，
@@ -40,8 +39,6 @@ struct SessionsView: View {
     // v2.0.43：会话重命名
     @State private var renameTarget: ChatSession?
     @State private var renameText = ""
-    // v3.9.39：改名同步失败提示（镜像 deleteError；errorText 只在列表为空时才会渲染，承载不了）
-    @State private var renameError: String?
     // v3.9.39：列表当前是否反映**网络**拉取结果（而非冷启动缓存）。
     // 缓存每会话截断到最近 50 条，而后端 merge 是整会话覆盖——用缓存快照去改名会永久截断历史。
     @State private var sessionsFromNetwork = false
@@ -54,8 +51,6 @@ struct SessionsView: View {
     // 与「删除会话」是两件事：删除走 merge 的 deleted 键（整条会话消失），
     // 清空走 merge 的 sessions 键 + 空 messages 数组（会话仍在，标题沿用当前值）。
     @State private var confirmClear: ChatSession?
-    // 清空失败提示（沿用 renameError/deleteError 的口径：errorText 只在列表为空时才渲染，承载不了）
-    @State private var clearError: String?
     // v3.9.39：批量删除确认（镜像 confirmDelete：先确认再动数据）。条数单独存一份，
     // 不用可空值同时当弹窗驱动——那样弹窗退场时计数已被清成 nil，文案会跳成「0 个会话」
     @State private var confirmBatchDelete = false
@@ -115,17 +110,6 @@ struct SessionsView: View {
                 Spacer()
                 Button("完成") { focused = false }
             }
-        }
-        .alert("删除失败", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
-            Button("好", role: .cancel) { deleteError = nil }
-        } message: {
-            Text(deleteError ?? "")
-        }
-        // v3.9.39：改名同步失败/被拦（本地标题已回滚）
-        .alert("改名未保存", isPresented: Binding(get: { renameError != nil }, set: { if !$0 { renameError = nil } })) {
-            Button("好", role: .cancel) { renameError = nil }
-        } message: {
-            Text(renameError ?? "")
         }
         // v2.0.43：会话重命名
         .alert("重命名会话", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
@@ -305,12 +289,6 @@ struct SessionsView: View {
             // 不带条数：列表可能来自 50 条冷启动缓存（loadFromSessionCache），
             // 显示的条数与服务器真实条数不符，用户会以为只清了一部分。
             Text("将清空「\(confirmClear?.title ?? "")」的全部消息，会话与标题保留，此操作不可恢复")
-        }
-        // v4.1.x：清空失败提示（列表非空时 errorText 不渲染，失败会完全静默）
-        .alert("清空失败", isPresented: Binding(get: { clearError != nil }, set: { if !$0 { clearError = nil } })) {
-            Button("好", role: .cancel) { clearError = nil }
-        } message: {
-            Text(clearError ?? "")
         }
     }
 
@@ -958,7 +936,7 @@ struct SessionsView: View {
         // v4.0.35：固定会话（Nori投递/Nori主动）禁止归档——与 delete(_:) 同款拦截，
         // 归档后从主列表消失（rank 置顶也救不回），cron 详情壳会被埋
         if s.id == ChatStore.deliverySessionId || s.id == ChatStore.proactiveSessionId {
-            deleteError = "「\(s.title)」是固定会话，不能归档"
+            ToastCenter.shared.show("「\(s.title)」是固定会话，不能归档")
             return
         }
         selectedIds.remove(s.id)
@@ -996,7 +974,7 @@ struct SessionsView: View {
         let msgs = usingLiveChat ? chat.messages : t.messages
         guard !msgs.isEmpty else { return }
         guard usingLiveChat || sessionsFromNetwork else {
-            renameError = "会话列表还没从服务器加载到完整内容（本机缓存每会话只留最近 50 条），已暂停同步改名以免截断历史。请联网刷新列表后重新改名。"
+            ToastCenter.shared.show("会话列表还没从服务器加载到完整内容（本机缓存每会话只留最近 50 条），已暂停同步改名以免截断历史。请联网刷新列表后重新改名。")
             return
         }
         // 序列化在 Task 内做，但只往闭包里带 Sendable 值（t / msgs），字典不进捕获列表
@@ -1012,11 +990,11 @@ struct SessionsView: View {
                 ])
                 if (j["ok"] as? Bool) != true {
                     applyTitle(oldTitle, to: t.id)
-                    renameError = "改名未同步到服务器（服务器返回异常），请检查网络后重试"
+                    ToastCenter.shared.show("改名未同步到服务器（服务器返回异常），请检查网络后重试")
                 }
             } catch {
                 applyTitle(oldTitle, to: t.id)
-                renameError = "改名未同步到服务器：\(error.localizedDescription)"
+                ToastCenter.shared.show("改名未同步到服务器：\(error.localizedDescription)")
             }
         }
     }
@@ -1107,7 +1085,7 @@ struct SessionsView: View {
         guard !ids.isEmpty else {
             editing = false
             selectedIds.removeAll()
-            deleteError = "固定会话不能删除"
+            ToastCenter.shared.show("固定会话不能删除")
             return
         }
         let idsCopy = ids
@@ -1137,14 +1115,14 @@ struct SessionsView: View {
                     selectedIds = Set(idsCopy)
                     editing = true
                     // v3.9.39：原来写 errorText，而它只在 sessions 为空时才渲染（删除后列表必然非空）
-                    // → 失败完全静默。改走 deleteError，与单条删除同一口径。
-                    deleteError = "删除未同步到服务器（服务器返回异常），请检查网络后重试"
+                    // → 失败完全静默。改走 ToastCenter（item11），与单条删除同一口径。
+                    ToastCenter.shared.show("删除未同步到服务器（服务器返回异常），请检查网络后重试")
                 }
             } catch {
                 // v2.0.102：失败恢复选择与编辑态
                 selectedIds = Set(idsCopy)
                 editing = true
-                deleteError = "删除未同步到服务器：\(error.localizedDescription)"
+                ToastCenter.shared.show("删除未同步到服务器：\(error.localizedDescription)")
             }
         }
     }
@@ -1184,9 +1162,9 @@ struct SessionsView: View {
                     "deleted": [] as [Any]
                 ])
                 synced = (j["ok"] as? Bool) == true
-                if !synced { clearError = "清空未同步到服务器（服务器返回异常），请联网后重试" }
+                if !synced { ToastCenter.shared.show("清空未同步到服务器（服务器返回异常），请联网后重试") }
             } catch {
-                clearError = "清空未同步到服务器：\(error.localizedDescription)"
+                ToastCenter.shared.show("清空未同步到服务器：\(error.localizedDescription)")
             }
             guard synced else { await load(); return }
 
@@ -1210,7 +1188,7 @@ struct SessionsView: View {
         // v4.0.x：固定会话（投递壳 / Nori主动）不可删除 —— 后端 _PROTECTED_IDS 会拒绝，
         // 这里先拦在前端，不让用户点完才看到一个失败的报错。
         if s.id == ChatStore.deliverySessionId || s.id == ChatStore.proactiveSessionId {
-            deleteError = "「\(s.title)」是固定会话，不能删除"
+            ToastCenter.shared.show("「\(s.title)」是固定会话，不能删除")
             return
         }
         // v4.1.x 多会话并行：该会话若有后台流在跑 → 撤轮询 + 停服务端任务（不往已删会话写库）
@@ -1241,11 +1219,11 @@ struct SessionsView: View {
                         }
                     }
                 } else {
-                    deleteError = "删除未同步到服务器（服务器返回异常），请检查网络后重试"
+                    ToastCenter.shared.show("删除未同步到服务器（服务器返回异常），请检查网络后重试")
                     await load()
                 }
             } catch {
-                deleteError = "删除未同步到服务器：\(error.localizedDescription)"
+                ToastCenter.shared.show("删除未同步到服务器：\(error.localizedDescription)")
                 await load()
             }
         }
@@ -1413,8 +1391,8 @@ struct SessionRow: View {
                         Text(hint)
                             .font(.system(size: Typography.tiny))
                             .foregroundStyle(Color.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, Spacing.sm)
+                            .padding(.vertical, Spacing.xxs)
                             .background(Color.secondary.opacity(Tint.soft), in: Capsule())
                             .lineLimit(1)
                     }
@@ -1423,8 +1401,8 @@ struct SessionRow: View {
                         Text(cat)
                             .font(.system(size: Typography.tiny))
                             .foregroundStyle(Color.accentColor)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, Spacing.sm)
+                            .padding(.vertical, Spacing.xxs)
                             .background(Color.accentColor.opacity(Tint.soft), in: Capsule())
                             .lineLimit(1)
                     }
@@ -1445,9 +1423,9 @@ struct SessionRow: View {
                 // v3.9.85：实心红色数字角标（原 v3.9.32 红点）——对标微信：≥100 显示 99+
                 if unread > 0 && !showCheck {
                     Text(unread >= 100 ? "99+" : "\(unread)")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: Typography.caption, weight: .semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
+                        .padding(.horizontal, Spacing.xs)
                         .frame(minWidth: 17, minHeight: 17)
                         .background(Capsule().fill(Color.red))
                         .accessibilityLabel("\(unread) 条未读消息")
@@ -1501,6 +1479,14 @@ struct SessionRow: View {
         .contentShape(Rectangle())
         // 用 tap 手势而非 Button 包裹（Button 会与 swipeActions 滑动手势冲突，导致滑动删除失效）
         .onTapGesture { action() }
+        // item4：VoiceOver 行标签（标题 + 相对时间）；只加 label，不改布局
+        .accessibilityLabel(a11yLabel)
+    }
+
+    /// item4：会话行 VoiceOver 标签（标题 + 相对时间）
+    private var a11yLabel: String {
+        let t = session.title.isEmpty ? "新对话" : session.title
+        return session.relativeTime.isEmpty ? t : "\(t)，\(session.relativeTime)"
     }
 }
 

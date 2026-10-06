@@ -91,12 +91,12 @@ struct DockTabView: View {
                 guard abs(t.width) > 60, abs(t.width) > abs(t.height) * 1.5 else { return }
                 if t.width > 0 {
                     guard !sidebarOpen, value.startLocation.x < 24 else { return }
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    withAnimation(Motion.settle) {
                         sidebarOpen = true
                     }
                 } else {
                     guard sidebarOpen else { return }
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    withAnimation(Motion.settle) {
                         sidebarOpen = false
                     }
                 }
@@ -172,12 +172,19 @@ struct DockTabView: View {
         }
         // 灰度重做 2026-10-06 晚：全局侧滑开关侧边栏（用户硬性要求：各个页面都要能侧滑打开/收起）。
         .gesture(sidebarEdgeSwipe)
+        // item9：微信式顶部离线条（safeAreaInset 把安全区往下推，不盖住各页顶部 Nori 胶囊）
+        .safeAreaInset(edge: .top, spacing: 0) { OfflineBanner() }
+        // item11：Toast 层（全 App 挂一次，供 ToastCenter.shared.show 调用）
+        .toastHost()
         // 设置页唯一入口（侧边栏齿轮）
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
                 SettingsView()
                     .toolbar(.hidden, for: .navigationBar)
             }
+            // item8 sheet 规范：整页内容用 .large，可见拖拽指示器，可下滑关闭
+            .presentationDetents([.large()])
+            .presentationDragIndicator(.visible)
         }
         // 会话搜索
         .sheet(isPresented: $showSessionSearch) {
@@ -185,10 +192,13 @@ struct DockTabView: View {
                 SessionsView()
                     .toolbar(.hidden, for: .navigationBar)
             }
+            // item8 sheet 规范：整页列表用 .large，可见拖拽指示器，可下滑关闭
+            .presentationDetents([.large()])
+            .presentationDragIndicator(.visible)
         }
         // 灰度重做 2026-10-06 晚：侧边栏开关（聊天页顶栏按钮发通知）
         .onReceive(NotificationCenter.default.publisher(for: .qingliaoToggleSidebar)) { _ in
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+            withAnimation(Motion.settle) {
                 sidebarOpen.toggle()
             }
         }
@@ -860,6 +870,8 @@ private extension DockTabView {
             // 之后「AI 速记 / 今日待办」再也弹不出来（MemoSection v3.9.17 / TodoSection 同款坑，本仓踩过）。
             .sheet(item: $quickCapture, onDismiss: { quickCapture = nil }) { mode in
                 QuickCaptureSheet(mode: mode)
+                    // item8 sheet 规范：detent 在 QuickCaptureSheet 内已声明 [.medium, .large]，这里补可见指示器
+                    .presentationDragIndicator(.visible)
             }
             // v3.9.82：译文弹窗（形态照上一张速记弹窗抄）。
             // ⚠️ 同一宿主上链式并存两个 .sheet —— 仓里的坑是「两个同时为真只有一个生效」；
@@ -876,6 +888,8 @@ private extension DockTabView {
                                    identifyStartTranslate = true
                                    showIdentify = true
                                })
+                    // item8 sheet 规范：detent 在 TranslateSheet 内已声明 [.medium, .large]，这里补可见指示器
+                    .presentationDragIndicator(.visible)
             }
             // v3.0.60 回顾：系统 tab bar 自行处理滚动边缘玻璃；此处不再加纯色背景掐死折射
             // v3.4.26：切页暂停/恢复看板轮询已改参数直传（DashboardView(isActive:)），通知已移除

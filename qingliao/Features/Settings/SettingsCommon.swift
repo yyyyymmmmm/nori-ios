@@ -542,6 +542,7 @@ struct TasksView: View {
                                         .foregroundStyle(t.enabled ? Color.orange : Color.green)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel(t.enabled ? "暂停任务" : "启用任务")
                                 // 立即运行
                                 Button {
                                     runTask(t)
@@ -551,6 +552,7 @@ struct TasksView: View {
                                         .foregroundStyle(Color.accentColor)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("立即运行")
                             }
                             .padding(.horizontal, Spacing.xxl)
                             .padding(.vertical, Spacing.lg)
@@ -716,6 +718,7 @@ struct LogsView: View {
                         Image(systemName: "doc.on.doc")
                             .foregroundStyle(Color.accentColor)
                     }
+                    .accessibilityLabel("复制日志")
                     Button {
                         exportText = logs.joined(separator: "\n")
                         showExporter = true
@@ -723,6 +726,7 @@ struct LogsView: View {
                         Image(systemName: "square.and.arrow.up")
                             .foregroundStyle(Color.accentColor)
                     }
+                    .accessibilityLabel("导出日志")
                     // v3.9.35：刷新改回系统裸按钮——与「完成」同款系统玻璃胶囊
                     Button("刷新") { Task { await load() } }
                 }
