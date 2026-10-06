@@ -7,6 +7,7 @@ import SwiftUI
 
 struct HealthBoardView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showAllData = false
     @State private var steps: Int?
     @State private var stepsHistory: [Double] = []
@@ -61,15 +62,34 @@ struct HealthBoardView: View {
     }
 
     private var healthGradient: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.90, green: 0.94, blue: 0.98),
-                Color(red: 0.96, green: 0.96, blue: 0.97),
-                Color(red: 0.985, green: 0.975, blue: 0.96)
-            ],
-            startPoint: .top, endPoint: .bottom
-        )
+        // 2026-10-07：深色适配
+        Group {
+            if colorScheme == .dark {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.08, green: 0.09, blue: 0.12),
+                        Color(red: 0.10, green: 0.11, blue: 0.14),
+                        Color(red: 0.12, green: 0.12, blue: 0.14)
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.90, green: 0.94, blue: 0.98),
+                        Color(red: 0.96, green: 0.96, blue: 0.97),
+                        Color(red: 0.985, green: 0.975, blue: 0.96)
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+            }
+        }
         .ignoresSafeArea()
+    }
+
+    // 2026-10-07：卡片背景深色适配
+    private var cardBackground: Color {
+        colorScheme == .dark ? Color(white: 0.14) : Color.white
     }
 
     // MARK: 2x2 指标卡
@@ -138,7 +158,7 @@ struct HealthBoardView: View {
             }
         }
         .padding(16)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 24))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 24))
         .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 3)
     }
 
@@ -202,7 +222,7 @@ struct HealthBoardView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 24))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 24))
         .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 3)
     }
 

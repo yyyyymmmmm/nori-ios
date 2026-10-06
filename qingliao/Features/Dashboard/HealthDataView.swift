@@ -7,6 +7,12 @@ import SwiftUI
 
 struct HealthDataView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+
+    // 2026-10-07：卡片背景深色适配
+    private var cardBackground: Color {
+        colorScheme == .dark ? Color(white: 0.14) : Color.white
+    }
 
     private enum Segment: String, CaseIterable {
         case sleep = "睡眠"
@@ -62,14 +68,28 @@ struct HealthDataView: View {
     }
 
     private var healthDataGradient: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.90, green: 0.94, blue: 0.98),
-                Color(red: 0.96, green: 0.96, blue: 0.97),
-                Color(red: 0.985, green: 0.975, blue: 0.96)
-            ],
-            startPoint: .top, endPoint: .bottom
-        )
+        // 2026-10-07：深色适配
+        Group {
+            if colorScheme == .dark {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.08, green: 0.09, blue: 0.12),
+                        Color(red: 0.10, green: 0.11, blue: 0.14),
+                        Color(red: 0.12, green: 0.12, blue: 0.14)
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.90, green: 0.94, blue: 0.98),
+                        Color(red: 0.96, green: 0.96, blue: 0.97),
+                        Color(red: 0.985, green: 0.975, blue: 0.96)
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+            }
+        }
         .ignoresSafeArea()
     }
 
@@ -86,7 +106,8 @@ struct HealthDataView: View {
                         .padding(.vertical, 10)
                         .background(
                             segment == s
-                                ? Color.white
+                                // 2026-10-07：深色下选中背景用深灰，否则白字白底看不见
+                                ? (colorScheme == .dark ? Color(white: 0.25) : Color.white)
                                 : Color.secondary.opacity(0.25),
                             in: Capsule()
                         )
@@ -144,7 +165,7 @@ struct HealthDataView: View {
             }
         }
         .padding(20)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 28))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 28))
         .shadow(color: .black.opacity(0.05), radius: 12, x: 0, y: 4)
     }
 
