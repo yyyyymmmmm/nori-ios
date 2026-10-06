@@ -96,7 +96,7 @@ struct FeedTabView: View {
                     }
                 }
                 .padding(.horizontal, Spacing.section)
-                .padding(.bottom, 100)   // 给悬浮 tab bar 留空
+                .padding(.bottom, 100)   // F线：系统 tab bar 下内容不被遮（原来按悬浮胶囊留的）
             }
             .toolbar(.hidden, for: .navigationBar)
             .task { await store.load() }
@@ -123,23 +123,8 @@ struct FeedTabView: View {
 
             Spacer()
 
-            HStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.18))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
-                }
-                Text("轻聊")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.primary)
-            }
-            .padding(.leading, 6)
-            .padding(.trailing, 14)
-            .padding(.vertical, 6)
-            .a11yGlass(.regular, in: Capsule(), stroke: Color.primary.opacity(0.08))
+            // F线：Muse 式 AI 形象胶囊（五页统一），点进任务中心
+            AITopCapsule()
 
             Spacer()
 

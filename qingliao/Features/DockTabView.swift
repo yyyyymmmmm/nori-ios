@@ -135,8 +135,8 @@ struct DockTabView: View {
                     .tag(DockTab.dashboard)
                     .tabTransition(for: .dashboard, selected: $selected)
             }
-            // 灰度重做：藏系统 tab bar，用自绘悬浮灰胶囊（GrayCapsuleTabBar）
-            .toolbar(.hidden, for: .tabBar)
+            // F线 2026-10-06：不再藏系统 tab bar（iOS 26 藏不干净导致双底栏，用户拍板直接用系统）。
+            // 选中态灰色见 applyDockTabChrome1 的 configureGrayTabBarAppearance。
             // v4.0.49x：启动链折叠（防 demangler 栈溢出）——原 24 条顶层修饰器按序折进 4 个具名分组，
             // body 这里只留 4 个 .modifier(…) 泛型调用。事故/手法同 ChatView.v4.0.49：
             // 巨型链把 body 编译后类型名撑到 2574 字符（全 App 最长），Swift 运行时按嵌套层数递归
@@ -147,15 +147,6 @@ struct DockTabView: View {
             .modifier(DockTabChrome2(host: self))
             .modifier(DockTabChrome3(host: self))
             .modifier(DockTabChrome4(host: self))
-
-            // 灰度重做 2026-10-06：悬浮胶囊 tab bar（对标 TodayAI 参考）。
-            // 系统 tab bar 已藏（见上方 .toolbar），这里自绘 5 tab 胶囊。
-            // 用 VStack+Spacer 贴底，不挡内容触摸（旧版"点不动"教训）。
-            VStack {
-                Spacer()
-                GrayCapsuleTabBar(selected: $selected)
-                    .padding(.bottom, GrayCapsuleTabBar.bottomGap)
-            }
 
             // 灰度重做 2026-10-06 晚：Muse 风格侧边栏抽屉（用户硬性要求 2）。
             // 盖在最上层；打开方式由聊天页顶栏按钮触发（见 ChatView）。
@@ -217,16 +208,11 @@ struct DockTabView: View {
 
     /// 聊天槽位（两态：iPad 宽屏双栏 / iPhone 单栏）：
     ///   · iPad 宽屏：会话 + 聊天双栏，系统 message 图标
-    ///   · iPhone：item 置空、无文字（系统 tab bar 已藏，用自绘灰胶囊 tab bar，槽位 item 不可见）
+    ///   · iPhone：单栏，系统 tab bar 直接显示
     ///
-    /// 聊天页要 tab bar **不铺那层液态玻璃**这件事，两条路都真机判过无效，**到此为止**：
-    ///   · 方案 A（v3.9.46，SwiftUI `.toolbarBackground(.hidden, for: .tabBar)`）——iOS 26 只褪了
-    ///     背景色、玻璃层照旧。
-    ///   · 方案 B（v3.9.47，UIKit：把真实 `UITabBar` 的 standard/scrollEdgeAppearance 换成
-    ///     `configureWithTransparentBackground()` 副本）——同样没褪掉，v3.9.48 用户判「回滚」，
-    ///     `TabBarGlass.swift` 探针已整块删除。
-    /// 第三条路也不要试（不再有公开出口的判断），更**不许**退回在 TabView 下层铺不透明色——
-    /// 那会掐死所有页的滚动边缘折射（v3.4.29 红线）。
+    /// F线 2026-10-06：不再藏系统 tab bar（`.toolbar(.hidden)` 在 iOS 26 藏不干净 → 双底栏，
+    /// 用户拍板直接用系统）。选中态改灰色见 configureGrayTabBarAppearance。
+    /// 仍不许退回在 TabView 下层铺不透明色——那会掐死所有页的滚动边缘折射（v3.4.29 红线）。
     @ViewBuilder
     private var chatTab: some View {
         if hSize == .regular {
@@ -242,8 +228,8 @@ struct DockTabView: View {
         } else {
             ChatView()
                 .tag(DockTab.chat)
-                // 槽位视觉为空（系统 tab bar 已藏）→ 补无障碍标签，VoiceOver 仍读得出「聊天」
-                .tabItem { Text("").accessibilityLabel("聊天") }
+                // F线：系统 tab bar 直接显示，对话格给真正的 label（原来置空是配合藏 tab bar）
+                .tabItem { Label(DockTab.chat.title, systemImage: DockTab.chat.icon) }
         }
     }
 
@@ -746,8 +732,9 @@ private extension DockTabView {
             // v3.4.30：装机实测后按用户要求关闭自动收缩——tab bar 常驻不缩，滚动时不再变窄
             // （v3.4.29 曾设为 .onScrollDown：向下滚动缩到角落只剩图标，用户不需要）
             .tabBarMinimizeBehavior(.never)
-            // v3.9.47 方案 B（UIKit 侧改 UITabBar 外观）真机实测同样无效，已整块回退——
-            // 这里**不要再挂任何东西**，理由见下方 chatTab 的注释与 README「iOS 26 系统玻璃的三条口径」。
+            // F线 2026-10-06：系统 tab bar 选中态改灰色（灰度纪律：不准蓝色）。
+            // v3.9.47 判无效的是「改透明」，改选中色是常规外观定制，真机有效。
+            .onAppear { Self.configureGrayTabBarAppearance() }
             // v3.4.29：切 tab 触感——挂在一处（TabView），别挂进每个 tab 的 modifier（会响 4 次）
             .onChange(of: selected) { _, _ in
                 Haptics.tap()
@@ -763,6 +750,26 @@ private extension DockTabView {
             .overlay {
                 if showOrbMenu { orbMenuOverlay }
             }
+    }
+
+    /// F线 2026-10-06：系统 tab bar 选中态灰色（`label` 主灰 / 未选中次级灰），不准蓝色。
+    /// 三种 layoutAppearance 全配（iOS 26 横竖屏/紧凑模式走不同的 layout）。
+    /// 只改颜色，不动背景/玻璃（v3.9.47 透明化判无效的前车之鉴）。
+    private static func configureGrayTabBarAppearance() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()
+        let selected = UIColor.label
+        let normal = UIColor.secondaryLabel
+        for layout in [appearance.stackedLayoutAppearance,
+                       appearance.inlineLayoutAppearance,
+                       appearance.compactInlineLayoutAppearance] {
+            layout.selected.iconColor = selected
+            layout.selected.titleTextAttributes = [.foregroundColor: selected]
+            layout.normal.iconColor = normal
+            layout.normal.titleTextAttributes = [.foregroundColor: normal]
+        }
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
 
     /// 折叠第 2 组（6 条）：菜单/识别浮层的动画 + 宠物菜单修饰符 + 识别浮层 + 语音对话/会话纪要两个全屏页。

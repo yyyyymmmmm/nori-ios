@@ -233,75 +233,6 @@ struct ChatView: View {
             && !isRetryableStreamError(stream.errorMessage)
     }
 
-    // MARK: - v4.1.0 D路：对话页顶部 AI 状态条（对标 Muse 头像+名字胶囊）
-    /// 后台任务名（任务中心同一数据源 `/api/agent/tasks/active`，20s 轮询；未登录/无任务 = nil）
-    @State private var stripTaskTitle: String? = nil
-
-    /// 状态条：左 PetAvatar（44pt，用户已选样式）+ 中"轻聊"胶囊/状态文字 + 右 chevron；
-    /// 点整条 → 任务中心（与侧边栏同一入口，一个功能一个入口）。有消息时也显示，不只欢迎页。
-    private var aiStatusStrip: some View {
-        Button {
-            NotificationCenter.default.post(name: .qingliaoOpenTaskCenter, object: nil)
-        } label: {
-            HStack(spacing: 10) {
-                // 52pt 槽位给走动位移留余量（±0.145×44≈±6pt）；形象本身按 44pt 直接画
-                // （PetAvatar 有警告：不许 96 画 + 小 frame 显示，会溢出压住别的元素）
-                PetAvatar(size: 44, state: aiStripPetState, patTrigger: 0)
-                    .frame(width: 52, height: 52)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("轻聊")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 3)
-                        .background(Color.secondary.opacity(0.12), in: Capsule())
-                    Text(aiStripStatusText)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("AI 状态，打开任务中心")
-        .task { await refreshStripTaskLoop() }
-    }
-
-    /// 状态文字：离线/失败 > 思考中 > 后台任务 > 在线
-    private var aiStripStatusText: String {
-        if serverOnline == false || generationFailed { return "连接异常" }
-        if aiBusy { return "正在思考…" }
-        if let t = stripTaskTitle, !t.isEmpty { return "正在执行：" + t }
-        return "在线"
-    }
-
-    /// 状态条宠物的态：复用 PetAvatar 的 thinking 动画；任务执行中也用 thinking 态
-    private var aiStripPetState: PetState {
-        if serverOnline == false || generationFailed { return .alert }
-        if aiBusy || stripTaskTitle != nil { return .thinking }
-        return .idle
-    }
-
-    /// 后台任务轮询（条在树上就跑，ChatView 卸载即取消；一次轻量 GET / 20s）
-    private func refreshStripTaskLoop() async {
-        while !Task.isCancelled {
-            if auth.isLoggedIn {
-                let tasks = await auth.fetchActiveTasks()
-                let title = tasks.filter { $0.status == "running" }
-                    .sorted { $0.createdAt > $1.createdAt }.first?.title
-                await MainActor.run { stripTaskTitle = title }
-            } else {
-                await MainActor.run { stripTaskTitle = nil }
-            }
-            try? await Task.sleep(for: .seconds(20))
-        }
-    }
     private var visibleMessageCount: Int { min(chat.messages.count, displayLimit) }
     /// 可见窗口起始绝对索引（用于日期分隔线的 prevTs 取真实前一条）
     private var visibleStartIndex: Int { chat.messages.count - visibleMessageCount }
@@ -511,14 +442,6 @@ struct ChatView: View {
             }
         }
     }
-    /// 头部状态文案/颜色（独立计算属性，避免 body 内嵌套三元）
-    private var headerSubtitle: String {
-        serverOnline == nil ? "检测中" : (serverOnline == true ? "在线" : "离线")
-    }
-    private var headerColor: Color {
-        serverOnline == true ? .green : (serverOnline == false ? .red : .gray)
-    }
-
     /// v3.3.0：header 右侧 trailing 组件抽离（PageHeader 的 AnyView(HStack{...}) 内联在 body
     /// 里过复杂，Xcode 26 type-check 超时——469-472行报 "unable to type-check in reasonable time"）。
     /// 抽成独立计算属性给 type-checker 更小的表达式单元。
@@ -1013,7 +936,6 @@ struct ChatView: View {
             // 只保留手动控制，输入框精确贴键盘。
             VStack(spacing: 0) {
                 chatHeaderBar
-                aiStatusStrip
                 chatStatusBannerStrip
                 chatTranscriptArea
                 // 🚨 v3.9.71 修复（用户截图报「输入法会遮住输入框」）：空态（欢迎页）在键盘弹起时把输入栏挤没了。
@@ -1513,19 +1435,18 @@ struct ChatView: View {
         !aiBusy && generationFailed
     }
 
-    /// 页头 + 思考档位/聊天操作弹窗 + 任务中心全屏页
+    /// 页头 + 思考档位弹窗 + 任务中心全屏页
+    /// F线 2026-10-06：Muse 式顶栏 —— 左侧边栏（line.3.horizontal）/ 中 AITopCapsule / 右搜索；
+    /// 更多（...）按钮已删（用户要求只留搜索）；离线状态由胶囊状态小字统一显示。
     @ViewBuilder
     private var chatHeaderBar: some View {
-        // 灰度重做 2026-10-06 晚：顶栏精简（用户硬性要求）。
-        // 干掉：大标题「聊天」/ 红色离线点 / 药丸按钮组 / 中央宠物。
-        // 保留：侧边栏按钮（左）/ 搜索 + 更多（右，悬浮圆形）；离线弱化为小字（不断连逻辑不变）。
         HStack(spacing: 12) {
             Button {
                 Haptics.tap()
                 NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
             } label: {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 18))
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 20))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
                     .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
@@ -1535,12 +1456,7 @@ struct ChatView: View {
 
             Spacer()
 
-            // 离线弱化：不断连逻辑保留，只显示灰色小字（原红色圆点已干掉）
-            if !isOnlineForHeader {
-                Text("离线")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-            }
+            AITopCapsule()
 
             Spacer()
 
@@ -1557,19 +1473,6 @@ struct ChatView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("搜索")
-
-            Button {
-                Haptics.tap()
-                showMoreMenu = true
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.primary)
-                    .frame(width: 44, height: 44)
-                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("更多")
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -1595,11 +1498,6 @@ struct ChatView: View {
         .onReceive(NotificationCenter.default.publisher(for: .qingliaoOpenTaskCenter)) { _ in
             showTaskCenter = true
         }
-    }
-
-    /// 顶栏离线判据（弱化显示用）：沿用原 headerColor 的在线逻辑，取反即离线
-    private var isOnlineForHeader: Bool {
-        headerColor == .green
     }
 
     /// 已送达提示 + 剪贴板地图提示条
@@ -1761,10 +1659,9 @@ struct ChatView: View {
         // v3.9.68：用户原话「发送键上下到输入框都等高，所以底部要再往上收一点」——底部呼吸
         // 由 Spacing.lg(10) 收到 **Spacing.xs(4)**（收起贴 dock / 弹键盘都收紧 6pt）。
         // ⚠️ 只动这一个数：输入栏自身高度（v3.9.67 起 50）、水平 padding 都不动。
-        // 灰度重做 2026-10-06 晚：悬浮灰胶囊 tab bar 会盖住输入框（真机截图）→ 键盘收起时底部
-        // 再垫一个 tab bar 位，让输入框坐在 tab bar 上方（从下往上：tab bar、输入框、内容）；
-        // 键盘弹起时不垫 —— 键盘盖住 tab bar，输入框仍精确贴键盘（v2.0.140 红线，不动显隐逻辑）。
-        .padding(.bottom, Spacing.xs + (kb.isVisible ? 0 : GrayCapsuleTabBar.bodyHeight + GrayCapsuleTabBar.bottomGap + safeAreaBottom))
+        // F线 2026-10-06：悬浮胶囊已删，改回系统 tab bar。输入框底部只留呼吸，
+        // 键盘避让交还系统安全区（v3.0.64 口径）；原来按胶囊高度算的那套数学已删。
+        .padding(.bottom, Spacing.xs)
         // 🚨 v3.9.72（审查修正）：`layoutPriority(1)` 只挂**输入栏这一层**，不挂整个 chatComposerArea。
         // 整组里还有选图条/动作条/附件面板/引用条/上下文条（各自定高，合计 ≈380pt）：把整组抬到最高
         // 优先 = 键盘与动作条同开时输入栏本身仍会被顶出可见区，且空态欢迎页（非 ScrollView）被压到
