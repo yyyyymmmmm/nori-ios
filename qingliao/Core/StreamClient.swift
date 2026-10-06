@@ -609,6 +609,10 @@ final class StreamClient {
         phase = .normal   // v3.9.58：收尾复位健康度（重试/等网相位只在流存活期间有意义）
         errorMessage = error
         lastFailed = !success && !userInitiated   // v3.9.33：真失败才置位
+        if lastFailed {
+            // 2026-10-07：流真失败 → 胶囊立刻重测连接（不等 20s 轮询；是不是真断网由检测说了算）
+            NotificationCenter.default.post(name: .qingliaoStreamFailed, object: nil)
+        }
         lastFinishFailed = lastFailed
         finishSeq += 1   // v3.9.33：收尾快照序号（dock 据此观察收尾，别观察 isStreaming）
         stopPolling()
