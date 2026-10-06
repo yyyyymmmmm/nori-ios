@@ -101,9 +101,9 @@ struct SettingsView: View {
     @State var showDiagnostics = false
     // K 线 2026-10-06：本地模型整套删除（Hermes 是唯一后端，端侧模型是第二套模型体系）。
     // J 线 2026-10-06：能力示例（卡片画廊）整行删掉；微信推送开关删掉。
-    // v3.0.81：上下文管理（v4.0.x：默认值与真源 ContextTuning.defaultThreshold 同源，勿再写字面量）
-    @AppStorage("qingliao_context_auto_compress") var contextAutoCompress = false
-    @AppStorage("qingliao_context_threshold") var contextThreshold = ContextTuning.defaultThreshold
+    // v3.0.81：上下文管理（v4.4.x：迁后端 /api/agent/settings，换设备一致）
+    @State var contextAutoCompress = false
+    @State var contextThreshold = ContextTuning.defaultThreshold
     // v3.9.56：TypeSafe 智能路由（设置页开关 + 就地展开）。后端是唯一真源，所以用 @State 影子状态
     // 而不是 @AppStorage —— 本地也存一份的话，换设备/运维改了后端配置，UI 就会显示假状态。
     @State var tsRouting = TypesafeRouting.fallback
@@ -235,6 +235,18 @@ struct SettingsView: View {
         .background(settingsCold6())
         .background(settingsCold7())
         .background(settingsCold8())
+        // v4.4.x：从后端加载通用设置（上下文压缩等）
+        .task {
+            if let j = try? await auth.json("/api/agent/settings", method: "GET"),
+               let s = j["settings"] as? [String: Any] {
+                if let v = s["context_auto_compress"] as? Bool {
+                    contextAutoCompress = v
+                }
+                if let v = s["context_threshold"] as? Int {
+                    contextThreshold = v
+                }
+            }
+        }
     }
 
     /// 灰度重做 2026-10-06 晚：设置页返回（sheet 场景 dismiss；导航栈场景靠系统返回）
@@ -808,7 +820,11 @@ extension SettingsView {
                         }
                     }
                     .onChange(of: contextAutoCompress) { _, new in
-                        UserDefaults.standard.set(new, forKey: "qingliao_context_auto_compress")
+                        // v4.4.x：存后端
+                        Task {
+                            _ = try? await auth.json("/api/agent/settings", method: "POST",
+                                                     body: ["context_auto_compress": new])
+                        }
                     }
                 }
                 if contextAutoCompress {
