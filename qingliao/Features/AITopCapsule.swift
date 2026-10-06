@@ -79,7 +79,7 @@ struct AITopCapsule: View {
             // （之前 ZStack bottom 对齐把名字压在头像下半截，真机截图实锤重叠）
             VStack(spacing: 4) {
                 ROTAvatarView(state: avatarState, size: 56)
-                Text("ROT")
+                Text("Nori")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
