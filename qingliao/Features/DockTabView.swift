@@ -139,6 +139,10 @@ struct DockTabView: View {
             // 2026-10-07：选中态原生 tint 保底（.primary 纯黑/纯白，不准蓝色）；未选中态走
             // configureGrayTabBarAppearance（App init 最早时机）+ tabItem 显式前景色。
             .tint(.primary)
+            // 2026-10-07 真机两轮未生效：iOS 26 下 SwiftUI TabView 不吃 UITabBar.appearance()
+            // 代理（未选中 tetap 黑）。改实例级硬设：onAppear 后遍历 window 找到 UITabBar
+            // 实例，直接写 unselectedItemTintColor——实例属性优先级高于代理，必生效。
+            .onAppear { DockTabView.enforceTabBarItemColors() }
             // v4.0.49x：启动链折叠（防 demangler 栈溢出）——原 24 条顶层修饰器按序折进 4 个具名分组，
             // body 这里只留 4 个 .modifier(…) 泛型调用。事故/手法同 ChatView.v4.0.49：
             // 巨型链把 body 编译后类型名撑到 2574 字符（全 App 最长），Swift 运行时按嵌套层数递归
@@ -792,8 +796,7 @@ private extension DockTabView {
     /// 调用时机晚于 tab bar 创建，appearance 代理没吃上。改：App init 最早时机只执行一次
     ///（见 QingliaoApp.init），并补 tintColor/unselectedItemTintColor 双保险。
     /// 注意：所在 extension 是 private，必须显式标 internal，否则 App 入口调不到。
-    internal static func configureGrayTabBarAppearance() {
-        let appearance = UITabBarAppearance()
+    internal static func configureGrayTabBarAppearance() {        let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
         let selected = UIColor.label
         let normal = UIColor.tertiaryLabel
@@ -811,6 +814,30 @@ private extension DockTabView {
         proxy.scrollEdgeAppearance = appearance
         proxy.tintColor = selected               // 选中态双保险（SwiftUI .tint 同口径）
         proxy.unselectedItemTintColor = normal   // 未选中态双保险
+    }
+
+    /// 2026-10-07：实例级硬设（见 TabView.onAppear 调用点）。appearance 代理在 iOS 26
+    /// SwiftUI 下两轮未生效，直接对 UITabBar 实例写色。async 到下一 runloop，确保
+    /// tab bar 已创建。
+    internal static func enforceTabBarItemColors() {
+        DispatchQueue.main.async {
+            for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+                for window in scene.windows {
+                    if let bar = findTabBar(in: window) {
+                        bar.tintColor = .label
+                        bar.unselectedItemTintColor = .tertiaryLabel
+                    }
+                }
+            }
+        }
+    }
+
+    private static func findTabBar(in view: UIView) -> UITabBar? {
+        if let bar = view as? UITabBar { return bar }
+        for sub in view.subviews {
+            if let found = findTabBar(in: sub) { return found }
+        }
+        return nil
     }
 
     /// 折叠第 2 组（6 条）：菜单/识别浮层的动画 + 宠物菜单修饰符 + 识别浮层 + 语音对话/会话纪要两个全屏页。

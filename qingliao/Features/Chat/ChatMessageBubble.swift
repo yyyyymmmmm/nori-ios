@@ -528,13 +528,13 @@ struct MessageBubble: View {
                 .contextMenu { cardMenu }
         } else {
             // v2.0.125：UITextView 渲染 —— 长按弹菜单（复制/引用/分享/大爆炸/选择文本/撤回/删除）
-            // 2026-10-07：用户泡改深色（暖黑 #2C2C2E），文字同步改白字（深色泡必须白字，对比度保底）
+            // 2026-10-07 回滚：用户泡回到浅蓝，文字同步回深色字（截图款）
             SelectableTextLabel(
                 attributedText: NSAttributedString(string: message.content, attributes: [
                     .font: UIFont.systemFont(ofSize: CGFloat(fontSize)),
-                    .foregroundColor: UIColor.white
+                    .foregroundColor: UIColor.label
                 ]),
-                fallbackColor: .white,
+                fallbackColor: .label,
                 lineSpacing: LineSpacing.compact,
                 onCopy: { UIPasteboard.general.string = message.content; Haptics.success() },   // v3.9.30：复制触感
                 onQuote: onQuote,

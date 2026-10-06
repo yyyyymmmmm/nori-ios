@@ -147,6 +147,22 @@ struct SettingsSubpageView<Content: View>: View {
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .toolbar(.hidden, for: .navigationBar)
+        // 2026-10-07 真机反馈：自定义返回头干掉了系统侧滑返回。补左边缘右滑手势
+        //（28pt 透明条，不挡纵向滚动；右滑 >70pt 且纵向 <50pt 触发返回）。
+        .overlay(alignment: .leading) {
+            Color.clear
+                .frame(width: 28)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 20)
+                        .onEnded { v in
+                            if v.translation.width > 70 && abs(v.translation.height) < 50 {
+                                Haptics.tap()
+                                dismiss()
+                            }
+                        }
+                )
+        }
     }
 }
 

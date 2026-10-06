@@ -1610,8 +1610,6 @@ struct ChatView: View {
     @ViewBuilder
     private var chatTranscriptArea: some View {
         messageList
-            // 2026-10-07：浅色暖灰压深半档（#F2F1EE），让 AI 白泡浮出来；深色保持系统背景
-            .background(BubbleTheme.chatBackground(scheme: colorScheme))
             // v4.0.64（用户 2026-10-05 真机复测第 2 条「聊天页的滚边玻璃也取消」）：
             // iOS 26 起 ScrollView / List 会自动带「滚动边缘效果」（内容滚到边缘被**模糊 + 变暗**，
             // 见 Apple `scrollEdgeEffectHidden(_:for:)` 文档原文 "content to be blurred and dimmed
