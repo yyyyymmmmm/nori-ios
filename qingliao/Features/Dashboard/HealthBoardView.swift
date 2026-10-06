@@ -106,8 +106,8 @@ struct HealthBoardView: View {
     }
 
     private func normalized(_ vals: [Double]) -> [Double] {
-        guard let max = vals.max(), max > 0 else { return vals.map { _ in 0.1 } }
-        return vals.map { max(0.08, $0 / max) }
+        guard let maxVal = vals.max(), maxVal > 0 else { return vals.map { _ in 0.1 } }
+        return vals.map { Swift.max(0.08, $0 / maxVal) }
     }
 
     private func metricCard(icon: String, iconColor: Color, title: String,

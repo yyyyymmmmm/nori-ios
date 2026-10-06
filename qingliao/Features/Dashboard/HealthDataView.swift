@@ -211,10 +211,10 @@ struct HealthDataView: View {
     }
 
     private func normalized(_ vals: [Double]) -> [Double] {
-        guard !vals.isEmpty, let max = vals.max(), max > 0 else {
+        guard !vals.isEmpty, let maxVal = vals.max(), maxVal > 0 else {
             return [0.3, 0.55, 0.7, 0.5, 0.4, 0.12, 0.08]
         }
-        return vals.map { max(0.08, $0 / max) }
+        return vals.map { Swift.max(0.08, $0 / maxVal) }
     }
 
     private func loadSleep() async {
