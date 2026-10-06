@@ -6,6 +6,7 @@ import SwiftUI
 
 struct ReadAloudSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AuthStore.self) private var auth
 
     @State private var ttsOn = CloudConfig.ttsEnabled
     @State private var ttsProvider = CloudConfig.ttsProvider
@@ -29,7 +30,7 @@ struct ReadAloudSheet: View {
     private func refreshTTSKeyStatus() async {
         ttsKeyMessage = ""
         do {
-            let (data, _) = try await AuthStore.shared.request(
+            let (data, _) = try await auth.request(
                 "/api/tts/key?provider=\(ttsProvider)", method: "GET")
             if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let ok = obj["ok"] as? Bool, ok {
@@ -47,7 +48,7 @@ struct ReadAloudSheet: View {
         ttsKeySaving = true
         ttsKeyMessage = ""
         do {
-            let (data, _) = try await AuthStore.shared.request(
+            let (data, _) = try await auth.request(
                 "/api/tts/key", method: "POST",
                 body: ["provider": ttsProvider, "api_key": key])
             if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
