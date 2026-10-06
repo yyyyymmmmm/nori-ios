@@ -63,6 +63,8 @@ final class ToastCenter {
 private struct ToastHostModifier: ViewModifier {
     // 口径同 AITopCapsule（`@State` 持有 `@Observable @MainActor` 单例）：读 current 即订阅刷新。
     @State private var center = ToastCenter.shared
+    // v4.4：读键盘高度——键盘弹起时 Toast 跟键盘上抬，否则会被键盘盖住
+    @Environment(KeyboardObserver.self) private var kb
 
     func body(content: Content) -> some View {
         content
@@ -77,8 +79,9 @@ private struct ToastHostModifier: ViewModifier {
                         .padding(.vertical, 10)
                         .background(Color.black.opacity(0.72), in: Capsule())
                         .padding(.horizontal, 40)
-                        // 让位系统 tab bar（~83pt + 安全区），Toast 悬在内容区底部上方
-                        .padding(.bottom, 96)
+                        // 让位系统 tab bar（~83pt + 安全区），Toast 悬在内容区底部上方；
+                        // v4.4：键盘弹起时跟键盘上抬（键盘高度已含安全区，+16 留呼吸）
+                        .padding(.bottom, kb.isVisible ? kb.height + 16 : 96)
                         .allowsHitTesting(false)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                         .id(item.id)

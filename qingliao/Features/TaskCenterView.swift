@@ -45,7 +45,7 @@ struct TaskCenterView: View {
                             if !activeTasks.isEmpty {
                                 Section("⏳ 进行中") {
                                     ForEach(activeTasks) { t in
-                                        ActiveTaskRow(task: t)
+                                        ActiveTaskRow(task: t, onCancel: cancelActiveTask)
                                     }
                                 }
                             }
@@ -210,11 +210,34 @@ struct TaskCenterView: View {
             dismiss()
         }
     }
+
+    /// v4.4：取消进行中任务——调后端 POST /api/agent/tasks/{id}/cancel；
+    /// 任务中心是唯一入口（聊天页停止键已删）。2 秒轮询会自动把已取消的行刷掉。
+    @MainActor
+    private func cancelActiveTask(_ id: String) {
+        Task {
+            let safeId = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+            do {
+                let j = try await auth.json("/api/agent/tasks/\(safeId)/cancel", method: "POST")
+                if (j["ok"] as? Bool) == true {
+                    Haptics.success()
+                } else {
+                    ToastCenter.shared.show("取消失败，请重试")
+                }
+            } catch {
+                ToastCenter.shared.show("取消失败：网络异常")
+            }
+            activeTasks = await auth.fetchActiveTasks()
+        }
+    }
 }
 
 // MARK: - v3.4.23 进行中任务行（AI 回复中 / 后台作业）
 private struct ActiveTaskRow: View {
     let task: AuthStore.ActiveTask
+    /// v4.4：取消回调——任务中心是取消任务的唯一入口（聊天页停止键已删，一个功能一个入口）
+    var onCancel: (String) -> Void = { _ in }
+    @State private var cancelling = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -246,8 +269,27 @@ private struct ActiveTaskRow: View {
                 // 只是任务中心不再渲染 —— 要恢复就把 PlanStepList 那段拿回来（见 git 历史 v4.0.54 前）。
             }
             Spacer()
-            ProgressView()
-                .controlSize(.small)
+            VStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                if cancelling {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else {
+                    Button {
+                        cancelling = true
+                        onCancel(task.id)
+                    } label: {
+                        Text("取消")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.secondary.opacity(0.12), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
         .padding(.vertical, Spacing.xs)
     }

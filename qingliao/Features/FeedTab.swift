@@ -246,8 +246,8 @@ struct FeedTabView: View {
         .background(Color(white: 0.11))
         .preferredColorScheme(.dark)
         .presentationDetents([.medium, .large])
-        .presentationCornerRadius(28)
-        .presentationDragIndicator(.hidden)
+        // v4.4：对齐 SheetConventions——圆角用系统默认（删 28 自定义），指示器一律 visible
+        .presentationDragIndicator(.visible)
         .onAppear { draftPrompt = store.prompt }
     }
 }
