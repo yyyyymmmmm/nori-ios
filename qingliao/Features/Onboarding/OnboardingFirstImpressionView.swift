@@ -97,7 +97,7 @@ struct OnboardingFirstImpressionView: View {
 
                 Button("记下来") { saveAndDone() }
                     .font(.system(size: 14.5, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(uiColor: .systemBackground))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color(uiColor: .label))

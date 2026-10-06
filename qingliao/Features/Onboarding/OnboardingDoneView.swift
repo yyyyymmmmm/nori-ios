@@ -35,7 +35,7 @@ struct OnboardingDoneView: View {
                     .frame(width: 84, height: 84)
                 Image(systemName: "checkmark")
                     .font(.system(size: 36, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(uiColor: .systemBackground))
             }
             .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
 

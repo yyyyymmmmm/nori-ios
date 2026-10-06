@@ -141,7 +141,7 @@ struct OnboardingPermissionsView: View {
                 } else {
                     Text("开启")
                         .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color(uiColor: .systemBackground))
                 }
             }
             .padding(.horizontal, 16)
