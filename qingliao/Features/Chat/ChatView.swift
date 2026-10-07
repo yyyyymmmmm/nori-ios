@@ -25,6 +25,7 @@ private struct ChatScrollSnapshot: Equatable {
     let offset: CGFloat
     let contentH: CGFloat
     let containerH: CGFloat
+    let bottomDistance: CGFloat
 }
 
 struct ChatView: View {
@@ -926,9 +927,17 @@ struct ChatView: View {
                 //   layoutPriority(1)：空间不足时**先挤上面的内容区**，输入栏必须完整可见。
                 //   配套：welcomeView 自己在键盘弹起时收缩（见那里的注释），否则会看到被截断的欢迎页。
             }
-            // Muse 式固定玻璃 chrome：消息列表铺满视口，顶部控件/输入区固定叠放，滚动文字能从下方透出。
-            .safeAreaBar(edge: .top) { chatHeaderBar.background(Color.clear) }
-            .safeAreaBar(edge: .bottom) { chatComposerArea.background(Color(uiColor: .systemBackground)) }
+            // 固定系统材质 chrome：消息仍可在下方滚动，顶部和输入区通过模糊材质与正文分层。
+            .safeAreaBar(edge: .top) {
+                chatHeaderBar
+                    .background(.regularMaterial)
+                    .overlay(alignment: .bottom) { Color(uiColor: .separator).opacity(0.18).frame(height: 0.5) }
+            }
+            .safeAreaBar(edge: .bottom) {
+                chatComposerArea
+                    .background(.regularMaterial)
+                    .overlay(alignment: .top) { Color(uiColor: .separator).opacity(0.18).frame(height: 0.5) }
+            }
             // v4.1.0 D路：实测底部安全区（替代不存在的 \.safeAreaInsets EnvironmentKey，CI 修错）
             .background(
                 GeometryReader { proxy in
@@ -4636,14 +4645,16 @@ extension ChatView {
             .onScrollGeometryChange(for: ChatScrollSnapshot.self) { geo in
                 ChatScrollSnapshot(offset: geo.contentOffset.y,
                                    contentH: geo.contentSize.height,
-                                   containerH: geo.containerSize.height)
+                                   containerH: geo.containerSize.height,
+                                   bottomDistance: max(0, geo.contentSize.height - geo.visibleRect.maxY))
             } action: { _, new in
                 scrollPinState = ChatScrollPin.next(state: scrollPinState,
                                                     offset: new.offset,
                                                     contentH: new.contentH,
                                                     containerH: new.containerH)
-                let remaining = new.contentH - new.offset - new.containerH
-                let shouldShow = remaining > 80
+                // visibleRect 已包含滚动视图的安全区与 contentInsets；用它判断真实可视底边，
+                // 避免旧公式把底部 inset 算成“仍未到底”，导致箭头留在屏幕上。
+                let shouldShow = new.bottomDistance > 48
                 if showScrollToBottom != shouldShow {
                     withAnimation(Motion.tap) { showScrollToBottom = shouldShow }
                 }
