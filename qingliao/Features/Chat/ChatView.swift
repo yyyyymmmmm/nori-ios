@@ -27,22 +27,6 @@ private struct ChatScrollSnapshot: Equatable {
     let containerH: CGFloat
 }
 
-// 2026-10-07：聊天底部可见性检测（回到底部按钮用）
-private struct ChatBottomVisibleKey: PreferenceKey {
-    nonisolated(unsafe) static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
-// 2026-10-07：聊天视口高度（配合底部锚点判断是否在底部）
-private struct ChatViewportHeightKey: PreferenceKey {
-    nonisolated(unsafe) static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
 struct ChatView: View {
     @Environment(AuthStore.self) var auth
     @Environment(ChatStore.self) var chat
@@ -140,8 +124,6 @@ struct ChatView: View {
     @State var showLongContextAlert = false
     /// 2026-10-07：上拉显示"回到底部"悬浮按钮（对标 Muse 小箭头）
     @State private var showScrollToBottom = false
-    /// 2026-10-07：聊天视口高度（用于判断底部锚点是否可见）
-    @State private var chatViewportH: CGFloat = 0
     // v3.9.58c：「上次任务未完」横幅——标记存在但不在当前会话（自动恢复被归属校验跳过）时显示
     @State var pendingResumeInfo: (sessionId: String, taskId: String, ageMinutes: Int)?
     @State var showCompressingAlert = false  // v3.0.81：AI 摘要压缩中
@@ -3159,6 +3141,7 @@ struct ChatView: View {
                 // v3.9.58c：把 proxy 挂到 @State，供引用块跳转等非 onChange 路径滚动定位。
                 // onAppear 一次性写回（body 重算不重复触发写 State 循环——赋同一值无副作用）。
                 ScrollView {
+                    VStack(spacing: 0) {
                     // v2.0.40：LazyVStack → VStack（懒加载在批量移除时有复用状态残留，
                     // 普通 VStack 全量渲染，移除只是简单数组变化，彻底绕开崩溃）
                     // v2.0.132：VStack → LazyVStack——清空/新建已走两步走（先切欢迎页卸载
@@ -3216,34 +3199,13 @@ struct ChatView: View {
                     Color.clear
                         .frame(height: 1)
                         .id("chatBottomAnchor")
-                    // 2026-10-07 fix：用 GeometryReader 检测底部是否可见（onAppear/onDisappear 在小 view 上不可靠）
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear
-                                .preference(key: ChatBottomVisibleKey.self,
-                                            value: geo.frame(in: .named("chatScroll")).maxY)
-                        }
-                    )
-                    // v4.0.34：内容不满一屏时的对齐口径。原为 `.bottom`（微信式贴底：不足的高度
-                    // 全留在列表顶部，最新气泡紧贴输入框上方）。
-                    // 🚨 v4.0.54（用户 2026-10-05：「第一条气泡就是在最上，后面的气泡不断往上挤」）：
-                    // 翻成 **`.top`** —— 新会话第一条气泡出现在**屏幕最上方**，后面的依次往下堆；
-                    // 排满一屏后自然上翻（旧气泡被往上挤）。frame 高度仍取滚动容器测量值
-                    // （GeometryReader 只读布局，不撑高 ScrollView 自身），minHeight 语义 =
-                    // 「不满屏时占满、超屏时自然增长」；满屏后行为与改前完全一致
-                    // （不影响上翻历史/加载更早/贴底检测）。
-                    // 别再改回 .bottom —— ql_scrollpin 真值表已把 `.top` 钉住（其余「贴底」指的是
-                    // 滚动贴底判定，与这里的对齐无关）。
-                    .frame(minHeight: chatListViewportH, alignment: .top)
+                    }
+                    // 视口不足一屏时只扩展整个内容容器；锚点留在真实消息之后，不能把
+                    // minHeight 挂在锚点上，否则会额外制造整屏空白滚动区。
+                    .frame(maxWidth: .infinity, minHeight: chatListViewportH, alignment: .top)
                     .id("messages")   // v2.0.39：与欢迎页分支区分身份
                 }
                 .coordinateSpace(name: "chatScroll")
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(key: ChatViewportHeightKey.self,
-                                               value: geo.size.height)
-                    }
-                )
             .modifier(MessageListScroll1(host: self, proxy: proxy))
             .modifier(MessageListScroll2(host: self, proxy: proxy))
             // 2026-10-07："回到底部"悬浮按钮（对标 Muse 小箭头）——上拉时显示，点即回最新
@@ -3268,20 +3230,6 @@ struct ChatView: View {
                 }
             }
             .animation(Motion.tap, value: showScrollToBottom)
-            // 2026-10-07：视口高度变化 → 存起来供底部判断用
-            .onPreferenceChange(ChatViewportHeightKey.self) { h in
-                chatViewportH = h
-            }
-            // 2026-10-07：底部锚点位置变化 → 控制回到底部按钮显隐
-            // maxY 是锚点底部在 ScrollView 视口坐标系中的位置；
-            // 在底部时 maxY ≈ 视口高度，上拉 x 后 maxY ≈ 视口高度 + x
-            .onPreferenceChange(ChatBottomVisibleKey.self) { maxY in
-                guard chatViewportH > 0 else { return }
-                let shouldShow = maxY > chatViewportH + 80
-                if shouldShow != showScrollToBottom {
-                    showScrollToBottom = shouldShow
-                }
-            }
             .modifier(MessageListScroll3(host: self, proxy: proxy))
 
         }
@@ -4772,6 +4720,8 @@ extension ChatView {
                                                     offset: new.offset,
                                                     contentH: new.contentH,
                                                     containerH: new.containerH)
+                let remaining = new.contentH - new.offset - new.containerH
+                showScrollToBottom = remaining > 80
             }
             // v4.0.34：测量滚动容器可视高度——列表 minHeight 用它实现「不满屏也贴底」
             //（onScrollGeometryChange 首次挂载即回调一次初始值；键盘弹出容器变矮也自动更新）
