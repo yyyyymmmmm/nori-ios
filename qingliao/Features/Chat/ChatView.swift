@@ -1150,7 +1150,8 @@ struct ChatView: View {
         Color.clear
         .task {
             await resumePersistedStream()
-            // 2026-10-07：从后端同步当前选中模型（只认后端，覆盖本地 UserDefaults）
+            // Hermes 是模型选择的真值来源；启动时尽力同步，但模型接口暂时不可用
+            // 不应阻止用户进入聊天或查看已有会话。真正发送时再重试并提示失败。
             hermesModelReady = await syncModelFromBackend()
             await chat.loadLatestMessagePage(auth: auth)
             // v3.9.58c：探测未完任务标记——标记归属**其他**会话时显示「继续上次任务」横幅
@@ -3605,7 +3606,7 @@ struct ChatView: View {
                 defer { modelSyncInFlight = false }
                 hermesModelReady = await syncModelFromBackend()
                 guard hermesModelReady else {
-                    modelError = "无法读取 Hermes 当前模型，请检查后端连接后重试"
+                    modelError = "无法从 Hermes 读取当前模型。请检查网络或后端版本后重试。"
                     return
                 }
                 sendCore(text: text, imageData: imageData, quotedText: quotedText, allowExpense: allowExpense)
