@@ -141,6 +141,8 @@ struct DockTabView: View {
             // UITabBar.appearance() / 实例 tintColor / tabItem 内 foregroundStyle
             // 全被 Liquid Glass bar 忽略——未选中色没有 API，只能接受系统默认灰。
             .tint(.primary)
+            .toolbarBackground(Color(uiColor: .systemBackground), for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
             // v4.0.49x：启动链折叠（防 demangler 栈溢出）——原 24 条顶层修饰器按序折进 4 个具名分组，
             // body 这里只留 4 个 .modifier(…) 泛型调用。事故/手法同 ChatView.v4.0.49：
             // 巨型链把 body 编译后类型名撑到 2574 字符（全 App 最长），Swift 运行时按嵌套层数递归
@@ -208,8 +210,6 @@ struct DockTabView: View {
                 try? await Task.sleep(for: .milliseconds(450))
                 NotificationCenter.default.post(name: .qingliaoFillInput, object: text)
             }
-            .toolbarBackground(Color(uiColor: .systemBackground), for: .tabBar)
-            .toolbarBackground(.visible, for: .tabBar)
         }
         // 灰度重做 2026-10-06 晚：侧边栏开关（聊天页顶栏按钮发通知）
         .onReceive(NotificationCenter.default.publisher(for: .qingliaoToggleSidebar)) { _ in
