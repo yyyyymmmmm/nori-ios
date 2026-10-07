@@ -47,6 +47,7 @@ struct ChatInputBar: View {
     var onSend: () -> Void
     var onPickAttachment: () -> Void = {}
     var onCamera: () -> Void = {}   // v2.0.38 拍照输入
+    var cameraEnabled: Bool = true
     // 语音输入（按住说话）—— v3.9.28 云端模式移除后仅剩 isRecording 态，
     // onVoiceStart/onVoiceEnd 全仓零注入点（语音走 voiceMode + onLongPressInput），已删。
     var isRecording: Bool = false
@@ -336,7 +337,7 @@ struct ChatInputBar: View {
         focused || kbEnv.isVisible
     }
 
-    /// 第二层（工具层）：附件 + 相机 + 模型快选（模型名右对齐）。
+    /// 第二层（工具层）：相机 + 模型快选（附件统一由第一层「＋」打开）。
     ///
     /// v3.9.61：`modelButton` 保留 displayIf 条件（`modelLabel` 为空时整块不渲染）。
     /// 这对输入框**零风险**：textArea 在第一层 `messageRow` 里、且不是条件分支的成员，
@@ -374,26 +375,13 @@ struct ChatInputBar: View {
         .allowsHitTesting(toolLayerExpanded)
     }
 
-    /// 左侧两枚次级按钮（附件 / 相机）——纯拆分，与单行 HStack 里的写法视觉零差异
+    /// 左侧相机入口。附件只保留第一层「＋」，避免两个按钮打开同一个附件菜单。
     /// v3.9.65：用户原话「第二层的附件和相机图标变小降低第二层高度」——图标视觉面 32×30 → 22×22。
     /// v3.9.75：用户「展开态的附件和相机图标加大一点」→ 视觉面 22×22 → **26×26**、字形 13 → 15，
     /// 命中区外扩量随之 11 → 9（26+9×2 = 44，HIG 最小可点尺寸仍成立、间距零变化）。
     private var attachButtons: some View {
         HStack(spacing: 8) {
-            Button(action: onPickAttachment) {
-                Image(systemName: "paperclip")
-                    .font(.system(size: Typography.body, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 26, height: 26)
-                    // v3.4.26：附件/相机纳入胶囊语义——低透明外圈（次级操作，弱于实底发送钮）
-                    .background(Color.primary.opacity(Tint.faint), in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.primary.opacity(Tint.faint), lineWidth: 0.8))
-            }
-            .buttonStyle(PressStyle())   // v3.4.29：统一按压反馈
-            // v3.9.75：命中区 44×44（视觉 26×26 → 外扩 9）
-            .hitArea44(h: 9, v: 9)
-
-            // v2.0.38：拍照输入
+            if cameraEnabled {
             Button(action: onCamera) {
                 Image(systemName: "camera")
                     .font(.system(size: Typography.body, weight: .medium))
@@ -405,6 +393,7 @@ struct ChatInputBar: View {
             .buttonStyle(PressStyle())   // v3.4.29：统一按压反馈
             // v3.9.75：命中区 44×44（视觉 26×26 → 外扩 9）
             .hitArea44(h: 9, v: 9)
+            }
         }
     }
 

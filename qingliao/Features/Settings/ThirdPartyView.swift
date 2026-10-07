@@ -14,6 +14,8 @@ struct ThirdPartyView: View {
     @State private var loadError = false
     @State private var busyID: String? = nil
     @State private var notice: String? = nil
+    @State private var configuring: ThirdPartyPlatform?
+    @State private var loadErrorText = ""
 
     var body: some View {
         NavigationStack {
@@ -26,7 +28,7 @@ struct ThirdPartyView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("点按连接，跳转厂商授权页同意即可，全程不用填地址和密钥。")
+                            Text("选择消息平台并填写所需信息。密钥只写入 Hermes 配置，不会回传到 App。")
                                 .font(.system(size: 14))
                                 .foregroundStyle(.tertiary)
                                 .padding(.horizontal, 20)
@@ -61,6 +63,11 @@ struct ThirdPartyView: View {
                 }
             }
             .task { await load() }
+            .sheet(item: $configuring) { platform in
+                ThirdPartyConfigSheet(platform: platform) { values in
+                    await setEnabled(platform, on: true, config: values)
+                }
+            }
         }
     }
 
@@ -71,7 +78,7 @@ struct ThirdPartyView: View {
                 .foregroundStyle(.tertiary)
             Text("未能连接到后端")
                 .font(.system(size: 17, weight: .medium))
-            Text("检查 Hermes 连接后重试")
+            Text(loadErrorText.isEmpty ? "检查 Nori 后端与 Hermes 容器后重试" : loadErrorText)
                 .font(.system(size: 14))
                 .foregroundStyle(.tertiary)
             Button("重试") {
@@ -92,7 +99,7 @@ struct ThirdPartyView: View {
                 Text(p.name)
                     .font(.system(size: 17))
                     .foregroundStyle(.primary)
-                Text(p.enabled ? "已连接" : "未连接")
+                Text(p.enabled ? "已连接" : p.configured ? "已配置 · 未启用" : p.needs == ["qrcode"] ? "需要扫码或配对" : "需要填写连接信息")
                     .font(.system(size: 14))
                     .foregroundStyle(.tertiary)
             }
@@ -102,15 +109,21 @@ struct ThirdPartyView: View {
             } else if p.enabled {
                 Button("断开") {
                     Haptics.tap()
-                    Task { await setEnabled(p, on: false) }
+                    Task { _ = await setEnabled(p, on: false) }
                 }
                 .font(.system(size: 15))
                 .foregroundStyle(.secondary)
                 .buttonStyle(.plain)
             } else {
-                Button("连接") {
+                Button(p.configured ? "启用" : p.needs == ["qrcode"] ? "说明" : "设置") {
                     Haptics.tap()
-                    Task { await connect(p) }
+                    if p.needs == ["qrcode"] {
+                        notice = "\(p.name) 需要先在 Hermes 网关完成扫码或配对；当前版本暂不支持在 App 内完成。"
+                    } else if p.configured {
+                        Task { _ = await setEnabled(p, on: true) }
+                    } else {
+                        configuring = p
+                    }
                 }
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.primary)
@@ -144,46 +157,43 @@ struct ThirdPartyView: View {
     private func load() async {
         loading = true
         loadError = false
+        loadErrorText = ""
         defer { loading = false }
-        guard let j = try? await auth.json("/api/agent/hermes/platforms"),
-              let arr = j["platforms"] as? [[String: Any]] else {
+        do {
+            let (data, response) = try await auth.request("/api/agent/hermes/platforms")
+            let payload = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+            guard (200..<300).contains(response.statusCode),
+                  let arr = payload["platforms"] as? [[String: Any]] else {
+                loadErrorText = (payload["error"] as? String) ?? "后端返回异常（HTTP \(response.statusCode)）"
+                loadError = true
+                return
+            }
+            platforms = arr.compactMap(ThirdPartyPlatform.init(json:))
+        } catch {
+            loadErrorText = "请求失败：\(error.localizedDescription)"
             loadError = true
-            return
         }
-        platforms = arr.compactMap(ThirdPartyPlatform.init(json:))
     }
 
-    /// 连接：优先走 OAuth（点按授权零填写）；无 OAuth 的平台走启用开关。
-    private func connect(_ p: ThirdPartyPlatform) async {
+    private func setEnabled(_ p: ThirdPartyPlatform, on: Bool, config: [String: String] = [:]) async -> String? {
         busyID = p.id
         defer { busyID = nil }
-        // 先试 OAuth
-        if let j = try? await auth.json("/api/agent/hermes/oauth/start", method: "POST",
-                                        body: ["vendor_id": p.id]),
-           let url = j["auth_url"] as? String, !url.isEmpty,
-           let u = URL(string: url) {
-            await MainActor.run { UIApplication.shared.open(u) }
-            notice = "已在浏览器打开授权页，完成授权后下拉…返回此页即自动刷新"
-            return
-        }
-        // 无 OAuth：直接启用
-        await setEnabled(p, on: true)
-    }
-
-    private func setEnabled(_ p: ThirdPartyPlatform, on: Bool) async {
-        busyID = p.id
-        defer { busyID = nil }
-        // 先试 OAuth 断开（云厂商），再走平台开关
-        if !on {
-            _ = try? await auth.json("/api/agent/hermes/oauth/disconnect", method: "POST",
-                                     body: ["vendor_id": p.id])
-        }
-        if let j = try? await auth.json("/api/agent/hermes/platforms", method: "POST",
-                                        body: ["platform": p.id, "enabled": on]),
-           (j["ok"] as? Bool) == true {
+        do {
+            let j = try await auth.json("/api/agent/hermes/platforms", method: "POST",
+                                        body: ["platform": p.id, "enabled": on, "config": config])
+            guard (j["ok"] as? Bool) == true else {
+                notice = (j["error"] as? String) ?? ((j["saved"] as? Bool == true)
+                    ? "配置已保存，但 Hermes 重启失败，尚未生效。"
+                    : "后端未能保存平台配置。")
+                return notice
+            }
+            notice = nil
+            configuring = nil
             await load()
-        } else {
-            notice = on ? "连接失败，请检查后端" : "断开失败，请检查后端"
+            return nil
+        } catch {
+            notice = "请求后端失败：\(error.localizedDescription)"
+            return notice
         }
     }
 }
@@ -195,6 +205,7 @@ struct ThirdPartyPlatform: Identifiable {
     let name: String
     let configured: Bool
     let enabled: Bool
+    let needs: [String]
 
     var icon: String {
         switch id {
@@ -241,6 +252,94 @@ struct ThirdPartyPlatform: Identifiable {
         self.name = name
         self.configured = (json["configured"] as? Bool) ?? false
         self.enabled = (json["enabled"] as? Bool) ?? false
+        self.needs = json["needs"] as? [String] ?? []
+    }
+}
+
+private struct ThirdPartyConfigSheet: View {
+    let platform: ThirdPartyPlatform
+    let save: ([String: String]) async -> String?
+    @State private var values: [String: String] = [:]
+    @State private var saving = false
+    @State private var errorText: String?
+
+    private var fields: [(String, String)] {
+        platform.needs.map { key in
+            let title: String
+            switch key {
+            case "bot_token": title = "Bot Token"
+            case "app_token": title = "App Token"
+            case "address": title = "邮箱地址"
+            case "password": title = "密码 / 授权码"
+            case "imap_host": title = "IMAP 服务器"
+            case "smtp_host": title = "SMTP 服务器"
+            case "account_sid": title = "Account SID"
+            case "auth_token": title = "Auth Token"
+            case "phone_number": title = "电话号码"
+            case "webhook_url": title = "Webhook URL"
+            case "homeserver": title = "Homeserver"
+            case "user_id": title = "用户 ID"
+            case "access_token": title = "Access Token"
+            case "server_url": title = "服务地址"
+            case "token": title = "访问令牌"
+            case "secret": title = "App Secret"
+            case "app_id": title = "App ID"
+            case "corp_id": title = "Corp ID"
+            case "corp_secret": title = "Corp Secret"
+            case "url": title = "Webhook URL"
+            default: title = key.replacingOccurrences(of: "_", with: " ").capitalized
+            }
+            return (key, title)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Label(platform.name, systemImage: "link").font(.headline)
+                    Text("连接信息将保存到 Hermes 的平台配置。已有密钥不会显示；重新填写会替换对应字段。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section("连接信息") {
+                    ForEach(fields, id: \.0) { field in
+                        let key = field.0
+                        let title = field.1
+                        let binding = Binding(get: { values[key, default: ""] }, set: { values[key] = $0 })
+                        if key.localizedCaseInsensitiveContains("token") || key.localizedCaseInsensitiveContains("secret") || key == "password" {
+                            SecureField(title, text: binding).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        } else {
+                            TextField(title, text: binding).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("配置\(platform.name)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "保存中" : "保存并连接") {
+                        guard !saving else { return }
+                        saving = true
+                        Task {
+                            errorText = await save(values)
+                            saving = false
+                        }
+                    }.disabled(saving || fields.contains(where: { values[$0.0, default: ""].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }))
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if let errorText {
+                    Text(errorText)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(.bar)
+                }
+            }
+        }
     }
 }
 

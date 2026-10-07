@@ -63,7 +63,6 @@ struct ConnectAppsView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("连接应用")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, prompt: "搜索应用")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("完成") { Haptics.tap(); dismiss() }

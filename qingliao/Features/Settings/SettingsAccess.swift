@@ -95,8 +95,9 @@ struct ConnSettingsView: View {
                         .foregroundStyle(.secondary)
                         .padding(.leading, Spacing.xs)
                         .padding(.top, Spacing.sm)
-                    VStack(spacing: 12) {
-                        ForEach(connections) { conn in
+                    VStack(spacing: 0) {
+                        ForEach(connections.indices, id: \.self) { index in
+                            let conn = connections[index]
                             Button {
                                 if conn.id == "homeassistant" {
                                     Haptics.tap()
@@ -139,14 +140,18 @@ struct ConnSettingsView: View {
                                             .foregroundStyle(.tertiary)
                                     }
                                 }
-                                .padding(16)
-                                .background(Color(uiColor: .secondarySystemGroupedBackground),
-                                            in: RoundedRectangle(cornerRadius: 20))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            if index < connections.count - 1 {
+                                MuseRowDivider().padding(.leading, 78)
+                            }
                         }
                     }
-                    .padding(.horizontal, 4)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground),
+                                in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .task {
                         await loadConnections()
                     }

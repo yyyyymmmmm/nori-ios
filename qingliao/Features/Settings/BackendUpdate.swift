@@ -328,7 +328,7 @@ struct BackendUpdateSheet: View {
         case .updating: return "正在更新…"
         case .restarting: return "后端重启中，请稍候…"
         case .done: return "更新完成 🎉"
-        case .manualUnverified: return "未核实版本"
+        case .manualUnverified: return "无法核对远端"
         case .failed: return "无法自动更新"
         case .idle: return "未检查"
         }
@@ -370,9 +370,9 @@ struct BackendUpdateSheet: View {
             return "后端已运行 \(model.currentVersion)，一切就绪"
         case .manualUnverified:
             if model.currentVersion.isEmpty {
-                return "当前镜像没有可识别的版本号或 Git 提交信息，因此无法判断是否最新。"
+                return "当前镜像没有版本号或提交标识；手动部署也未提供 Git 仓库，无法确认正在运行哪次提交或是否最新。"
             }
-            return "当前版本标识为 \(model.currentVersion)，但手动部署没有远端 Git 仓库，无法核实是否最新。"
+            return "当前版本标识：\(model.currentVersion)。这台 NAS 是手动部署，未配置宿主 Git 仓库（QL_REPO_DIR），所以只能显示当前标识，不能与 GitHub 比对。"
         case .failed(let msg):
             return msg + "。也可以在 NAS 上手动执行下方命令更新"
         case .idle:

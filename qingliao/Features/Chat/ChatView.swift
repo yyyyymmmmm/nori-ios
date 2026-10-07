@@ -666,14 +666,12 @@ struct ChatView: View {
                          }
                      },
                      onCamera: {
-                        // v3.0.86 fix：模拟器/无摄像头 iPad 先查可用性——sourceType=.camera 在无相机
-                        // 设备上 present 即抛 NSInvalidArgumentException；不可用改走相册（PhotosPicker）
+                        // 只在有摄像头的设备显示此入口；相册统一从「＋」菜单进入。
                         if UIImagePickerController.isSourceTypeAvailable(.camera) {
                             showCameraPicker = true
-                        } else {
-                            showPhotoPicker = true
                         }
                     },
+                     cameraEnabled: UIImagePickerController.isSourceTypeAvailable(.camera),
                      isRecording: liveSpeech.isRunning,
                     // v2.0.96：语音转文字（长按发送按钮）
                     voiceMode: voiceMode,
