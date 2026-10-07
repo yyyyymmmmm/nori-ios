@@ -103,7 +103,7 @@ struct GoalsTabView: View {
                 topBar
                     .padding(.horizontal, Spacing.section)
                     .padding(.top, Spacing.xl)
-                    .background(.clear)
+                    .background(Color(uiColor: .systemBackground))
             }
             .toolbar(.hidden, for: .navigationBar)
             .task { await store.loadFromServer() }
@@ -123,7 +123,7 @@ struct GoalsTabView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .opaqueChrome(in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
@@ -155,7 +155,7 @@ struct GoalsTabView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .opaqueChrome(in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("更多")

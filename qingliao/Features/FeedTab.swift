@@ -224,7 +224,7 @@ struct FeedTabView: View {
                 topBar
                     .padding(.horizontal, Spacing.section)
                     .padding(.top, Spacing.xl)
-                    .background(.clear)
+                    .background(Color(uiColor: .systemBackground))
             }
             .toolbar(.hidden, for: .navigationBar)
             .task {
@@ -260,7 +260,7 @@ struct FeedTabView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .opaqueChrome(in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
@@ -277,7 +277,7 @@ struct FeedTabView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .opaqueChrome(in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("编辑动态关注主题")
@@ -408,7 +408,8 @@ private struct FeedUnitCard: View {
     let onDiscuss: () -> Void
     let onShowReason: () -> Void
 
-    private var textColumnWidth: CGFloat { max(0, availableWidth - 40) }
+    // 两侧各留 12pt 的正文安全边距，图文都在内容列内换行/裁切，不顶到屏幕边缘。
+    private var textColumnWidth: CGFloat { max(0, availableWidth - 64) }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -474,6 +475,7 @@ private struct FeedUnitCard: View {
             }
             .frame(width: textColumnWidth, alignment: .leading)
         }
+        .padding(.horizontal, 12)
         .frame(width: availableWidth, alignment: .leading)
         .padding(.vertical, Spacing.section)
     }

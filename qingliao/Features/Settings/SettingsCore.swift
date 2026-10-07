@@ -112,77 +112,13 @@ struct SettingsView: View {
     // v2.0.128：AI 输出行高（0-6 步进 0.5，默认 1.0 = 紧凑；滑条控制）已随死代码外观块删除——
     // 行高/流光/Siri 发光全部统一由 AppearanceSheet 管理（与云端同一组件）
     // v2.0.102：切回设置页刷新计数（密码管理/记忆增删后行尾数字即时更新，原只有 .task 首刷）
-    // v4.0.6：卡通宠物自定义页 + 大头像摘要所需的 key
-    // （与 PetStudioSheet 共用同一组 @AppStorage，所以摘要改完立刻刷新，不需要额外通知）
-    @State var showPetStudio = false
     // v4.0.22：设置页搜索（顶部搜索框 + 结果区；索引见 Core/SettingsSearchIndex.swift）
     @State var settingsQuery = ""
     /// 2026-10-07：一级页收成 6 个分组行后，搜索「滚到分组看」改为直接打开对应二级页
     /// （分组内容已搬进二级页，一级页没有滚动锚点了）
     @State var searchNavTarget: SettingsSubpage?
-    @AppStorage(PetKeys.style) var petStyle: PetStyle = .liquid
-    @AppStorage(PetKeys.face) var petFace: PetFace = .calm
     var body: some View {
         VStack(spacing: 0) {
-            // J 线 2026-10-06：Muse 式顶栏 —— 居中小标题「设置」（约 20pt 半粗）+ 右上 X 关闭
-            // （sheet 场景）。玻璃只用在 X 按钮上。
-            HStack {
-                Color.clear.frame(width: 44, height: 44)
-                Spacer()
-                Text("设置")
-                    .font(.system(size: Typography.headline, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Spacer()
-                Button {
-                    Haptics.tap()
-                    dismissSettings()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: Typography.title, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44)
-                        .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("关闭")
-            }
-            .padding(.horizontal, Spacing.section)
-            .padding(.top, Spacing.md)
-            .padding(.bottom, Spacing.xs)
-            // 2026-10-07 Item 2：AI 形象独立大卡片（Muse 订阅卡同款）：64pt 头像 +
-            // 「Nori」大标题 + petSummary 副标题 + 右箭头；点按进 AI 形象设置
-            // （复用 PetStudioSheet 链路，showPetStudio 不变）。
-            GraySettingsGroup(title: "AI形象") {
-                Button {
-                    Haptics.tap()
-                    showPetStudio = true
-                } label: {
-                    HStack(spacing: 16) {
-                        ROTAvatarView(state: .idle, size: 64)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Nori")
-                                .font(.system(size: Typography.titleXL, weight: .bold))
-                                .foregroundStyle(.primary)
-                            Text(petSummary)
-                                .font(.system(size: Typography.subhead))
-                                .foregroundStyle(.tertiary)
-                                .lineLimit(2)
-                        }
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: Typography.subhead, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(20)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, Spacing.section)
-            .padding(.top, Spacing.xs)
-            // 2026-10-07 真机反馈：AI形象卡与搜索框间距偏小——卡下方加 6pt，
-            // 与搜索框拉开呼吸感（仍远小于分组行 28pt 间距）
-            .padding(.bottom, Spacing.sm)
             // v4.0.22：设置项越堆越多，顶部给一行搜索框（索引与匹配见 Core/SettingsSearchIndex.swift）
             SettingsSearchBar(text: $settingsQuery)
             ScrollView {
@@ -229,6 +165,21 @@ struct SettingsView: View {
         }
         // 2026-10-07：搜索 sec:xxx 直达二级页（编程式 push；分组行本身用 NavigationLink 被动跳转）
         .navigationDestination(item: $searchNavTarget) { subpage(for: $0) }
+        .navigationTitle("设置")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Haptics.tap()
+                    dismissSettings()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: Typography.title, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("关闭")
+            }
+        }
         // 灰度重做 B 路：浅灰分组底（参考图是浅色渐变；灰度语言里用 systemGroupedBackground）
         .background(Color(uiColor: .systemGroupedBackground))
         .background(settingsCold1())
@@ -268,10 +219,6 @@ struct SettingsView: View {
             // v3.0.4：外观弹窗（与云端共用同一组件，样式统一）
             AppearanceSheet()
                 .scrollContentBackground(.hidden)
-        }
-        .sheet(isPresented: $showPetStudio) {
-            // v4.0.6：卡通宠物自定义（形象 / 表情 / 行为动作 / 动画档；改完聊天页联动）
-            PetStudioSheet()
         }
         .sheet(isPresented: $showHomeShortcuts) {
             // v3.9.82：桌面快捷方式选择（动态 shortcutItems，最多 4 项）
@@ -486,7 +433,6 @@ struct SettingsView: View {
         case "agentKeywords": showAgentKeywords = true
         case "agentMemory": showAgentMemory = true
         case "appearance": showAppearance = true
-        case "pet": showPetStudio = true
         case "homeShortcuts": showHomeShortcuts = true
         case "about": showAbout = true
         // 2026-10-07：一级页收成 6 个分组行后，「滚到分组看」改为直开对应二级页
@@ -869,11 +815,6 @@ extension SettingsView {
         }
     }
 
-    /// 行尾摘要：形象 + 表情 + 动作数（一行说完，别让人点进去才发现是空的）
-    private var petSummary: String {
-        let on = PetKeys.enabledQuirks().count
-        return "\(petStyle.name) · \(petFace.name)脸 · 动作 \(on)/\(Quirk.pool.count)"
-    }
 }
 
 // MARK: - 辅助函数

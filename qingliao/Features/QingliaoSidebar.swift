@@ -123,7 +123,7 @@ struct QingliaoSidebar: View {
                         .font(.system(size: Typography.title))
                         .foregroundStyle(.primary)
                         .frame(width: 44, height: 44)
-                        .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .opaqueChrome(in: Circle())
                 }
                 .buttonStyle(.plain)
             }
@@ -213,7 +213,7 @@ struct QingliaoSidebar: View {
                     }
                     .padding(.horizontal, 18)
                     .frame(height: 52)
-                    .a11yGlass(.regular, in: Capsule(), stroke: Color.primary.opacity(0.08))
+                    .opaqueChrome(in: Capsule())
                 }
                 .buttonStyle(.plain)
                 Button {
@@ -225,7 +225,7 @@ struct QingliaoSidebar: View {
                         .font(.system(size: Typography.headline))
                         .foregroundStyle(.primary)
                         .frame(width: 52, height: 52)
-                        .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                        .opaqueChrome(in: Circle())
                 }
                 .buttonStyle(.plain)
             }
@@ -233,8 +233,8 @@ struct QingliaoSidebar: View {
             .padding(.bottom, 30)
         }
         .frame(maxHeight: .infinity)
-        // 侧栏保持固定抽屉，但用系统材质透出当前页面，避免整块不透明底板。
-        .background(.regularMaterial)
+        // 固定侧栏使用实体系统表面，不透出底页文字。
+        .background(Color(uiColor: .systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.trailing, 60)   // 右侧露出一点底页，暗示可滑回
         .shadow(color: .black.opacity(0.15), radius: 24, x: 8, y: 0)

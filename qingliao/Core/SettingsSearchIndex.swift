@@ -96,8 +96,6 @@ enum SettingsSearchIndex {
         // ── 外观与显示 ──
         .init(route: "appearance", title: "外观", icon: "circle.lefthalf.filled", group: "外观与显示",
               keywords: ["主题", "深浅色", "暗黑", "行高", "流光"]),
-        .init(route: "pet", title: "AI形象", icon: "face.smiling.inverse", group: "外观与显示",
-              keywords: ["宠物", "卡通", "形象", "头像", "表情"]),
         .init(route: "sec:appearance", title: "震动反馈", icon: "iphone.radiowaves.left.and.right", group: "外观与显示",
               keywords: ["震动", "触感", "haptic", "反馈"]),
         .init(route: "sec:appearance", title: "首页卡片", icon: "rectangle.grid.2x2.fill", group: "外观与显示",

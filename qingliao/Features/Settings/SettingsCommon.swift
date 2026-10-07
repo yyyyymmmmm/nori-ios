@@ -900,8 +900,6 @@ struct AppearanceSheet: View {
     // v3.0.4：补全本地外观独有项（输入框流光 / 天气城市）
     // v4.0.7：烟花粒子特效开关（DockTabView.fireDockBurst 读同一 key）
     @AppStorage("qingliao_dock_burst") private var dockBurstOn = true
-    // v4.0.6：聊天页形象/表情/动作/动画档四组 key 已搬去 PetStudioSheet（外观页不再重复持有，
-    // 否则两处 @AppStorage 同 key 也能跑，但「外观页改动不刷新预览」这类半联动问题会很难查）。
     @State private var weatherCity = UserDefaults.standard.string(forKey: "qingliao_weather_city") ?? ""
     @State private var showWeatherCityField = false
     // v3.9.94：启动会话（逻辑早已接好，见 LaunchSession.swift / ChatStore.swift:158-165，
@@ -923,10 +921,6 @@ struct AppearanceSheet: View {
                     }
                     .padding(.vertical, Spacing.xs)
                 }
-                // v3.9.78 的「聊天页形象」段（形象三选一 + 动画三档）**已于 v4.0.6 搬去 PetStudioSheet**
-                // （用户：「外观里面的聊天页选项就可以移动到卡通宠物头像的设置里」）。
-                // 搬走而非复制：两处都能改迟早会不一致，且外观页那个 petOption/motionOption 已无调用点。
-                // 聊天页顶部仍是同一只宠物（共用 PetKeys.style/.motion/.quirks/.face 四个 key）。
                 // 交互
                 Section("交互") {
                     // v4.4：输入框流光特效已删除（用户：不需要输入框炫酷的颜色），开关同步删除

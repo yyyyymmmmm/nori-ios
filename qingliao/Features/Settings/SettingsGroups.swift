@@ -1,6 +1,5 @@
 // 2026-10-07 设置页一级/二级重构：
-// 一级页只剩 AI 形象大卡 + 搜索框 + 6 个分组行；每组内容（原 6 个 Section builder）
-// 整体搬进二级页，GraySettingsGroup 原样复用。只搬行、不改功能。
+// 一级页用搜索框与分类行承载入口；各组内容统一进入二级页，复用 GraySettingsGroup。
 
 import SwiftUI
 
@@ -74,10 +73,10 @@ struct SettingsGroupLink<Destination: View>: View {
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 16))
+                        .font(.system(size: Typography.rowTitle))
                         .foregroundStyle(.primary)
                     Text(subtitle)
-                        .font(.system(size: 13))
+                        .font(.system(size: Typography.subhead))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                 }
@@ -113,12 +112,12 @@ struct SettingsGroupActionRow: View {
                     .foregroundStyle(.primary)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.system(size: 16)).foregroundStyle(.primary)
-                    Text(subtitle).font(.system(size: 13)).foregroundStyle(.tertiary).lineLimit(2)
+                    Text(title).font(.system(size: Typography.rowTitle)).foregroundStyle(.primary)
+                    Text(subtitle).font(.system(size: Typography.subhead)).foregroundStyle(.tertiary).lineLimit(2)
                 }
                 Spacer(minLength: 8)
                 if let value {
-                    Text(value).font(.system(size: 13)).foregroundStyle(.secondary)
+                    Text(value).font(.system(size: Typography.subhead)).foregroundStyle(.secondary)
                 }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .medium))
@@ -137,7 +136,6 @@ struct SettingsGroupActionRow: View {
 struct SettingsSubpageView<Content: View>: View {
     let title: String
     let content: () -> Content
-    @Environment(\.dismiss) private var dismiss
 
     init(title: String, @ViewBuilder content: @escaping () -> Content) {
         self.title = title
@@ -146,33 +144,6 @@ struct SettingsSubpageView<Content: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 2026-10-07 真机反馈：push 转场抖动——根因是一级页 toolbar hidden、
-            // 二级页 toolbar visible，导航栏显隐切换导致内容跳动。
-            // 改：二级页也保持 toolbar hidden，chrome 前后一致；返回用自定义左箭头
-            //（样式与一级页"标题+X 关闭"自定义头统一：44pt 触区、headline 居中标题）。
-            HStack {
-                Button {
-                    Haptics.tap()
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: Typography.title, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44)
-                        .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("返回")
-                Spacer()
-                Text(title)
-                    .font(.system(size: Typography.headline, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Spacer()
-                Color.clear.frame(width: 44, height: 44) // 与左箭头对称，标题真正居中
-            }
-            .padding(.horizontal, Spacing.section)
-            .padding(.top, Spacing.md)
-            .padding(.bottom, Spacing.xs)
             ScrollView {
                 VStack(spacing: 28) {
                     content()
@@ -184,23 +155,8 @@ struct SettingsSubpageView<Content: View>: View {
             }
         }
         .background(Color(uiColor: .systemGroupedBackground))
-        .toolbar(.hidden, for: .navigationBar)
-        // 2026-10-07 真机反馈：自定义返回头干掉了系统侧滑返回。补左边缘右滑手势
-        //（28pt 透明条，不挡纵向滚动；右滑 >70pt 且纵向 <50pt 触发返回）。
-        .overlay(alignment: .leading) {
-            Color.clear
-                .frame(width: 28)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 20)
-                        .onEnded { v in
-                            if v.translation.width > 70 && abs(v.translation.height) < 50 {
-                                Haptics.tap()
-                                dismiss()
-                            }
-                        }
-                )
-        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

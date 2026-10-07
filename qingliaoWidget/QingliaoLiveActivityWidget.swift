@@ -6,7 +6,7 @@ import WidgetKit
 /// 轻聊形象 + 阶段 + 计时 +（可选）停止生成。
 ///
 /// v3.9.79 两处形态变更（用户 2026-09-25 真机反馈，**灵动岛与锁屏横幅一起改**）：
-///   · 左侧图标：球 → **用户在外观设置里选的卡通形象**（`PetOrbView`，随 `ContentState.petStyle` 下发）
+///   · 左侧图标：统一 SF Symbols 状态标记
 ///   · 右侧：阶段环 `phaseRing` → **线性进度条** `phaseBar`（语义仍是「本轮推进度」，不是答案完成度）
 ///   球的渲染器 `OrbView` 与环 `phaseRing` **都已删除**（没有任何调用点了）；要回滚从 git 历史取。
 ///   `OrbPalette` 仍是在用的配色真源（进度条渐变 / 停止按钮 / keylineTint），别一起删。
@@ -48,11 +48,7 @@ struct QingliaoLiveActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     // 尺寸沿革：34 → 36（v3.9.11「球大一点」）。**不要再往上加**：展开态顶行就是传感器区，
                     // 高度约 36.67pt，38 会顶到灵动岛圆角遮罩被切上下边（本机无 iOS SDK，这类几何只能真机定论）。
-                    // v3.9.79：图标从「球」换成**用户选的卡通形象**（用户 2026-09-25：「加改一条，
-                    // 灵动岛球图标跟随卡通形象动态图」）。形象随 ContentState.petStyle 下发，尺寸口径不变。
-                    PetOrbView(size: 36, styleRaw: context.state.petStyle, faceRaw: context.state.petFace,
-                               phase: context.state.phase,
-                               spin: context.state.spin, beat: context.state.beatSeconds)
+                    ActivityStatusIcon(size: 36)
                         .padding(.leading, 1)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -69,15 +65,11 @@ struct QingliaoLiveActivityWidget: Widget {
             } compactLeading: {
                 // v3.9.12：25 → 27（真机反馈「球反而小了」——球再加大一档，环同时收小，主次才分明）
                 // v3.9.79：同上，换卡通形象（27 仍取 36 的 3/4，主次关系不变）
-                PetOrbView(size: 27, styleRaw: context.state.petStyle, faceRaw: context.state.petFace,
-                           phase: context.state.phase,
-                           spin: context.state.spin, beat: context.state.beatSeconds)
+                ActivityStatusIcon(size: 27)
             } compactTrailing: {
                 self.compactTrailing(state: context.state)
             } minimal: {
-                PetOrbView(size: 24, styleRaw: context.state.petStyle, faceRaw: context.state.petFace,
-                           phase: context.state.phase,
-                           spin: context.state.spin, beat: context.state.beatSeconds)
+                ActivityStatusIcon(size: 24)
             }
             .keylineTint(OrbPalette.accent)
             // v3.9.7：点岛回聊天页
@@ -273,9 +265,7 @@ struct QingliaoLiveActivityWidget: Widget {
     private func lockScreenBanner(state: QingliaoActivityAttributes.ContentState) -> some View {
         HStack(spacing: 12) {
             // v3.9.79（用户回「1」拍板：锁屏横幅也换）：球 → 卡通形象，与灵动岛三处同一份画法/同一份状态下发
-            PetOrbView(size: 46, styleRaw: state.petStyle, faceRaw: state.petFace,
-                       phase: state.phase,
-                       spin: state.spin, beat: state.beatSeconds)
+            ActivityStatusIcon(size: 46)
             VStack(alignment: .leading, spacing: 3) {
                 Text(state.sessionTitle.isEmpty ? "轻聊" : state.sessionTitle)
                     .font(.system(size: 15, weight: .semibold))
@@ -331,81 +321,14 @@ struct QingliaoLiveActivityWidget: Widget {
     }
 }
 
-// MARK: - 轻聊球
-
-/// v3.9.79：**灵动岛图标 = 用户在设置里选的卡通形象**（用户 2026-09-25：「加改一条，
-/// 灵动岛球图标跟随卡通形象动态图」）。
-///
-/// 三个硬约束（抄送一份，省得下次重新踩）：
-///  1. **形象靠数据下发，不靠挂件自己读设置**：侧载免费签名拿不到 App Groups，
-///     扩展进程的 `UserDefaults.standard` 跟主 App 不是同一个域 → 只能走 `ContentState.petStyle`。
-///  2. **复用主 App 的矢量绘制**（`PetPainter`，纯 `Canvas + Path`、零依赖）——同一份源码
-///     在 project.yml 里同时编进主 App 与挂件两个 target，画法永远一致，不用在挂件里再抄一套造型。
-///  3. **动效只随数据更新发生**（文件头第 2 条硬约束）：实时活动**没有连续帧源**，
-///     所以形象的「呼吸」不做 `repeatForever`/`TimelineView(.animation)`，而是**每拍换向一次**
-///     （`spin` 每拍 +`OrbBeat.spinStep` → 取第几拍的奇偶决定缩放/起伏的哪一端），
-///     过渡时长按本拍真实间隔现算（`OrbBeat.animation`）→ 两拍接得上，观感是持续起伏。
-///     眨眼同理**不做**：0.06s 的瞬时眨眼在「1.2s～2s 一段过渡」的粒度下渲染不出来，
-///     硬做只会变成慢速眯眼，比不眨更怪（表情仍由 `state` 切换：思考 = 睁眼思考脸，失败 = alert 脸）。
-struct PetOrbView: View {
-
-    var size: CGFloat
-    /// `PetStyle.rawValue`（由 `ContentState.petStyle` 透传；认不出的值落回液态小生物）
-    var styleRaw: String
-    /// v4.0.6：`PetFace.rawValue`（由 `ContentState.petFace` 透传；认不出的值落回平静脸）
-    var faceRaw: String
-    /// 阶段字符串（`QingliaoActivityAttributes.Phase`）
-    var phase: String
-    /// 累计相位（同 OrbView.spin，每拍 +0.125，不回绕）
-    var spin: Double = 0
-    /// 同 `OrbView.beat`：**刻意不给默认值**，漏传必须编译不过（慢档下会静默变快，见 OrbView 注释）
-    var beat: Double
-
-    private var style: PetStyle { PetStyle.from(styleRaw) }
-
-    /// v4.0.6：常态表情随 `ContentState.petFace` 下发（同 petStyle 口径：挂件读不到主 App 的
-    /// UserDefaults，只能吃下发值；挂件的 `done` 态就是 idle，此时画的就是用户选的脸）
-    private var face: PetFace { PetFace.from(faceRaw) }
-
-    /// 阶段 → 形象表情（与球时代同口径：thinking/streaming = 思考脸，failed = alert 脸，done = 常态）
-    private var petState: PetState {
-        switch phase {
-        case QingliaoActivityAttributes.Phase.failed.rawValue:
-            return .alert
-        case QingliaoActivityAttributes.Phase.thinking.rawValue,
-             QingliaoActivityAttributes.Phase.streaming.rawValue:
-            return .thinking
-        default:
-            return .idle        // done / 未知值
-        }
-    }
-
-    /// 本拍是「吸气」还是「呼气」：按拍数取奇偶（用共享步长换算，别自己写 0.125）
-    private var inhale: Bool {
-        Int((spin / OrbBeat.spinStep).rounded()) % 2 == 0
-    }
-
+// MARK: - Activity 状态图标（统一 SF Symbols，不展示角色形象）
+private struct ActivityStatusIcon: View {
+    let size: CGFloat
     var body: some View {
-        Canvas { gc, canvasSize in
-            PetPainter(style: style,
-                       state: petState,
-                       face: face,
-                       blink: false,       // 见上：实时活动渲染不出瞬时眨眼，硬做会变成慢速眯眼
-                       // 岛内尺寸 24 ~ 36pt 全在 76pt 简化阈值以下：只画头 + 眼 + 嘴。
-                       // 这里显式写成尺寸判断（而不是靠 PetAvatar 的 76pt 阈值），是因为本视图
-                       // 不经过 PetAvatar，别让「简化口径」变成第二处真源。
-                       simplify: size < PetKeys.simplifyBelow)
-                .draw(&gc, size: canvasSize)
-        }
-        .frame(width: size, height: size)
-        // 呼吸：整层缩放 + 极轻的上下起伏（不重绘 Canvas，最省）——每拍换向，过渡 = 本拍间隔
-        // v3.9.79：呼吸改成**只往内收**（0.97）+ 向下极轻起伏。
-        // 原来用 1.03 外扩 + 向上 offset：36pt 展开态会顶出布局框约 1.26pt，而同一区域上方就是传感器区
-        // （见 44-46 行：36.67pt 顶行，38 就会被圆角遮罩切上下边）——审查 F5 推算出来的真机切边风险。
-        // 改内收后任何尺寸都不越框，动感不变（缩放方向反过来而已）。
-        .scaleEffect(inhale ? 0.97 : 1.0)
-        .offset(y: inhale ? 0 : size * 0.015)
-        .animation(OrbBeat.animation(beat), value: spin)
+        Image(systemName: "sparkles")
+            .font(.system(size: min(size * 0.55, 22), weight: .medium))
+            .foregroundStyle(.primary)
+            .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 }
@@ -432,6 +355,5 @@ extension OrbBeat {
     }
 }
 
-// ⚠️ v3.9.79：球体视图 `OrbView` **已整体退役**——灵动岛三处 + 锁屏横幅现在都画用户的卡通形象（`PetOrbView`），
-//    没有任何调用点了，所以整块删掉（球时代的脉冲环/旋转弧/对勾/叹号一并退场，动画改由 `PetOrbView` 的每拍呼吸承担）。
+// ⚠️ 球体视图 `OrbView` 已退役；当前以 SF Symbols 状态标记替代角色形象。
 //    要回滚请从 git 历史取，别凭记忆重写；`OrbPalette` 仍在用（进度条配色 / 停止按钮 / keystore tint），别一起删。

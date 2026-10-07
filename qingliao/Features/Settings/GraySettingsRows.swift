@@ -15,7 +15,7 @@ struct GraySettingsGroup<Content: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             if !title.isEmpty {
                 Text(title)
-                    .font(.system(size: 15))
+                    .font(.system(size: Typography.groupLabel))
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 20)
             }
@@ -68,16 +68,16 @@ struct GraySettingsRow: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    .font(.system(size: 20))
+                        .font(.system(size: Typography.headline))
                     .frame(width: 30)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 16))
+                        .font(.system(size: Typography.rowTitle))
                         .foregroundStyle(.primary)
                     if let subtitle {
                         Text(subtitle)
-                            .font(.system(size: 13))
+                            .font(.system(size: Typography.subhead))
                             .foregroundStyle(.tertiary)
                             .lineLimit(2)
                     }
@@ -85,13 +85,13 @@ struct GraySettingsRow: View {
                 Spacer(minLength: 8)
                 if let value {
                     Text(value)
-                        .font(.system(size: 14))
+                        .font(.system(size: Typography.rowValue))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 if chevron {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: Typography.rowValue, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -114,17 +114,17 @@ struct GraySettingsStaticRow: View {
         HStack(spacing: 12) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
+                    .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 30)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 16))
+                    .font(.system(size: Typography.rowTitle))
                     .foregroundStyle(.primary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 13))
+                        .font(.system(size: Typography.subhead))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                 }
@@ -148,17 +148,17 @@ struct GraySettingsToggleRow: View {
         HStack(spacing: 12) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
+                    .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 30)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 16))
+                    .font(.system(size: Typography.rowTitle))
                     .foregroundStyle(.primary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 13))
+                        .font(.system(size: Typography.subhead))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                 }

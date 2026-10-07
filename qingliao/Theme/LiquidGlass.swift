@@ -279,6 +279,15 @@ struct A11yGlassSurface<S: InsettableShape>: ViewModifier {
 }
 
 extension View {
+    /// Opaque surface for persistent chrome (headers, controls and composers).
+    /// Unlike `a11yGlass`, this never reveals scrolling content underneath.
+    func opaqueChrome<S: Shape>(in shape: S,
+                                fill: Color = Color(uiColor: .secondarySystemBackground),
+                                stroke: Color = Color(uiColor: .separator).opacity(0.35)) -> some View {
+        background(fill, in: shape)
+            .overlay(shape.stroke(stroke, lineWidth: 0.8))
+    }
+
     /// 玻璃面统一出口（含「降低透明度」降级 / 「增强对比度」描边加粗）——见上方 A11yGlassSurface。
     func a11yGlass<S: InsettableShape>(_ glass: Glass = .regular, in shape: S,
                                        stroke: Color, strokeWidth: CGFloat = 0.8,

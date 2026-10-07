@@ -184,7 +184,6 @@ struct DockTabView: View {
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
                 SettingsView()
-                    .toolbar(.hidden, for: .navigationBar)
             }
             // item8 sheet 规范：整页内容用 .large，可见拖拽指示器，可下滑关闭
             .presentationDetents([.large])
@@ -209,6 +208,8 @@ struct DockTabView: View {
                 try? await Task.sleep(for: .milliseconds(450))
                 NotificationCenter.default.post(name: .qingliaoFillInput, object: text)
             }
+            .toolbarBackground(Color(uiColor: .systemBackground), for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
         }
         // 灰度重做 2026-10-06 晚：侧边栏开关（聊天页顶栏按钮发通知）
         .onReceive(NotificationCenter.default.publisher(for: .qingliaoToggleSidebar)) { _ in
@@ -851,7 +852,8 @@ private extension DockTabView {
     /// 当前真机颜色只靠 TabView.tint(.primary)（选中黑）+ 系统默认（未选中灰）。
     /// 注意：所在 extension 是 private，必须显式标 internal，否则 App 入口调不到。
     internal static func configureGrayTabBarAppearance() {        let appearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor.systemBackground
         let selected = UIColor.label
         let normal = UIColor.tertiaryLabel
         for layout in [appearance.stackedLayoutAppearance,

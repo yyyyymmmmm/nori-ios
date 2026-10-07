@@ -170,7 +170,6 @@ targets:
       # 必须是这两个**干净文件**（无 @AppStorage/无 View），别把 PetAvatar.swift 整份塞进来：
       # 形象由 ContentState.petStyle 下发，挂件不读 UserDefaults（免费签名没有 App Groups）。
       - qingliao/Features/Chat/PetModel.swift
-      - qingliao/Features/Chat/PetPainter.swift
     info:
       path: qingliaoWidget/Info.plist
       properties:

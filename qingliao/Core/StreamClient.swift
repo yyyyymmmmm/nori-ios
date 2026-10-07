@@ -480,7 +480,12 @@ final class StreamClient {
                     recoverTried = true
                     if await tryRecover(auth: auth) { return }
                 }
-                finish(success: st != "error", error: err)
+                let hasReply = !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                let terminalError = err.isEmpty
+                    ? "AI 服务已结束，但没有返回正文。请检查 Hermes/模型服务商日志后重试。"
+                    : err
+                finish(success: st != "error" && hasReply,
+                       error: st == "error" ? err : (hasReply ? err : terminalError))
             }
             if phase != .normal { phase = .normal }   // v3.9.58：成功轮询 → 恢复正常相位
         } catch APIError.server(404) {
@@ -581,7 +586,12 @@ final class StreamClient {
                 }
                 if done {
                     // 待做池⑥：中断任务用断点提示（含已完成步数），普通任务保持原 error。
-                    finish(success: st != "error", error: interruptedNote ?? err)
+                    let hasReply = !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    let terminalError = err.isEmpty
+                        ? "AI 服务已结束，但没有返回正文。请检查 Hermes/模型服务商日志后重试。"
+                        : err
+                    finish(success: st != "error" && hasReply,
+                           error: interruptedNote ?? (st == "error" ? err : (hasReply ? err : terminalError)))
                 }
                 return true
             }

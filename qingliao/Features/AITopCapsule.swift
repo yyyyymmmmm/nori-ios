@@ -1,8 +1,8 @@
 import SwiftUI
 
-// MARK: - F线 2026-10-06：AI 形象胶囊（Muse 式，五页顶栏统一）
+// MARK: - F线 2026-10-06：AI 状态胶囊（五页顶栏统一）
 //
-// 顶部居中：单行小胶囊——28pt 动态猫头像 + "Nori" + 状态小字，总高 ~40pt。
+// 顶部居中：纯文字状态胶囊——"Nori" + 状态小字，不展示 AI 形象。
 // 状态：连接中… / 未连接 / AI 未就绪 / 正在执行任务 / 正在思考… / 待命中
 //   （2026-10-07 重做：状态必须诚实——冷启动不读缓存预设在线；"在线"改"待命中"；
 //    Python 通但 Hermes 不通显示"AI 未就绪"）
@@ -146,7 +146,6 @@ struct AITopCapsule: View {
     @Environment(StreamClient.self) private var stream
     @Environment(\.scenePhase) private var scenePhase
     @State private var capsuleState = AITopCapsuleState.shared
-    @ObservedObject private var speech = PetSpeechDrive.shared
 
     /// 状态小字：连接中… > 未连接 / AI 未就绪 > 正在执行任务 > 正在思考… > 待命中
     private var statusText: String {
@@ -161,13 +160,6 @@ struct AITopCapsule: View {
         }
     }
 
-    /// L线：动态猫头像状态（ROTAvatarView）——朗读中 > 任务/思考中 > 待命/连接中/异常
-    private var avatarState: ROTAvatarState {
-        if speech.isSpeaking { return .speaking }
-        if capsuleState.taskTitle != nil || stream.isStreaming { return .thinking }
-        return .idle
-    }
-
     var body: some View {
         Button {
             Haptics.tap()
@@ -178,9 +170,8 @@ struct AITopCapsule: View {
                 NotificationCenter.default.post(name: .qingliaoOpenTaskCenter, object: nil)
             }
         } label: {
-            // v4.x item8：单行小胶囊（Muse 式）——28pt 头像 + 名字 + 状态，总高 ~40pt
+            // 纯文字身份与真实连接状态，不显示卡通头像。
             HStack(spacing: 8) {
-                ROTAvatarView(state: avatarState, size: 28)
                 Text("Nori")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.primary)
@@ -191,7 +182,7 @@ struct AITopCapsule: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(Color.secondary.opacity(0.12), in: Capsule())
+            .opaqueChrome(in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("AI 状态，打开任务中心")

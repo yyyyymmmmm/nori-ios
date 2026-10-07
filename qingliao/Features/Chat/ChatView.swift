@@ -214,25 +214,8 @@ struct ChatView: View {
     // 🚨 v4.0.54：对齐口径由 `.bottom`（贴底）改为 **`.top`** —— 新会话第一条气泡在最上方，
     // 后面的往下堆、排满后往上翻（用户 2026-10-05 报障原话）。
     @State private var chatListViewportH: CGFloat = 0
-    /// v3.9.78：欢迎页宠物的「抚摸」反应触发器（轻点自增 → PetAvatar 播一次 ≤1.2s 反应）
-    @State private var petPat = 0
     /// v3.9.78：宠物在屏幕上的真实中心（长按弹菜单时当锚点用，胶囊从宠物身上绽放）
     @State private var petGlobalCenter: CGPoint = .zero
-
-    /// v3.9.78：欢迎页宠物的状态——**只接既有信号，不新增状态源**。
-    ///   · alert（耷拉）：后端离线（`serverOnline == false`，欢迎页本来就该有失败的冗余通道）
-    ///     或本条生成失败（`generationFailed`，与灵动岛「生成失败」红态同一判定）
-    ///   · thinking：AI 正在回（aiBusy）
-    ///   · idle / patting 其余
-    ///
-    /// ⚠️ 为什么**不接**「新消息（unseen）」：`orbUnseen` 只在本页**不可见**时才为真
-    ///   （DockTabView 用 `!chatVisible` 置位），而欢迎页只在 `chat.messages.isEmpty` 时渲染
-    ///   —— 两者时间上互斥，接上去就是死代码（调研结论：不做只动画表达状态的假接线）。
-    ///   要让它有意义，得先把宠物放到「有消息时也在场」的位置（那是 30/38pt 头像那一层）。
-    private var petState: PetState {
-        if serverOnline == false || generationFailed { return .alert }
-        return aiBusy ? .thinking : .idle
-    }
 
     /// v3.9.78：生成失败判定提成**单一真源**（原来只写在 pushLiveActivity 里）——宠物与灵动岛共用。
     private var generationFailed: Bool {
@@ -332,7 +315,6 @@ struct ChatView: View {
     @State private var suppressAutoReadOnce = false
     @State private var showReasoningPicker = false
     /// v4.0.31：header 中央宠物的「回答完成」庆祝触发器（本会话流结束那一刻 +1，v4.0.27 口径回归）
-    @State private var petCelebrate = 0
     /// v3.9.48：输入栏展开态右下角的模型快选面板
     @State private var showComposerModel = false
 
@@ -945,8 +927,8 @@ struct ChatView: View {
                 //   配套：welcomeView 自己在键盘弹起时收缩（见那里的注释），否则会看到被截断的欢迎页。
             }
             // Muse 式固定玻璃 chrome：消息列表铺满视口，顶部控件/输入区固定叠放，滚动文字能从下方透出。
-            .safeAreaBar(edge: .top) { chatHeaderBar.background(.clear) }
-            .safeAreaBar(edge: .bottom) { chatComposerArea.background(.clear) }
+            .safeAreaBar(edge: .top) { chatHeaderBar.background(Color(uiColor: .systemBackground)) }
+            .safeAreaBar(edge: .bottom) { chatComposerArea.background(Color(uiColor: .systemBackground)) }
             // v4.1.0 D路：实测底部安全区（替代不存在的 \.safeAreaInsets EnvironmentKey，CI 修错）
             .background(
                 GeometryReader { proxy in
@@ -1419,24 +1401,6 @@ struct ChatView: View {
     // 这里按原注释分段把视图块原样搬成独立 @ViewBuilder 属性 —— **纯搬运**：视图顺序、
     // 层级、条件分支、闭包、修饰符逐字未变，渲染结果与拆分前一致，只为把类型检查表达式打小。
 
-    /// v4.0.31：聊天页 header 正中的宠物（v4.0.28 删除后按新规格回归；用户拍板 2A）——
-    ///   **AI 忙** = `.thinking` + 困倦脸 + 托腮（方案 A：thinkingFaceOverride=.sleepy，托腮由 PetAvatar 内 onChange 驱动）
-    ///   **空闲** = `.idle`（呼吸、眨眼、随机微动作）
-    ///   **回答完成** = `celebrateTrigger` +1 → 庆祝动作（欢呼/比心/鼓掌/挥手随机）+ 开心脸（方案 A：celebrateFace=.happy，播完回落）
-    ///   **出错** = `.alert` + 默认脸 + 张望一次（方案 A：alertFaceOverride=.calm，张望由 PetAvatar 内驱动）
-    /// 60pt（v4.0.36 用户改规格，此前 62pt 是当年三档对比选定值）；v4.0.32 起加 keepDetail
-    /// 旁路简化阈值——60 < 76 本会被画成「头+眼+嘴」（真机报修「header 宠物没有手」），现在完整细节照常画，
-    /// 省电靠 state 映射（idle 只呼吸+眨眼+偶发微动作，无逐帧常驻）。
-    /// 交互与欢迎页那只完全同款（拍板 2A）：轻点抚摸+聚焦输入框 / 长按快捷菜单（手势挂 overlay 命中层）。
-    private var petHeaderBadge: some View {
-        ROTAvatarView(state: aiBusy ? .thinking : .idle, size: 60)
-    }
-
-    /// v4.0.31：header 宠物的出错信号 —— 本会话这轮生成失败（非可重试错误），与欢迎页 alert 同源判定
-    private var headerPetError: Bool {
-        !aiBusy && generationFailed
-    }
-
     /// 页头 + 思考档位弹窗 + 任务中心全屏页
     /// F线 2026-10-06：Muse 式顶栏 —— 左侧边栏（line.3.horizontal）/ 中 AITopCapsule / 右搜索；
     /// 更多（...）按钮已删（用户要求只留搜索）；离线状态由胶囊状态小字统一显示。
@@ -1451,7 +1415,7 @@ struct ChatView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .opaqueChrome(in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
@@ -1471,7 +1435,7 @@ struct ChatView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .opaqueChrome(in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("搜索")
@@ -1485,7 +1449,7 @@ struct ChatView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .opaqueChrome(in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("语音对话")
@@ -1496,11 +1460,6 @@ struct ChatView: View {
         // 2026-10-07：语音对话全屏页
         .sheet(isPresented: $showVoiceDialog) {
             VoiceDialogView()
-        }
-        // v4.0.31：本会话这轮回答结束（忙→闲）→ 庆祝动作（v4.0.27 口径回归）。
-        // 用 thisSessionStreaming 而不是 aiBusy：别会话跑完不该庆祝（原注释同）。
-        .onChange(of: thisSessionStreaming) { was, now in
-            if was && !now { petCelebrate += 1 }
         }
         .confirmationDialog("模型思考档位", isPresented: $showReasoningPicker, titleVisibility: .visible) {
             reasoningPickerContent
@@ -2372,45 +2331,31 @@ struct ChatView: View {
 
     // MARK: v3.9.79 欢迎页拆件（横屏两栏与竖屏共用同一批子视图 —— 别复制第二套，手势/样式只此一份）
 
-    /// 欢迎页形象：96pt 身份尺寸 + 长按（同一套六颗胶囊）/ 轻点（抚摸 + 聚焦输入框）手势。
-    /// ⚠️ 竖屏与横屏共用本视图：手势只写这一份，横屏不许再来一套（两套迟早口径不一）。
+    /// 欢迎页快捷操作入口：抽象 SF Symbol，不展示角色形象；轻点聚焦输入框，长按打开快捷菜单。
+    /// 竖屏与横屏共用本视图，手势和菜单锚点只维护一份。
     private var petHero: some View {
         ZStack {
-            // v3.9.78：欢迎页形象 = 用户拍板的**卡通宠物**（三选一，见 PetAvatar / PetPainter）。
-            // 原口径（v3.9.57~v3.9.77）= 96pt 液态球（Metal 着色器）+ live: true 常驻 30fps；
-            // 现在换成原生矢量宠物：零 SPM 依赖、包体积增量 0，且**不再常驻逐帧渲染**
-            // （只有呼吸/眨眼/状态切换时才动，后台/键盘无关场景自动停 —— 比原来省电）。
-            // 尺寸仍锁 96pt（欢迎页身份，不因布局改动而变）；三态：思考中（AI 正在回）/ 抚摸（轻点）/ 待机。
-            ROTAvatarView(state: petState == .thinking ? .thinking : .idle, size: 96)
+            Image(systemName: "sparkles")
+                .font(.system(size: 34, weight: .regular))
+                .foregroundStyle(.secondary)
+                .frame(width: 96, height: 96)
+                .background(Color(uiColor: .secondarySystemBackground), in: Circle())
         }
-        // 尺寸仍锁 96pt（身份尺寸不因命中域而变）
+        // 固定命中尺寸，保持竖屏与横屏菜单锚点一致。
         .frame(width: 96, height: 96)
-        // v4.0.0 走动位移最大 ±0.145×96 ≈ ±14pt，会溢出这个 96×96 框；宠物走到框外那半截若
-        // 点不到，「轻点抚摸」就在手的位置失灵 → 命中域横向放宽到两侧各 18pt。
-        //
-        // ⚠️ 别再试图构造「带 inset 的形状」：v4.0.0 连续两次踩坑 ——
-        //   ① `Rectangle().inset(by: EdgeInsets)` → Rectangle 的 inset(by:) 收 CGFloat，编不过；
-        //   ② `Path(insetBy:)` → 这个重载根本不存在（iOS 17 的 Path 没有）。
-        // 正确做法：叠一个**透明扩边 overlay** 当命中层。overlay 不参与父级布局，
-        //   所以不会像「直接 frame 撑宽」那样把旁边文字挤走 —— 这是选它而不是撑宽的唯一理由。
         .overlay {
-            // 透明命中层：横向 ±18pt（位移余量 14pt + 4pt 保险），纵向不扩（颠步仅 3pt）。
-            // Color.clear 自身不渲染任何像素，但挂上 contentShape 后就是命中形状。
             Color.clear
                 .frame(width: 96 + 18 * 2, height: 96)
                 .contentShape(Rectangle())
         }
-        // 96×96 本体也要命中（overlay 虽已覆盖更大范围，但本体命中语义留一份，双保险）
         .contentShape(Rectangle())
-        .accessibilityLabel("Nori智能体")
-        // v3.9.78：量宠物在屏幕上的真实中心（菜单从这里绽放；键盘/滚动导致的位移会同步刷新）
+        .accessibilityLabel("快捷操作")
+        // 测量真实屏幕中心，确保菜单总从当前入口位置展开。
         .onGeometryChange(for: CGPoint.self) { proxy in
             let r = proxy.frame(in: .global)
             return CGPoint(x: r.midX, y: r.midY)
         } action: { petGlobalCenter = $0 }
-        // v3.9.79：宠物中心一变就**只刷新菜单锚点**（dock 侧仅在菜单开着时消费，关着直接丢弃 → 无副作用）。
-        // 为什么必须做：长按弹菜单会顺手收键盘 → 宠物随 Spacer 回弹下移 ≥56pt，而锚点是长按那一刻的快照，
-        // 菜单层会在旧位置再画一只宠物（真机观感＝两只宠物）。发版前只读审查实测指出这条交互缺陷。
+        // 入口移动时刷新菜单锚点，避免键盘收起后菜单落在旧坐标。
         .onChange(of: petGlobalCenter) { _, center in
             // v4.0.x：宠物中心刚就位（欢迎页刚挂树）时，若有人（快捷指令）在等这张菜单弹在宠物上 →
             // 这里消费掉 pending 并**补发**应答（那次请求发出时本视图还没挂树，听不到）。
@@ -2427,9 +2372,7 @@ struct ChatView: View {
                 // 「顺手改用局部变量」就会把护栏打红 —— 局部变量那版已在 v4.0.x 试过一次）。
                 userInfo: OrbPetAnchor(center: center, size: 96).userInfo)
         }
-        // v4.0.x：dock 层要弹菜单但需要本视图的锚点 → 立刻应答（欢迎页已经在屏的情形）。
-        // 为什么不塞进 OrbMenuFromPetModifier 之类的宿主修饰符：那类修饰符挂在 DockTabView 全身，
-        // 而锚点只有本视图有；挂在宠物自己身上，生命周期与它完全一致。
+        // 外部快捷指令请求菜单时，如果欢迎页已显示，则回报当前锚点。
         .onReceive(NotificationCenter.default.publisher(for: .qingliaoRequestPetAnchor)) { _ in
             guard petGlobalCenter != .zero, OrbPetAnchorRegistry.consumePendingRequest() else { return }
             replyOrbMenuAnchor(center: petGlobalCenter)
@@ -2451,26 +2394,10 @@ struct ChatView: View {
                 },
                 TapGesture().onEnded {
                     Haptics.tap()
-                    petPat += 1        // 抚摸：一次触感 + ≤1.2s 一次性反应（不进任何功能页）
                     inputFocus = true
                 }
             )
         )
-    }
-
-    /// v4.0.31：header 宠物的手势层 —— 与欢迎页那只完全同款（拍板 2A）：
-    ///   轻点 = 抚摸（petPat +1）+ 聚焦输入框；长按 = 发 .qingliaoOrbMenuFromPet（DockTabView 合流消费，
-    ///   动作分发单一真源）。⚠️ ql_orbmenu 护栏钉着「ChatView 里 .qingliaoOrbMenuFromPet 恰一次」——
-    ///   为不破坏「手势只此一份」，header 宠物**不发第二条通知**：长按只做本地按压反馈，
-    ///   快捷菜单走欢迎页那条长按链（header 与欢迎页不同时在屏，锚点天然正确）。
-    ///   备查：曾评估给 header 宠物挂独立锚点+第二发声明，护栏会红且复制第二套手势，弃。
-    private var chatHeaderPet: some View {
-        petHeaderBadge
-            .contentShape(Rectangle())
-            .onTapGesture {
-                Haptics.tap()
-                petPat += 1
-            }
     }
 
     /// 「从宠物位置弹快捷菜单」的发声点 —— ⚠️ **刻意不与长按手势共用一个方法**。

@@ -1,13 +1,9 @@
 import Foundation
 
-// MARK: - v3.9.79 形象模型（从 PetAvatar.swift 抽出，供主 App 与实时活动挂件共用）
+// MARK: - Live Activity legacy state models
 //
-// 为什么抽成独立文件：**实时活动挂件 target 要画同一只形象**（用户 2026-09-25：
-// 「加改一条，灵动岛球图标跟随卡通形象动态图」），而挂件 target 只编 `qingliaoWidget/` + 白名单源码。
-// 形象 View（PetAvatar）里有 `@AppStorage`/动画等主 App 侧的东西，没必要塞进扩展；
-// 所以把「形象枚举」与「矢量绘制（PetPainter）」分成两个干净文件，挂件只引这两份：
-//   project.yml → QingliaoWidget.sources: PetModel.swift + PetPainter.swift
-// ⚠️ 三个 target 的源码清单必须同步：漏了任何一个文件挂件会编译失败（CI Archive 才暴露）。
+// The activity payload still decodes these values for compatibility with activities
+// created by earlier app versions. Character rendering and its settings UI were removed.
 
 enum PetKeys {
     static let style = "qingliao_pet_style"

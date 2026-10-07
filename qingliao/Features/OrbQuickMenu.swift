@@ -438,8 +438,11 @@ struct OrbQuickMenuLayer: View {
     /// 唯一一种画法：宠物（球版分支已删，见上面的口径注释）
     @ViewBuilder
     private var anchorObject: some View {
-        ROTAvatarView(state: thinking ? .thinking : .idle, size: anchorSize)
+        Image(systemName: "sparkles")
+            .font(.system(size: min(anchorSize * 0.34, 34), weight: .medium))
+            .foregroundStyle(.primary)
             .frame(width: anchorSize, height: anchorSize)
+            .background(Color(uiColor: .secondarySystemBackground), in: Circle())
             .position(ballCenter)
             .opacity(shown ? 1 : 0)          // 与轻纱同节奏淡入（onAppear 的 withAnimation 一并驱动）
             .allowsHitTesting(false)
