@@ -720,22 +720,10 @@ extension ChatInputBar {
             .padding(.vertical, Spacing.xs)
     }
 
-    /// 启动链折叠第 2 组（4 条修饰器）：玻璃底 + 聚焦蓝边 + 静态外阴影。
+    /// 输入框系统材质底、统一描边与轻阴影。
     @MainActor
     private func applyInputBarGlassChrome<C: View>(to content: C) -> some View {
         content
-            // v2.0.87e：原生液态玻璃输入栏（iOS 26+）
-            // v3.9.62：玻璃形状 Capsule → 14pt 档圆角矩形（Radius.field，输入框档）。
-            // v3.9.63：v3.9.62 的写法 `.background { RoundedRectangle(...).glassEffect() }` **不成立**——
-            //   Apple 官方明确 glassEffect 的默认形状是 Capsule（`DefaultGlassEffectShape`；原文「applies
-            //   the given effect within a Capsule shape behind the view's content」），宿主 Shape 是圆角矩形
-            //   也拦不住：玻璃本体仍按胶囊渲染（两端半径 = 容器高/2 ≈54），衬在圆角矩形白边**里面**——
-            //   用户看到的就是「方形圆角框里还套一层椭圆玻璃」。正确做法 = 官方 `in:` 参数把玻璃钉进
-            //   RoundedRectangle：`.glassEffect(.regular, in: RoundedRectangle(...))`，玻璃与描边同形，
-            //   整个容器只剩一个形状。
-            // 半径历史：v3.9.62 用 Radius.field(14) → v3.9.64 用 Radius.card(16) →
-            //   v3.9.65 起用户明确「加到 18」→ ChatInputBarLayout.containerCornerRadius（单一真源，见 enum 定义）。
-            // 外层玻璃容器其余件（白边/聚焦蓝边/流光）全部换成同一个形状（四处同形真值表钉住）。
             // 收起态沿用系统常见的胶囊输入框；展开工具层时切换为圆角矩形。
             // regularMaterial 提供真正的系统模糊，同时保持输入文字与正文之间的层级。
             .background {
@@ -775,23 +763,10 @@ extension ChatInputBar {
             .shadow(color: .black.opacity(0.08), radius: 10, y: 3)
     }
 
-    /// 启动链折叠第 3 组（2 条修饰器）：等待回复流光 overlay + 收窄水平 padding。
+    /// 输入栏外侧留白。
     @MainActor
     private func applyInputBarGlowChrome<C: View>(to content: C) -> some View {
         content
-            // v2.0.87s：等待回复特效（v2.0.87ay：改回 87 版效果——内部旋转流光，Siri 淡雅）
-            .overlay {
-                // v4.4：等待回复流光删除——输入框是遥控器，状态要稳；任务状态由顶栏 Nori 胶囊承担。
-                // 两处同时表达状态就是乱。设置页"输入框流光光效"开关同步删除。
-                Group {
-                    if toolLayerExpanded {
-                        RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous)
-                            .strokeBorder(Color.white.opacity(Tint.subtle), lineWidth: 0.6)
-                    } else {
-                        Capsule().strokeBorder(Color.white.opacity(Tint.subtle), lineWidth: 0.6)
-                    }
-                }
-            }
             .padding(.horizontal, 18)   // v2.0.87aw：输入框宽度收窄（12→18）
     }
 
