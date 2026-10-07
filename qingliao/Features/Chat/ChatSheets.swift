@@ -149,54 +149,66 @@ struct QuickPromptSheet: View {
 ///    配了 Agent 模型时它不生效（视觉 > Agent > 主），面板顶部照 `ModelSheet` 的话术把这件事说清楚，
 ///    不静默骗人。
 struct ComposerModelSheet: View {
+    @Environment(AuthStore.self) private var auth
     @Environment(\.dismiss) private var dismiss
     // 默认值必须与全站其余读点逐字一致（自查清单第 3 条）
     @AppStorage("qingliao_model") private var modelName = "deepseek-v4-flash"
     @AppStorage("qingliao_provider") private var provider = "opencode"
-    @AppStorage(UserDefaultsKey.agentModel) private var agentModel = ""
-
-    private let groups: [(id: String, models: [String])]
-
-    init() { groups = ModelProvidersCache.load() }
+    @State private var groups: [HermesProviderGroup] = []
+    @State private var loading = true
+    @State private var loadError: String?
+    @State private var actionError: String?
+    @State private var savingID: String?
 
     var body: some View {
         NavigationStack {
             Group {
-                if groups.isEmpty {
+                if loading {
+                    ProgressView("正在读取 Hermes 模型…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let loadError {
+                    VStack(spacing: 10) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: Typography.display, weight: .light))
+                            .foregroundStyle(.tertiary)
+                        Text("模型列表加载失败")
+                            .font(.system(size: Typography.subhead))
+                            .foregroundStyle(.secondary)
+                        Text(loadError)
+                            .font(.system(size: Typography.tiny))
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                        Button("重试") { Task { await loadModels() } }
+                    }
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if groups.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "cube.box")
                             .font(.system(size: Typography.display, weight: .light))
                             .foregroundStyle(.tertiary)
-                        Text("还没有可选的模型")
+                        Text("Hermes 当前没有可选模型")
                             .font(.system(size: Typography.subhead))
                             .foregroundStyle(.secondary)
-                        Text("先到 设置 › 模型管理 同步一次模型列表")
-                            .font(.system(size: Typography.tiny))
-                            .foregroundStyle(.tertiary)
+                        Button("重新读取") { Task { await loadModels() } }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        if !agentModel.isEmpty {
-                            Section {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "sparkles")
-                                        .font(.system(size: Typography.subhead))
-                                        .foregroundStyle(.orange)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("聊天实际使用 Agent 模型：\(agentModel)")
-                                            .font(.system(size: Typography.subhead, weight: .medium))
-                                        Text("配置了 Agent 模型时优先使用，这里换主模型不生效；可在设置页「Agent 模型」改为跟随主模型")
-                                            .font(.system(size: Typography.tiny))
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                            }
+                        Section {
+                            Text("模型与当前选择均由 Hermes 管理")
+                                .font(.system(size: Typography.tiny))
+                                .foregroundStyle(.secondary)
                         }
-                        ForEach(groups, id: \.id) { g in
-                            Section(g.id) {
-                                ForEach(g.models, id: \.self) { m in
-                                    modelRow(m, in: g.id)
+                        ForEach(groups) { group in
+                            Section(group.name) {
+                                if let error = group.error {
+                                    Text(error)
+                                        .font(.system(size: Typography.tiny))
+                                        .foregroundStyle(.orange)
+                                }
+                                ForEach(group.models) { model in
+                                    modelRow(model, in: group.id)
                                 }
                             }
                         }
@@ -212,36 +224,95 @@ struct ComposerModelSheet: View {
                     }
                 }
             }
+            .task { await loadModels() }
+            .alert("无法切换模型", isPresented: Binding(
+                get: { actionError != nil },
+                set: { if !$0 { actionError = nil } }
+            )) {
+                Button("好", role: .cancel) { actionError = nil }
+            } message: {
+                Text(actionError ?? "请稍后重试")
+            }
         }
     }
 
-    private func modelRow(_ m: String, in p: String) -> some View {
+    private func loadModels() async {
+        loading = true
+        loadError = nil
+        defer { loading = false }
+        do {
+            let response = try await auth.json("/api/agent/hermes/inspect/models")
+            guard let models = response["models"] as? [[String: Any]] else {
+                loadError = (response["error"] as? String) ?? "Hermes 没有返回模型数据"
+                groups = []
+                return
+            }
+            var grouped: [String: [[String: Any]]] = [:]
+            for model in models {
+                let providerID = model["provider"] as? String ?? "hermes"
+                grouped[providerID, default: []].append(model)
+            }
+            groups = grouped.keys.sorted().compactMap { providerID in
+                HermesProviderGroup(json: [
+                    "id": providerID,
+                    "name": providerID,
+                    "models": grouped[providerID] ?? []
+                ])
+            }
+        } catch {
+            groups = []
+            loadError = error.localizedDescription
+        }
+    }
+
+    private func modelRow(_ model: HermesModelOption, in providerID: String) -> some View {
         Button {
-            modelName = m
-            provider = p
-            Haptics.success()
-            dismiss()
+            Task { await select(model, providerID: providerID) }
         } label: {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(m)
+                    Text(model.name)
                         .font(.system(size: Typography.subhead))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Text(p)
+                    Text(providerID)
                         .font(.system(size: Typography.tiny))
                         .foregroundStyle(.tertiary)
                 }
                 Spacer()
-                if m == modelName && p == provider {
+                if savingID == "\(providerID)|\(model.id)" {
+                    ProgressView()
+                } else if model.selected || (model.id == modelName && providerID == provider) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Color.accentColor)
                 }
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("切换到模型 \(m)（\(p)）")
+        .disabled(savingID != nil)
+        .accessibilityLabel("切换到模型 \(model.name)（\(providerID)）")
+    }
+
+    private func select(_ model: HermesModelOption, providerID: String) async {
+        guard savingID == nil else { return }
+        let key = "\(providerID)|\(model.id)"
+        savingID = key
+        defer { savingID = nil }
+        do {
+            let response = try await auth.json("/api/agent/hermes/model", method: "POST",
+                                               body: ["provider": providerID, "model_id": model.id])
+            guard (response["ok"] as? Bool) == true else {
+                actionError = (response["error"] as? String) ?? "Hermes 切换模型失败"
+                return
+            }
+            modelName = model.id
+            provider = providerID
+            Haptics.success()
+            dismiss()
+        } catch {
+            actionError = "切换失败：\(error.localizedDescription)"
+        }
     }
 }
 

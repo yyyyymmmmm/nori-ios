@@ -3823,7 +3823,7 @@ struct ChatView: View {
     /// 保证两条路径落库回调一致（否则探针接回的回复没有 onFinished 收尾，答案会丢）。
     // 2026-10-07：从后端同步当前选中模型（只认后端 /api/agent/hermes/models 的 selected）
     private func syncModelFromBackend() async {
-        guard let j = try? await auth.json("/api/agent/hermes/models", method: "GET") else { return }
+        guard let j = try? await auth.json("/api/agent/hermes/inspect/models", method: "GET") else { return }
         var found: (String, String)?
         if let groups = j["groups"] as? [[String: Any]] {
             for g in groups {
