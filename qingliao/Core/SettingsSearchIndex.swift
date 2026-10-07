@@ -59,8 +59,8 @@ enum SettingsSearchIndex {
               keywords: ["邮箱", "邮件", "163"]),
         .init(route: "cloudDrive", title: "网盘接入", icon: "externaldrive.fill", group: "连接与模型",
               keywords: ["网盘", "云盘", "夸克", "上传"]),
-        .init(route: "appPermissions", title: "权限与 AI 操控", icon: "lock.shield.fill", group: "连接与模型",
-              keywords: ["权限", "授权", "ai 操控", "操控"]),
+        .init(route: "appPermissions", title: "连接应用", icon: "square.grid.2x2", group: "连接器",
+              keywords: ["权限", "授权", "工具服务", "mcp", "云端连接"]),
         // ── AI 智能 ──
         .init(route: "memory", title: "Hermes 记忆", icon: "brain.head.profile", group: "AI 智能",
               keywords: ["Hermes 记忆", "长期记忆", "记住"]),
@@ -102,6 +102,8 @@ enum SettingsSearchIndex {
               keywords: ["震动", "触感", "haptic", "反馈"]),
         .init(route: "sec:appearance", title: "首页卡片", icon: "rectangle.grid.2x2.fill", group: "外观与显示",
               keywords: ["快捷卡片", "首页卡片", "网格", "开关"]),
+        .init(route: "sec:general", title: "后端更新", icon: "arrow.triangle.2.circlepath", group: "通用设置",
+              keywords: ["更新服务端", "Nori 后端版本", "维护"]),
         .init(route: "homeShortcuts", title: "桌面快捷方式", icon: "square.grid.2x2.fill", group: "外观与显示",
               keywords: ["桌面", "快捷方式", "长按图标"]),
 

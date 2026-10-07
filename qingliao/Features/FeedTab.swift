@@ -237,7 +237,7 @@ struct FeedTabView: View {
                     .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("编辑动态版块提示词")
+            .accessibilityLabel("编辑动态关注主题")
         }
     }
 
@@ -272,16 +272,18 @@ struct FeedTabView: View {
             Image(systemName: "newspaper")
                 .font(.system(size: 36))
                 .foregroundStyle(.tertiary)
-            Text("动态版块由上面的提示词驱动")
+            Text("动态来自已配置的真实资讯源")
                 .font(.system(size: Typography.body, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text("feed 内容服务暂未连接")
+            Text("当前没有可展示的 RSS 条目")
                 .font(.system(size: Typography.subhead))
                 .foregroundStyle(.tertiary)
             // v4.x item5：空态加指引。暂无到「连接设置」的现成导航路径，不发明导航，只给文案。
-            Text("连接 Hermes 后，这里会按你的提示词生成动态")
+            Text("在资讯设置中添加可访问的 RSS 源后，动态会自动更新；Hermes 只负责按关注主题排序，不会编造内容。")
                 .font(.system(size: Typography.subhead))
                 .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
@@ -292,10 +294,10 @@ struct FeedTabView: View {
     private var promptSheet: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
-                Text("动态版块说明")
+                Text("动态关注主题")
                     .font(.system(size: Typography.titleXL, weight: .bold))
                     .foregroundStyle(.white)
-                Text("你的动态版块由以下指示驱动。你对此提示做出的任何编辑都将应用于今后的动态版块帖子。")
+                Text("动态只展示资讯设置中 RSS 源的真实文章。Hermes 会按这里的关注主题调整排序；上游不可用时仍展示 RSS 原始顺序。")
                     .font(.system(size: Typography.body))
                     .foregroundStyle(.white.opacity(0.65))
                     .lineSpacing(3)

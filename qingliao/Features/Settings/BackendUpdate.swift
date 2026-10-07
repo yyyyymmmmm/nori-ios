@@ -24,6 +24,7 @@ enum BackendUpdatePhase: Equatable {
     case updating
     case restarting          // run 已发出、后端暂时失联
     case done                // 更新完成、后端已回来
+    case manualUnverified    // 没有 Git 仓库 / 版本标记，不能声称「最新」
     case failed(String)
 }
 
@@ -72,8 +73,8 @@ final class BackendUpdateModel {
             let ver = (j["version"] as? String) ?? ""
             currentVersion = ver
             if ver.isEmpty {
-                // 部署方没注入版本号 → 无法自动判断，静默不动（不打扰）
-                phase = .idle
+                // Manual / bind-mounted deployments without a version marker must be explicit.
+                phase = .manualUnverified
                 return
             }
             phase = qlCompareBackendVersion(ver, QLCompatibleBackendVersion) < 0
@@ -102,6 +103,15 @@ final class BackendUpdateModel {
                 return
             }
             if j["ok"] as? Bool == true {
+                if j["manual"] as? Bool == true {
+                    currentVersion = (j["current_version"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if currentVersion.isEmpty, let commit = j["commit"] as? String, !commit.isEmpty {
+                        currentVersion = "commit \(commit)"
+                    }
+                    logTail = (j["log"] as? String) ?? ""
+                    phase = .manualUnverified
+                    return
+                }
                 if j["update_available"] as? Bool == true {
                     phase = .available(behind: (j["behind"] as? Int) ?? -1)
                 } else {
@@ -318,6 +328,7 @@ struct BackendUpdateSheet: View {
         case .updating: return "正在更新…"
         case .restarting: return "后端重启中，请稍候…"
         case .done: return "更新完成 🎉"
+        case .manualUnverified: return "未核实版本"
         case .failed: return "无法自动更新"
         case .idle: return "未检查"
         }
@@ -326,6 +337,7 @@ struct BackendUpdateSheet: View {
         switch model.phase {
         case .checking, .updating, .restarting: return "arrow.triangle.2.circlepath"
         case .upToDate, .done: return "checkmark.seal.fill"
+        case .manualUnverified: return "questionmark.circle.fill"
         case .available: return "arrow.down.circle.fill"
         case .failed: return "wrench.and.screwdriver.fill"
         case .idle: return "info.circle"
@@ -335,6 +347,7 @@ struct BackendUpdateSheet: View {
         switch model.phase {
         case .available: return .orange
         case .upToDate, .done: return .green
+        case .manualUnverified: return .orange
         case .failed: return .red
         default: return .primary
         }
@@ -355,6 +368,11 @@ struct BackendUpdateSheet: View {
             return "后端容器正在用新代码重启，通常 1–3 分钟内恢复，请保持页面打开"
         case .done:
             return "后端已运行 \(model.currentVersion)，一切就绪"
+        case .manualUnverified:
+            if model.currentVersion.isEmpty {
+                return "当前镜像没有可识别的版本号或 Git 提交信息，因此无法判断是否最新。"
+            }
+            return "当前版本标识为 \(model.currentVersion)，但手动部署没有远端 Git 仓库，无法核实是否最新。"
         case .failed(let msg):
             return msg + "。也可以在 NAS 上手动执行下方命令更新"
         case .idle:
@@ -443,6 +461,7 @@ struct BackendUpdateRow: View {
         case .updating, .restarting: return "更新中"
         case .done: return "已完成"
         case .checking: return "检查中"
+        case .manualUnverified: return "未核实"
         default: return model.currentVersion.isEmpty ? "" : model.currentVersion
         }
     }

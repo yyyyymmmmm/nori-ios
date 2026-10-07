@@ -1,270 +1,118 @@
 import SwiftUI
 
-// MARK: - 健康数据三级页（对标参考设计）
-//
-// 分段：睡眠 / 活动 / 生命体征；每段全宽指标卡，大数字 + mini 柱状图。
-// 数据：HealthStore 结构化查询；读不到显示 "--" 占位，不编假数据。
+enum HealthDataSegment: String, CaseIterable {
+    case sleep = "睡眠"
+    case activity = "活动"
+    case vitals = "生命体征"
+}
 
+/// HealthKit-backed details. Values remain unavailable until HealthKit can return real samples.
 struct HealthDataView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @State private var segment: HealthDataSegment
+    @State private var sleep: Double?
+    @State private var steps: Double?
+    @State private var energy: Double?
+    @State private var heart: Double?
+    @State private var restingHeart: Double?
+    @State private var hrv: Double?
+    @State private var canRead = false
+    @State private var loading = true
 
-    // 2026-10-07：卡片背景深色适配
-    private var cardBackground: Color {
-        colorScheme == .dark ? Color(white: 0.14) : Color.white
+    init(initialSegment: HealthDataSegment = .sleep) {
+        _segment = State(initialValue: initialSegment)
     }
-
-    private enum Segment: String, CaseIterable {
-        case sleep = "睡眠"
-        case activity = "活动"
-        case vitals = "生命体征"
-    }
-    @State private var segment: Segment = .sleep
-
-    // 睡眠段数据
-    @State private var sleepHours: Double?
-    @State private var sleepHistory: [Double] = []
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                segmentPicker
-                Text("Apple Health")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 4)
-                    .padding(.top, 4)
-                switch segment {
-                case .sleep: sleepCards
-                case .activity: activityCards
-                case .vitals: vitalsCards
+            VStack(alignment: .leading, spacing: 18) {
+                Picker("健康数据类别", selection: $segment) {
+                    ForEach(HealthDataSegment.allCases, id: \.self) { item in
+                        Text(item.rawValue).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if !HealthStore.isAvailable {
+                    ContentUnavailableView("此安装暂不可读取 Apple 健康", systemImage: "heart.slash",
+                                           description: Text("当前设备或安装包未提供 HealthKit 能力。"))
+                } else if !canRead {
+                    ContentUnavailableView {
+                        Label("尚未读取到健康数据", systemImage: "heart.text.square")
+                    } description: {
+                        Text("请在系统健康权限中允许 Nori 读取对应项目；HealthKit 不会向应用公开单项读取权限状态。")
+                    } actions: {
+                        Button("请求健康数据访问") {
+                            Task { canRead = await HealthStore.shared.requestAccess(); await load() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                } else if loading {
+                    ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+                } else {
+                    switch segment {
+                    case .sleep:
+                        metric("睡眠时长", value: hoursText(sleep), unit: "昨晚")
+                    case .activity:
+                        metric("步数", value: steps.map { Int($0).formatted() } ?? "暂无记录", unit: "今天")
+                        metric("活动能量", value: energy.map { Int($0).formatted() } ?? "暂无记录", unit: "千卡 · 今天")
+                    case .vitals:
+                        metric("心率", value: heart.map { Int($0.rounded()).formatted() } ?? "暂无记录", unit: "次/分 · 今日平均")
+                        metric("静息心率", value: restingHeart.map { Int($0.rounded()).formatted() } ?? "暂无记录", unit: "次/分")
+                        metric("心率变异性", value: hrv.map { Int($0.rounded()).formatted() } ?? "暂无记录", unit: "毫秒 · SDNN")
+                    }
+                    Text("数据来自此 iPhone 的 Apple 健康。空值表示所选时间范围内没有可读取的记录。")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 20)
+            .padding(16)
         }
         .navigationTitle("健康数据")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                ZStack(alignment: .bottomTrailing) {
-                    Image(systemName: "cloud")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .frame(width: 40, height: 40)
-                        .background(.ultraThinMaterial, in: Circle())
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 11, height: 11)
-                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                        .offset(x: -3, y: -3)
-                }
-                .accessibilityLabel("健康数据已同步")
+        .background(Color(uiColor: .systemGroupedBackground))
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    private func metric(_ title: String, value: String, unit: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title).font(.headline)
+                Text(unit).font(.subheadline).foregroundStyle(.secondary)
             }
+            Spacer()
+            Text(value).font(.system(size: 24, weight: .semibold, design: .rounded))
+                .foregroundStyle(value == "暂无记录" ? Color.secondary : Color.primary)
         }
-        .background(healthDataGradient)
-        .task { await loadSleep() }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(colorScheme == .dark ? Color(white: 0.14) : Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private var healthDataGradient: some View {
-        // 2026-10-07：深色适配
-        Group {
-            if colorScheme == .dark {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.08, green: 0.09, blue: 0.12),
-                        Color(red: 0.10, green: 0.11, blue: 0.14),
-                        Color(red: 0.12, green: 0.12, blue: 0.14)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-            } else {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.90, green: 0.94, blue: 0.98),
-                        Color(red: 0.96, green: 0.96, blue: 0.97),
-                        Color(red: 0.985, green: 0.975, blue: 0.96)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-            }
-        }
-        .ignoresSafeArea()
+    private func hoursText(_ value: Double?) -> String {
+        guard let value else { return "暂无记录" }
+        let minutes = Int((value * 60).rounded())
+        return "\(minutes / 60) 小时 \(minutes % 60) 分"
     }
 
-    // MARK: 分段选择器
-
-    private var segmentPicker: some View {
-        HStack(spacing: 8) {
-            ForEach(Segment.allCases, id: \.self) { s in
-                Button { segment = s } label: {
-                    Text(s.rawValue)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(segment == s ? Color.primary : Color.white.opacity(0.85))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(
-                            segment == s
-                                // 2026-10-07：深色下选中背景用深灰，否则白字白底看不见
-                                ? (colorScheme == .dark ? Color(white: 0.25) : Color.white)
-                                : Color.secondary.opacity(0.25),
-                            in: Capsule()
-                        )
-                        .shadow(color: .black.opacity(segment == s ? 0.06 : 0),
-                                radius: 6, x: 0, y: 2)
-                }
-                .buttonStyle(.plain)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    // MARK: 指标大卡
-
-    private func metricCard(icon: String, iconColor: Color, title: String,
-                            dateText: String,
-                            bigValue: String, bigUnit: String,
-                            secondValue: String? = nil, secondUnit: String? = nil,
-                            bars: [Double], highlightColor: Color) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundStyle(iconColor)
-                Spacer(minLength: 0)
-                Text(dateText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-            }
-            Text(title)
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(.primary)
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .lastTextBaseline, spacing: 6) {
-                        Text(bigValue)
-                            .font(.system(size: 40, weight: .bold))
-                            .foregroundStyle(bigValue == "--" ? .secondary : .primary)
-                        Text(bigUnit)
-                            .font(.system(size: 16))
-                            .foregroundStyle(.secondary)
-                        if let sv = secondValue, let su = secondUnit {
-                            Text(sv)
-                                .font(.system(size: 40, weight: .bold))
-                                .foregroundStyle(.primary)
-                            Text(su)
-                                .font(.system(size: 16))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                Spacer(minLength: 0)
-                MiniBarRow(values: bars, highlightColor: highlightColor)
-                    .frame(width: 150, height: 90)
-            }
-        }
-        .padding(20)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 28))
-        .shadow(color: .black.opacity(0.05), radius: 12, x: 0, y: 4)
-    }
-
-    // MARK: 各分段
-
-    private var sleepCards: some View {
-        VStack(spacing: 14) {
-            if let h = sleepHours {
-                let hh = Int(h), mm = Int((h - Double(hh)) * 60)
-                metricCard(icon: "moon.fill", iconColor: .blue, title: "睡眠时长",
-                           dateText: "10月5日",
-                           bigValue: "\(hh)", bigUnit: "小时",
-                           secondValue: "\(mm)", secondUnit: "分钟",
-                           bars: normalized(sleepHistory), highlightColor: .blue)
-            } else {
-                metricCard(icon: "moon.fill", iconColor: .blue, title: "睡眠时长",
-                           dateText: "--",
-                           bigValue: "--", bigUnit: "小时",
-                           bars: [0.3, 0.55, 0.7, 0.5, 0.4, 0.12, 0.08], highlightColor: .blue)
-            }
-            metricCard(icon: "chart.bar.fill", iconColor: .yellow, title: "清醒时长",
-                       dateText: "10月5日",
-                       bigValue: "--", bigUnit: "分钟",
-                       bars: [0.5, 0.1, 0.25, 0.7, 0.15, 0.08, 0.08], highlightColor: .yellow)
-            metricCard(icon: "moon.fill", iconColor: .blue, title: "REM 睡眠时长",
-                       dateText: "10月5日",
-                       bigValue: "--", bigUnit: "小时",
-                       bars: [0.25, 0.6, 0.55, 0.5, 0.12, 0.08, 0.08], highlightColor: .blue)
-            metricCard(icon: "moon.fill", iconColor: .purple, title: "浅睡时长",
-                       dateText: "10月5日",
-                       bigValue: "--", bigUnit: "小时",
-                       bars: [0.3, 0.4, 0.7, 0.55, 0.35, 0.1, 0.08], highlightColor: .purple)
-        }
-    }
-
-    private var activityCards: some View {
-        VStack(spacing: 14) {
-            metricCard(icon: "figure.walk", iconColor: .green, title: "步数",
-                       dateText: "今天",
-                       bigValue: "--", bigUnit: "步",
-                       bars: [0.4, 0.3, 0.35, 0.6, 0.4, 0.15, 0.08], highlightColor: .green)
-            metricCard(icon: "flame.fill", iconColor: .orange, title: "活动能量",
-                       dateText: "今天",
-                       bigValue: "--", bigUnit: "千卡",
-                       bars: [0.3, 0.5, 0.4, 0.65, 0.35, 0.12, 0.08], highlightColor: .orange)
-        }
-    }
-
-    private var vitalsCards: some View {
-        VStack(spacing: 14) {
-            metricCard(icon: "heart.fill", iconColor: .red, title: "心率",
-                       dateText: "今天",
-                       bigValue: "--", bigUnit: "次/分",
-                       bars: [0.4, 0.45, 0.42, 0.5, 0.46, 0.2, 0.15], highlightColor: .red)
-            metricCard(icon: "heart.fill", iconColor: .orange, title: "静息心率",
-                       dateText: "今天",
-                       bigValue: "--", bigUnit: "次/分",
-                       bars: [0.4, 0.42, 0.4, 0.44, 0.43, 0.2, 0.15], highlightColor: .orange)
-            metricCard(icon: "waveform.path.ecg", iconColor: .pink, title: "心率变异性 (HRV)",
-                       dateText: "今天",
-                       bigValue: "--", bigUnit: "毫秒",
-                       bars: [0.35, 0.5, 0.45, 0.55, 0.4, 0.18, 0.12], highlightColor: .pink)
-        }
-    }
-
-    private func normalized(_ vals: [Double]) -> [Double] {
-        guard !vals.isEmpty, let maxVal = vals.max(), maxVal > 0 else {
-            return [0.3, 0.55, 0.7, 0.5, 0.4, 0.12, 0.08]
-        }
-        return vals.map { Swift.max(0.08, $0 / maxVal) }
-    }
-
-    private func loadSleep() async {
-        guard HealthStore.isAvailable else { return }
-        sleepHours = await HealthStore.shared.lastNightSleepHours()
-        // 近 7 天睡眠趋势：暂无按日聚合接口，用步数趋势占位高度，数值仍以 sleepHours 为准
-        sleepHistory = await HealthStore.shared.last7DaysSteps()
-    }
-}
-
-// MARK: - 横向 mini 柱状图
-
-private struct MiniBarRow: View {
-    let values: [Double]
-    let highlightColor: Color
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 5) {
-            ForEach(values.indices, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(i == highlightIndex ? highlightColor : Color.secondary.opacity(0.15))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .scaleEffect(y: max(0.06, values[i]), anchor: .bottom)
-            }
-        }
-    }
-    private var highlightIndex: Int {
-        // 高亮最后一个有意义的值（跳过尾部占位 0.08）
-        var idx = values.count - 1
-        while idx > 0 && values[idx] <= 0.09 { idx -= 1 }
-        return idx
+    private func load() async {
+        guard HealthStore.isAvailable else { loading = false; return }
+        loading = true
+        defer { loading = false }
+        let store = HealthStore.shared
+        async let s = store.lastNightSleepHours()
+        async let st = store.todaySteps()
+        async let en = store.todayActiveEnergy()
+        async let hr = store.todayHeartRate()
+        async let rhr = store.todayRestingHeartRate()
+        async let variability = store.todayHRV()
+        sleep = await s
+        steps = await st
+        energy = await en
+        heart = await hr
+        restingHeart = await rhr
+        hrv = await variability
+        canRead = sleep != nil || steps != nil || energy != nil || heart != nil || restingHeart != nil || hrv != nil
     }
 }

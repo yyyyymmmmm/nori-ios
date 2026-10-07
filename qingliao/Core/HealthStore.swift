@@ -37,7 +37,7 @@ import HealthKit
 
 /// 查询要用的单位口径（Sendable 枚举，代替直接捕获 HKUnit）
 private enum HealthUnitKind: Sendable {
-    case count, kilometer, kilocalorie, perMinute
+    case count, kilometer, kilocalorie, perMinute, millisecond
 }
 
 private func healthUnit(_ kind: HealthUnitKind) -> HKUnit {
@@ -46,6 +46,7 @@ private func healthUnit(_ kind: HealthUnitKind) -> HKUnit {
     case .kilometer:   return .meterUnit(with: .kilo)
     case .kilocalorie: return .kilocalorie()
     case .perMinute:   return HKUnit.count().unitDivided(by: .minute())
+    case .millisecond: return .secondUnit(with: .milli)
     }
 }
 
@@ -149,6 +150,7 @@ final class HealthStore {
             HKQuantityType(.activeEnergyBurned),
             HKQuantityType(.heartRate),
             HKQuantityType(.restingHeartRate),
+            HKQuantityType(.heartRateVariabilitySDNN),
             HKCategoryType(.sleepAnalysis),
             HKObjectType.workoutType(),
         ]
@@ -161,6 +163,7 @@ final class HealthStore {
     /// 口径：`HKObjectType.xxx()` 造出来的东西只用于「授权集 `readTypes`」，凡进查询/样本 API 一律 `HKSampleType`。
     private static var probeTypes: [HKSampleType] {
         [HKQuantityType(.stepCount), HKQuantityType(.heartRate),
+         HKQuantityType(.heartRateVariabilitySDNN),
          HKCategoryType(.sleepAnalysis), HKObjectType.workoutType()]
     }
 
@@ -277,6 +280,48 @@ final class HealthStore {
             result.append(await sum(.stepCount, kind: .count, from: day, to: end) ?? 0)
         }
         return result
+    }
+
+    /// Recent seven-day sleep totals, in hours, by calendar day.
+    func last7DaysSleep() async -> [Double] {
+        guard Self.isAvailable else { return [] }
+        let cal = Calendar.current
+        let now = Date()
+        var result: [Double] = []
+        for offset in (0..<7).reversed() {
+            let day = cal.date(byAdding: .day, value: -offset, to: cal.startOfDay(for: now)) ?? now
+            let end = cal.date(byAdding: .day, value: 1, to: day) ?? now
+            result.append(await sleepHours(from: day, to: end) ?? 0)
+        }
+        return result
+    }
+
+    func todayActiveEnergy() async -> Double? {
+        guard Self.isAvailable else { return nil }
+        let now = Date()
+        return await sum(.activeEnergyBurned, kind: .kilocalorie,
+                         from: Calendar.current.startOfDay(for: now), to: now)
+    }
+
+    func todayHeartRate() async -> Double? {
+        guard Self.isAvailable else { return nil }
+        let now = Date()
+        return await stats(.heartRate, kind: .perMinute,
+                           from: Calendar.current.startOfDay(for: now), to: now)?.avg
+    }
+
+    func todayRestingHeartRate() async -> Double? {
+        guard Self.isAvailable else { return nil }
+        let now = Date()
+        return await stats(.restingHeartRate, kind: .perMinute,
+                           from: Calendar.current.startOfDay(for: now), to: now)?.avg
+    }
+
+    func todayHRV() async -> Double? {
+        guard Self.isAvailable else { return nil }
+        let now = Date()
+        return await stats(.heartRateVariabilitySDNN, kind: .millisecond,
+                           from: Calendar.current.startOfDay(for: now), to: now)?.avg
     }
 
     // MARK: - 查询实现（回调里只带 Sendable 值回来；execute 一律在闭包外）

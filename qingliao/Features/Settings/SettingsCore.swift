@@ -32,8 +32,6 @@ struct SettingsView: View {
     @State var showPasswordSheet = false
     @State var showSecrets = false
     @State var showSkills = false
-    // 2026-10-07：MCP 服务
-    @State var showMCP = false
     // v2.0.87：AI 记忆
     @State var showMemory = false
     @State var showTasks = false
@@ -55,8 +53,6 @@ struct SettingsView: View {
     @State var confirmLogout = false   // v3.0.5 review fix：退出登录二次确认（与云端一致）
     @State var secretCount = 0
     @State var showHASettings = false
-    // v3.5.0：MCP 工具服务管理弹窗
-    @State var showMCPSettings = false
     // J 线 2026-10-06：新增页开关
     @State var showConnectApps = false
     @State var showThirdParty = false
@@ -304,11 +300,6 @@ struct SettingsView: View {
             SkillsView()
                 .scrollContentBackground(.hidden)
         }
-        // 2026-10-07：MCP 服务管理（整页）
-        .sheet(isPresented: $showMCP) {
-            MCPView()
-                .scrollContentBackground(.hidden)
-        }
         // v2.0.87：AI 记忆
     }
 
@@ -320,11 +311,6 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showHASettings) {
             HASettingsSheet()
-        }
-        // v3.5.0：MCP 工具服务管理
-        .sheet(isPresented: $showMCPSettings) {
-            MCPSettingsSheet()
-                .scrollContentBackground(.hidden)
         }
         // v4.0.x：邮件接入
         .sheet(isPresented: $showMailSettings) {
@@ -458,7 +444,7 @@ struct SettingsView: View {
             showConnSettings = true
         case "wechatChannel": showThirdParty = true
         case "ha": showHASettings = true
-        case "mcp": showMCPSettings = true
+        case "mcp": showConnectApps = true
         case "mail": showMailSettings = true
         case "cloudDrive": showCloudDrive = true
         case "appPermissions": showConnectApps = true
@@ -492,6 +478,7 @@ struct SettingsView: View {
         case "sec:account": searchNavTarget = .profile
         case "sec:ai": searchNavTarget = .ai
         case "sec:appearance": searchNavTarget = .general
+        case "sec:general": searchNavTarget = .general
         default: break
         }
     }
@@ -527,12 +514,7 @@ extension SettingsView {
             GraySettingsRow(icon: "network", title: "连接设置") { showConnSettings = true }
             MuseRowDivider()
             GraySettingsRow(icon: "square.grid.2x2", title: "连接应用",
-                            subtitle: "本机权限与云端服务，点按授权") { showConnectApps = true }
-            MuseRowDivider()
-            // K 线 2026-10-06：本地模型整套删除（Hermes 是唯一后端）。
-            GraySettingsRow(icon: "hammer", title: "工具服务", subtitle: "可接入外部工具") { showMCPSettings = true }
-            MuseRowDivider()
-            BackendUpdateRow()
+                            subtitle: "设备权限、云端服务与工具服务") { showConnectApps = true }
         }
     }
 
@@ -554,6 +536,8 @@ extension SettingsView {
                             value: "已选 \(HomeShortcutStore.ids(from: homeShortcutsRaw).count)/\(HomeShortcut.maxCount)") { showHomeShortcuts = true }
             MuseRowDivider()
             GraySettingsRow(icon: "folder", title: "文件管理", subtitle: "上传目录里的文件") { showFilesManager = true }
+            MuseRowDivider()
+            BackendUpdateRow()
         }
     }
 

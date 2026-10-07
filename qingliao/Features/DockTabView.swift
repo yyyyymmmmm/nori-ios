@@ -200,6 +200,16 @@ struct DockTabView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
+        // Skill create/community actions come from Settings and must land in the real chat composer.
+        .onReceive(NotificationCenter.default.publisher(for: .qingliaoOpenChatWithDraft)) { note in
+            guard let text = note.object as? String, !text.isEmpty else { return }
+            showSettingsSheet = false
+            selected = .chat
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(450))
+                NotificationCenter.default.post(name: .qingliaoFillInput, object: text)
+            }
+        }
         // 灰度重做 2026-10-06 晚：侧边栏开关（聊天页顶栏按钮发通知）
         .onReceive(NotificationCenter.default.publisher(for: .qingliaoToggleSidebar)) { _ in
             withAnimation(Motion.settle) {

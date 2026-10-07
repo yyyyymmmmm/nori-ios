@@ -17,6 +17,7 @@ extension Notification.Name {
     // 2026-10-06 H线：点子/目标卡片「填进对话框」通知（DockTabView 广播，ChatView 消费填 inputText，不发送）——
     // 与 qingliaoTaskSend 的区别：只填框，用户自己检查后发送（用户拍板口径）。
     static let qingliaoFillInput = Notification.Name("qingliao_fill_input")
+    static let qingliaoOpenChatWithDraft = Notification.Name("qingliao_open_chat_with_draft")
     // v3.9.14：备忘录「发给 AI」——生活页发通知，这里发送 + DockTabView 切回聊天页
     static let qingliaoMemoSend = Notification.Name("qingliao_memo_send")
     // v3.9.79：长按快捷菜单弹出 → 收键盘（DockTabView 广播，ChatView 消费）

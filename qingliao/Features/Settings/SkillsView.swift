@@ -35,8 +35,17 @@ struct SkillsView: View {
                         .background(Color.primary.opacity(0.06), in: Circle())
                 }
                 Spacer()
-                Button {
-                    notice = "技能由 Hermes 安装；安装后下拉刷新列表"
+                Menu {
+                    Button {
+                        requestSkillPrompt(createSkillPrompt)
+                    } label: {
+                        Label("创建你的技能", systemImage: "square.and.pencil")
+                    }
+                    Button {
+                        requestSkillPrompt(communitySkillPrompt)
+                    } label: {
+                        Label("安装社区技能", systemImage: "square.and.arrow.down")
+                    }
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 18, weight: .semibold))
@@ -225,5 +234,17 @@ struct SkillsView: View {
     // 2026-10-07：写闭环 —— 切换技能启用/禁用
     private func toggleSkill(_ skill: SkillItem) async {
         await setEnabled(!skill.enabled, for: skill)
+    }
+
+    private let createSkillPrompt = "请帮我创建一个 Hermes 技能。先问清技能名称、解决的问题、触发条件、需要调用的工具、输入输出格式和安全边界；然后给我看完整 SKILL.md 草稿，确认后再写入 Hermes 的 skills 目录，并检查技能能否被识别。不要只告诉我步骤，也不要在我确认前覆盖已有技能。"
+
+    private let communitySkillPrompt = "请帮我安装一个 Hermes 社区技能。先根据我的需求搜索社区仓库，核实来源、最近维护时间、安装内容和所需权限；把候选名称、仓库链接、风险点和安装方式列给我。等我选定后再安装到 Hermes skills 目录，最后刷新技能列表并验证是否启用。不要安装来源不明或要求暴露密钥的技能。"
+
+    private func requestSkillPrompt(_ prompt: String) {
+        dismiss()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            NotificationCenter.default.post(name: .qingliaoOpenChatWithDraft, object: prompt)
+        }
     }
 }
