@@ -75,6 +75,7 @@ struct ChatInputBar: View {
     @Environment(KeyboardObserver.self) private var kbEnv
     // v3.4.28：横屏限宽
     @Environment(\.horizontalSizeClass) private var hSizeInput
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     // v4.1.0 E路：pressKeyboardUp 已随输入框长按语音入口摘除而删除
     // v4.4：输入框流光开关已删除（特效本身删除），AppStorage key 保留做数据兼容，不再读取。
     // v3.4.25：上下文阈值预警——外部传入上下文使用率（0-1），超 0.8 发送键变橙轻提醒
@@ -289,36 +290,12 @@ struct ChatInputBar: View {
             } else {
                 textArea
             }
-            // v3.9.68（用户：「输入框可以优化的精致一点视觉上更美观一点」）：
-            // 文字区与发送键之间补一条 **0.8pt 淡分隔线**（Tint.faint 同全站描边口径）——
-            // 单行时代发送键与文字同层贴得太近，分层后两侧各有 5pt 空隙仍显「一坨」；
-            // 一条细线把「输入区」与「操作键」分成两个视觉组，是「精致」的最低成本做法
-            // （全站卡片/分组均以 0.8pt 描边分区，口径一致）。
-            // 命中区零影响：allowsHitTesting(false) + HStack spacing 不变（线占 0 宽）。
-            if !pttVoiceMode {
-                divider
-            }
             trailingButtons
         }
         .frame(minHeight: ChatInputBarLayout.messageRowMinHeight)
     }
 
-    /// v3.9.68：输入区 / 发送键之间的竖向细分隔线（视觉 0.8pt，命中区让渡）。
-    /// v3.9.70（真机 v3.9.69 仍「输入框很大」的**真根因**，用户截图像素取证）：
-    /// 原 `.frame(maxHeight 无穷)` 让本线最大高度不设限 → 第一层 HStack 成为
-    /// 外层 VStack 里最灵活的子项，根布局把富余空间全塞给它——实测分隔线被撑到
-    /// ≈285pt、容器 ≈293pt（正常 50），即 v3.9.68 起「输入框怎么这么大」的本体；
-    /// v3.9.69 修的 22pt 工具层残留只是零头。现钳到 messageRowMinHeight(42)：
-    /// 行恢复定高（textArea 本就 fixedSize 定理想高，按钮 32 定帧），不再吸收多余空间；
-    /// 多行输入时行由 TextField 顶高，分隔线保持 42 由 HStack 垂直居中，观感正常。
-    private var divider: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(Tint.faint))
-            .frame(width: 0.8)
-            .frame(maxHeight: ChatInputBarLayout.messageRowMinHeight)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
+    /// 输入行由文本和操作按钮自然定高；输入文字与语音/发送操作处于同一视觉行。
 
     /// v3.9.66（用户：「做 1」）——**第二层可见性判据**（单一真源，VStack spacing / toolRow
     /// 的 height+opacity 三处都读它，三者必须同源否则高度动画与内容淡入不同步）。
@@ -696,18 +673,27 @@ extension ChatInputBar {
             .padding(.vertical, Spacing.xs)
     }
 
-    /// 输入框使用不透明系统表面、统一描边与轻阴影，与页面底色清楚分层。
+    /// 输入框用轻磨砂胶囊；系统降低透明度时退回不透明语义色，正文不会清晰透出。
     @MainActor
     private func applyInputBarGlassChrome<C: View>(to content: C) -> some View {
         content
-            // 收起态使用系统胶囊输入框；键盘展开工具层后切换为圆角面板。
-            // 实心语义色保证正文不会透过输入栏干扰占位文字与输入内容。
+            // 收起态保持紧凑胶囊；键盘展开工具层后切换为圆角面板。
             .background {
                 if toolLayerExpanded {
-                    RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous)
-                        .fill(Color(uiColor: .secondarySystemBackground))
+                    let shape = RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous)
+                    if reduceTransparency {
+                        shape.fill(Color(uiColor: .secondarySystemBackground))
+                    } else {
+                        shape.fill(.regularMaterial)
+                            .overlay(shape.fill(Color(uiColor: .systemBackground).opacity(0.22)))
+                    }
                 } else {
-                    Capsule().fill(Color(uiColor: .secondarySystemBackground))
+                    if reduceTransparency {
+                        Capsule().fill(Color(uiColor: .secondarySystemBackground))
+                    } else {
+                        Capsule().fill(.regularMaterial)
+                            .overlay(Capsule().fill(Color(uiColor: .systemBackground).opacity(0.22)))
+                    }
                 }
             }
             .overlay {

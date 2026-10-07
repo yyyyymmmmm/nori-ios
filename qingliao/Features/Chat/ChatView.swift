@@ -210,6 +210,7 @@ struct ChatView: View {
     @State private var scrollPinState = ChatScrollPinState.pinnedAtBottom
     // 2026-10-07：聊天背景浅色压深（暖灰 #F2F1EE）用——读当前深浅色
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     // v4.0.34：消息列表滚动容器的可视高度（GeometryReader 测量）——内容不满一屏时
     // 列表以它为 minHeight。
     // 🚨 v4.0.54：对齐口径由 `.bottom`（贴底）改为 **`.top`** —— 新会话第一条气泡在最上方，
@@ -904,12 +905,23 @@ struct ChatView: View {
                 //   layoutPriority(1)：空间不足时**先挤上面的内容区**，输入栏必须完整可见。
                 //   配套：welcomeView 自己在键盘弹起时收缩（见那里的注释），否则会看到被截断的欢迎页。
             }
-            // 对话页与其他主页面采用相同的固定页头、系统背景和原生底部 Tab 栏。
+            // 固定页头沿用其他主页面的几何；内容滚动经过时由轻磨砂承接层级。
             .safeAreaBar(edge: .top) {
                 chatHeaderBar
                     .padding(.horizontal, Spacing.section)
                     .padding(.top, Spacing.xl)
-                    .background(Color(uiColor: .systemBackground))
+                    .background {
+                        if reduceTransparency {
+                            Color(uiColor: .systemBackground)
+                        } else {
+                            Rectangle()
+                                .fill(.regularMaterial)
+                                .overlay(Rectangle().fill(Color(uiColor: .systemBackground).opacity(0.24)))
+                        }
+                    }
+                    .overlay(alignment: .bottom) {
+                        Color(uiColor: .separator).opacity(0.14).frame(height: 0.5)
+                    }
             }
             .safeAreaBar(edge: .bottom) {
                 chatComposerArea
@@ -923,7 +935,18 @@ struct ChatView: View {
                     } message: {
                         Text("选择要添加到消息的内容")
                     }
-                    .background(Color(uiColor: .systemBackground))
+                    .background {
+                        if reduceTransparency {
+                            Color(uiColor: .systemBackground)
+                        } else {
+                            Rectangle()
+                                .fill(.regularMaterial)
+                                .overlay(Rectangle().fill(Color(uiColor: .systemBackground).opacity(0.30)))
+                        }
+                    }
+                    .overlay(alignment: .top) {
+                        Color(uiColor: .separator).opacity(0.14).frame(height: 0.5)
+                    }
             }
             // v4.1.0 D路：实测底部安全区（替代不存在的 \.safeAreaInsets EnvironmentKey，CI 修错）
             .background(
