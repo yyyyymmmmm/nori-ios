@@ -945,8 +945,8 @@ struct ChatView: View {
                 //   配套：welcomeView 自己在键盘弹起时收缩（见那里的注释），否则会看到被截断的欢迎页。
             }
             // Muse 式固定玻璃 chrome：消息列表铺满视口，顶部控件/输入区固定叠放，滚动文字能从下方透出。
-            .safeAreaBar(edge: .top) { chatHeaderBar }
-            .safeAreaBar(edge: .bottom) { chatComposerArea }
+            .safeAreaBar(edge: .top) { chatHeaderBar.background(.clear) }
+            .safeAreaBar(edge: .bottom) { chatComposerArea.background(.clear) }
             // v4.1.0 D路：实测底部安全区（替代不存在的 \.safeAreaInsets EnvironmentKey，CI 修错）
             .background(
                 GeometryReader { proxy in

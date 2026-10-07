@@ -32,10 +32,12 @@ struct IdeasTabView: View {
                 .padding(.horizontal, Spacing.section)
                 .padding(.bottom, Spacing.xl)
             }
+            .scrollEdgeEffectHidden(true)
             .safeAreaBar(edge: .top) {
                 topBar
                     .padding(.horizontal, Spacing.section)
                     .padding(.top, Spacing.xl)
+                    .background(.clear)
             }
             .toolbar(.hidden, for: .navigationBar)
             .task { await store.refresh() }

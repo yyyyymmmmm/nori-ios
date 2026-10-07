@@ -216,6 +216,7 @@ struct FeedTabView: View {
                     .frame(width: geometry.size.width, alignment: .leading)
                     .padding(.bottom, 100)
                 }
+                .scrollEdgeEffectHidden(true)
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
             }
             // 顶栏固定在页面视口，信息流从它下面滚过；采用系统滚动边缘材质。
@@ -223,6 +224,7 @@ struct FeedTabView: View {
                 topBar
                     .padding(.horizontal, Spacing.section)
                     .padding(.top, Spacing.xl)
+                    .background(.clear)
             }
             .toolbar(.hidden, for: .navigationBar)
             .task {

@@ -156,6 +156,7 @@ struct DashboardView: View {
                 .frame(maxWidth: .infinity)
                 .frame(maxWidth: AdaptiveLayout.contentMaxWidth(hSizeBoard))
             }
+            .scrollEdgeEffectHidden(true)
             // v4.0.62：滚边玻璃（`safeAreaBar`）——页头挂在滚动视图上，
             // 滚动时内容在页头下沿走系统级模糊/渐隐（同生活页 v4.0.61 试点形态，逐字同款）。
             // 回退：删掉本块、在 VStack 第一行恢复 PageHeader(...) 即可。
@@ -193,6 +194,7 @@ struct DashboardView: View {
                     .accessibilityLabel("查看天气")
                 }
                 .padding(.horizontal, Spacing.xxl)
+                .background(.clear)
             }
             .modifier(DashboardScrollChrome(host: self))
             .modifier(DashboardDialogChrome(host: self))
