@@ -335,6 +335,7 @@ struct ChatView: View {
     // 设置页切换模型后聊天页头部不刷新（模型实际生效但显示旧名）
     @AppStorage("qingliao_model") private var modelName = ""
     @AppStorage("qingliao_provider") private var provider = ""
+    @AppStorage("qingliao_context_auto_compress") private var contextAutoCompress = true
     @State private var hermesModelReady = false
     @State private var modelSyncInFlight = false
     /// v3.6.5：模型思考档位（header 胶囊，仅本地模式）——随流式请求下发给后端
@@ -1149,6 +1150,7 @@ struct ChatView: View {
     private func chatColdChrome4() -> some View {
         Color.clear
         .task {
+            await syncContextSettingsFromBackend()
             await resumePersistedStream()
             // Hermes 是模型选择的真值来源；启动时尽力同步，但模型接口暂时不可用
             // 不应阻止用户进入聊天或查看已有会话。真正发送时再重试并提示失败。
@@ -1196,7 +1198,7 @@ struct ChatView: View {
             AnyView(QuickPromptSheet(onPick: { prompt in
                 inputText = prompt
                 showAttachmentMenu = false
-            }, includeKB: true)   // v3.9.28：知识库恒显示（原按云端/本地分流，云端已移除）
+            })
             .presentationDetents([.medium, .large])
             )
         }
@@ -3457,10 +3459,9 @@ struct ChatView: View {
         quotedMessage = nil
 
         // v3.0.81：上下文自动管理（v4.0.x：阈值真源 = ContextTuning，别再在本文件写死 6000）
-        let autoCompress = UserDefaults.standard.bool(forKey: "qingliao_context_auto_compress")
         let effectiveThreshold = ContextTuning.threshold
 
-        if autoCompress && chat.needsCompress(threshold: effectiveThreshold) {
+        if contextAutoCompress && chat.needsCompress(threshold: effectiveThreshold) {
             // 自动压缩：先显示提示，后台执行 AI 摘要
             pendingSend = (text, img)
             showCompressingAlert = true
@@ -3880,6 +3881,19 @@ struct ChatView: View {
         provider = providerID
         modelName = modelID
         return true
+    }
+
+    /// Hermes owns shared context settings. Keep the synchronous send path's local mirror
+    /// aligned at chat startup so a stale device preference cannot silently bypass it.
+    private func syncContextSettingsFromBackend() async {
+        guard let j = try? await auth.json("/api/agent/settings", method: "GET"),
+              let settings = j["settings"] as? [String: Any] else { return }
+        if let enabled = settings["context_auto_compress"] as? Bool {
+            contextAutoCompress = enabled
+        }
+        if let threshold = settings["context_threshold"] as? Int {
+            UserDefaults.standard.set(threshold, forKey: "qingliao_context_threshold")
+        }
     }
 
     private func resumePersistedStream() async {

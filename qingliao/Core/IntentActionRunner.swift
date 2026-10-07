@@ -31,7 +31,6 @@ enum IntentActionRunner {
         case .addTodo:      return addTodo(intent)
         case .addReminder:  return await addReminder(intent)
         case .saveMemo:     return saveMemo(intent)
-        case .saveToKB:     return await saveToKB(intent, auth: auth)
         case .openMap:      return openMap(intent)
         case .call:         return open("tel://\(digits(intent.fields["value"] ?? intent.raw))")
         case .mailto:       return open("mailto:\(intent.fields["value"] ?? intent.raw)")
@@ -105,19 +104,6 @@ enum IntentActionRunner {
         return .done(message: "已存备忘录", undo: created.map { item in
             { MemoStore.shared.delete(item) }
         })
-    }
-
-    private static func saveToKB(_ intent: RecognizedIntent, auth: AuthStore?) async -> Outcome {
-        guard let auth else { return .failed("未登录，存不了知识库") }
-        let text = intent.raw.isEmpty ? intent.title : intent.raw
-        let name = intent.fields["host"] ?? displayTitle(intent)
-        let body: [String: Any] = ["name": name, "content": text]
-        guard let j = try? await auth.json("/api/kb/upload", method: "POST", body: body),
-              (j["ok"] as? Bool) != false else {
-            return .failed("知识库上传失败")
-        }
-        // 知识库没有单条删除接口 → 不给撤销（提示里说清楚存在哪）
-        return .done(message: "已存进知识库", undo: nil)
     }
 
     // MARK: 外跳 / 复制 / 问 AI

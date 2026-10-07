@@ -74,12 +74,19 @@ struct MemoryEntry: Identifiable, Equatable {
         switch source {
         case "chat": return "聊天中自动记住"
         case "manual": return "手动添加"
+        case "local": return "已停用的旧版本地记忆"
+        case "hermes": return "Hermes 原生记忆"
         default: return ""
         }
     }
 
     var sourceIcon: String {
-        source == "chat" ? "bubble.left.and.bubble.right" : "hand.tap"
+        switch source {
+        case "chat": return "bubble.left.and.bubble.right"
+        case "local": return "internaldrive"
+        case "hermes": return "sparkles"
+        default: return "hand.tap"
+        }
     }
 
     var hasSource: Bool { !sourceTitle.isEmpty }
@@ -118,7 +125,14 @@ struct MemoryEntry: Identifiable, Equatable {
             let out = arr.compactMap { MemoryEntry.from($0) }
             if !out.isEmpty { return out }
         }
-        return ((json["entries"] as? [String]) ?? []).map { MemoryEntry.legacy($0) }
+        // Older Hermes bridge versions temporarily mixed the Hermes dictionary record
+        // with legacy string entries under `entries`. Parse each value independently so
+        // one structured record cannot make the entire memory list disappear.
+        guard let arr = json["entries"] as? [Any] else { return [] }
+        return arr.compactMap { value in
+            if let text = value as? String { return MemoryEntry.legacy(text) }
+            return MemoryEntry.from(value)
+        }
     }
 
     /// 响应体里**是否带了列表字段**（用于区分「解析失败」与「后端真的空了」）。

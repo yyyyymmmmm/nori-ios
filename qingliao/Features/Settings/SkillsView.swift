@@ -7,14 +7,9 @@ struct SkillItem: Identifiable, Decodable {
     let id: String
     let name: String
     let description: String?
-    let enabled: Bool?
-    // 2026-10-07：Muse 式展示字段（后端可选返回）
-    let category: String?      // official=官方，mine=我的
-    let authorized: Bool?       // 是否已授权
-
-    enum CodingKeys: String, CodingKey {
-        case id, name, description, enabled, category, authorized
-    }
+    var enabled: Bool
+    let category: String?
+    let authorized: Bool?
 }
 
 struct SkillsView: View {
@@ -23,8 +18,8 @@ struct SkillsView: View {
     @State private var skills: [SkillItem] = []
     @State private var loading = true
     @State private var error: String?
-    @State private var actionMessage: String?
-    @State private var busySkillID: String?
+    @State private var notice: String?
+    @State private var busySkillIDs = Set<String>()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,7 +36,7 @@ struct SkillsView: View {
                 }
                 Spacer()
                 Button {
-                    // TODO: 添加技能
+                    notice = "技能由 Hermes 安装；安装后下拉刷新列表"
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 18, weight: .semibold))
@@ -100,13 +95,12 @@ struct SkillsView: View {
                         VStack(spacing: 0) {
                             ForEach(skills) { skill in
                                 Button {
-                                    guard busySkillID == nil else { return }
-                                    busySkillID = skill.id
-                                    Task { await toggleSkill(skill); busySkillID = nil }
+                                    Task { await toggleSkill(skill) }
                                 } label: {
-                                    skillRow(skill).opacity(busySkillID == skill.id ? 0.55 : 1)
+                                    skillRow(skill)
                                 }
                                 .buttonStyle(.plain)
+                                .disabled(busySkillIDs.contains(skill.id))
                                 if skill.id != skills.last?.id {
                                     Divider()
                                         .padding(.leading, 68)
@@ -114,22 +108,21 @@ struct SkillsView: View {
                             }
                         }
                     }
+                    .overlay(alignment: .top) {
+                        if let notice {
+                            Text(notice)
+                                .font(.system(size: 13))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(.regularMaterial, in: Capsule())
+                                .padding(.top, 8)
+                        }
+                    }
                 }
             }
         }
         .task { await load() }
         .refreshable { await load() }
-        .overlay(alignment: .bottom) {
-            if let actionMessage {
-                Text(actionMessage)
-                    .font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(Color.black.opacity(0.82), in: Capsule()).padding(.bottom, 18)
-                    .onAppear {
-                        Task { try? await Task.sleep(for: .seconds(3)); self.actionMessage = nil }
-                    }
-            }
-        }
     }
 
     // Muse 式技能行：图标｜名称｜描述｜官方/未授权（点行进详情）
@@ -166,14 +159,15 @@ struct SkillsView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.red)
                     }
-                    Text(skill.enabled == true ? "已启用 · 点按关闭" : "已关闭 · 点按启用")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(skill.enabled == true ? .green : .secondary)
                 }
                 .padding(.top, 2)
             }
 
             Spacer()
+            Image(systemName: skill.enabled ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 22))
+                .foregroundStyle(skill.enabled ? Color.green : Color.secondary)
+                .accessibilityLabel(skill.enabled ? "Hermes 已启用" : "Hermes 已停用")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
@@ -186,39 +180,50 @@ struct SkillsView: View {
         defer { loading = false }
         do {
             let j = try await auth.json("/api/agent/skills", method: "GET")
-            if let list = j["skills"] as? [[String: Any]] {
-                let data = try JSONSerialization.data(withJSONObject: list)
-                skills = try JSONDecoder().decode([SkillItem].self, from: data).filter { !$0.id.isEmpty }
-            } else {
-                self.error = "加载失败，请检查连接"
+            guard let list = j["skills"] as? [[String: Any]] else {
+                throw NSError(domain: "HermesSkills", code: 1,
+                              userInfo: [NSLocalizedDescriptionKey:
+                                j["error"] as? String ?? "Hermes 未返回技能列表"])
             }
+            let data = try JSONSerialization.data(withJSONObject: list)
+            skills = try JSONDecoder().decode([SkillItem].self, from: data)
         } catch {
-            self.error = "加载失败，请检查连接"
+            self.error = "Hermes 技能读取失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func setEnabled(_ enabled: Bool, for skill: SkillItem) async {
+        guard !busySkillIDs.contains(skill.id), skill.enabled != enabled else { return }
+        let previous = skill.enabled
+        busySkillIDs.insert(skill.id)
+        notice = nil
+        if let index = skills.firstIndex(where: { $0.id == skill.id }) {
+            skills[index].enabled = enabled
+        }
+        defer { busySkillIDs.remove(skill.id) }
+        do {
+            let result = try await auth.json("/api/agent/skills", method: "POST",
+                                             body: ["skill_id": skill.id, "enabled": enabled])
+            guard (result["ok"] as? Bool) == true else {
+                if (result["saved"] as? Bool) == true {
+                    notice = result["error"] as? String ?? "配置已保存，但 Hermes 重启未完成"
+                    return
+                }
+                throw NSError(domain: "HermesSkills", code: 2,
+                              userInfo: [NSLocalizedDescriptionKey:
+                                result["error"] as? String ?? "Hermes 未接受技能设置"])
+            }
+            notice = enabled ? "已在 Hermes 启用技能" : "已在 Hermes 停用技能"
+        } catch {
+            if let index = skills.firstIndex(where: { $0.id == skill.id }) {
+                skills[index].enabled = previous
+            }
+            notice = "设置未生效：\(error.localizedDescription)"
         }
     }
 
     // 2026-10-07：写闭环 —— 切换技能启用/禁用
     private func toggleSkill(_ skill: SkillItem) async {
-        let newEnabled = !(skill.enabled == true)
-        do {
-            let response = try await auth.json("/api/agent/skills", method: "POST",
-                                               body: ["skill_id": skill.id, "enabled": newEnabled])
-            guard response["ok"] as? Bool == true else {
-                actionMessage = response["error"] as? String ?? "技能设置失败"
-                if response["saved"] as? Bool == true { await load() }
-                return
-            }
-            if (response["restart"] as? String) == "failed" {
-                actionMessage = "配置已保存，但 Hermes 重启失败，请检查服务状态"
-                await load()
-                return
-            }
-            actionMessage = (response["restart"] as? String) == "triggered"
-                ? "技能已更新，Hermes 正在重启"
-                : "技能配置已保存；Hermes 重启未确认"
-            await load()
-        } catch {
-            actionMessage = "技能设置失败：\(error.localizedDescription)"
-        }
+        await setEnabled(!skill.enabled, for: skill)
     }
 }

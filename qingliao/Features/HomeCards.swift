@@ -69,8 +69,6 @@ final class HomeCardData {
     /// 关注行情（/api/life/cards → 首只自选股）
     var stockName: String = ""
     var stockLine: String = ""        // "23.40 +2.1%"
-    /// 知识库问答（/api/kb/list 文档数）
-    var kbCount: Int = -1
     /// 家庭场景（/api/scenes/list 首个场景名）
     var sceneName: String = ""
     var sceneCount: Int = -1
@@ -87,7 +85,6 @@ final class HomeCardData {
     private var mailFetched = false
     private var weatherFetched = false
     private var lifeFetched = false   // 快递 + 行情同源，一趟请求
-    private var kbFetched = false
     private var sceneFetched = false
     private var deviceFetched = false
     private var cloudFetched = false
@@ -111,10 +108,6 @@ final class HomeCardData {
         if anyVisible(.express, .stock), !lifeFetched {
             lifeFetched = true
             await loadLifeCards(auth: auth)
-        }
-        if anyVisible(.kb), !kbFetched {
-            kbFetched = true
-            await loadKB(auth: auth)
         }
         if anyVisible(.scene), !sceneFetched {
             sceneFetched = true
@@ -144,10 +137,6 @@ final class HomeCardData {
         if anyVisible(.express, .stock), !lifeFetched {
             lifeFetched = true
             await loadLifeCards(auth: auth)
-        }
-        if anyVisible(.kb), !kbFetched {
-            kbFetched = true
-            await loadKB(auth: auth)
         }
         if anyVisible(.scene), !sceneFetched {
             sceneFetched = true
@@ -218,11 +207,6 @@ final class HomeCardData {
         }
     }
 
-    /// 知识库问答：文档数
-    private func loadKB(auth: AuthStore) async {
-        guard let j = try? await auth.json("/api/kb/list") else { return }
-        kbCount = (j["docs"] as? [[String: Any]] ?? []).count
-    }
 
     /// 家庭场景：首个场景名 + 总数
     private func loadScenes(auth: AuthStore) async {
@@ -629,8 +613,6 @@ struct HomeCardsGrid: View {
             onOpenLife()                        // 快递详情在生活页
         case .stock:
             onOpenLife()                        // 行情详情在生活页
-        case .kb:
-            onAsk("@知识库 ")                    // 带前缀发问（输入框填充，用户补问题）
         case .scene, .device:
             onOpenBoard()                       // 场景一键执行 / 设备详情在看板
         case .cloud:
@@ -706,7 +688,6 @@ struct HomeCardFace: View {
         case .memo: return "note.text"
         case .express: return "shippingbox.fill"
         case .stock: return "chart.line.uptrend.xyaxis"
-        case .kb: return "books.vertical.fill"
         case .scene: return "house.fill"
         case .device: return "cpu.fill"
         case .cloud: return "cloud.fill"
@@ -729,7 +710,6 @@ struct HomeCardFace: View {
         case .memo: return "备忘速记"
         case .express: return "快递在途"
         case .stock: return data.stockName.isEmpty ? "关注行情" : data.stockName
-        case .kb: return "知识库问答"
         case .scene: return "家庭场景"
         case .device: return "设备状态"
         case .cloud: return "云盘"
@@ -793,9 +773,6 @@ struct HomeCardFace: View {
             return "\(data.expressCount) 件 · \(data.expressLine)"
         case .stock:
             return data.stockLine.isEmpty ? "去生活页关注股票" : data.stockLine
-        case .kb:
-            guard data.kbCount >= 0 else { return "点一下问知识库" }
-            return data.kbCount == 0 ? "还没有文档 · 去设置上传" : "\(data.kbCount) 份文档 · 点一下提问"
         case .scene:
             guard data.sceneCount > 0 else { return "没有可用场景" }
             return data.sceneName.isEmpty ? "\(data.sceneCount) 个场景" : "「\(data.sceneName)」等 \(data.sceneCount) 个"
@@ -871,7 +848,6 @@ enum HomeCardLabels {
         case .memo: return "备忘速记"
         case .express: return "快递在途"
         case .stock: return "关注行情"
-        case .kb: return "知识库问答"
         case .scene: return "家庭场景"
         case .device: return "设备状态"
         case .cloud: return "云盘"
@@ -894,7 +870,6 @@ enum HomeCardLabels {
         case .memo: return "note.text"
         case .express: return "shippingbox.fill"
         case .stock: return "chart.line.uptrend.xyaxis"
-        case .kb: return "books.vertical.fill"
         case .scene: return "house.fill"
         case .device: return "cpu.fill"
         case .cloud: return "cloud.fill"

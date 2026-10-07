@@ -39,7 +39,7 @@ struct AboutView: View {
                 // 2026-10-07：产品定位更新（对标 Muse，更强大的自部署 AI 助手）
                 aboutRow("产品", "Nori —— 你的 AI 助手。SwiftUI 原生客户端，连接 Hermes Agent，数据自主可控。")
                 appModeRow()
-                aboutRow("功能", "流式对话 · 语音对话 · 图片理解 · 知识库检索 · 技能扩展 · 定时任务 · 智能家居 · 记忆管理")
+                aboutRow("功能", "流式对话 · 语音对话 · 图片理解 · 文件 · Hermes 技能 · 定时任务 · 智能家居 · Hermes 记忆")
                 aboutRow("模型", "Hermes Agent 统一调度（多服务商/多模型）")
                 aboutRow("架构", "SwiftUI 原生 · Hermes Agent 引擎 · Nori 后端（代理与控制面）")
                 // v3.0.8：Hermes Agent 版本号固定放在介绍最后一行（本地模式读容器实时版本）
@@ -103,7 +103,7 @@ struct AboutView: View {
 
     /// v3.0.3：当前模式行（v3.9.28 云端直连移除后恒为本地 AI）
     private func appModeRow() -> some View {
-        aboutRow("当前模式", "本地 AI —— 连接自家 NAS 上的 Hermes Agent，对话/读图/语音/知识库/智能家居全掌控。")
+        aboutRow("当前模式", "自托管 AI 客户端 —— 连接 NAS 上的 Hermes Agent；模型、记忆、技能与任务由 Hermes 管理。")
     }
 
     private func aboutRow(_ title: String, _ content: String) -> some View {

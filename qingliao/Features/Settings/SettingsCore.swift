@@ -4,11 +4,8 @@
 import Combine
 import Foundation
 import LocalAuthentication
-import PDFKit
-import QuickLook
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 
 // MARK: ===== 以下原为 Features/Settings/SettingsView.swift =====
 
@@ -34,14 +31,11 @@ struct SettingsView: View {
     @State var showConnSettings = false
     @State var showPasswordSheet = false
     @State var showSecrets = false
-    // v2.0.81：知识库页面
-    @State var showKB = false
     @State var showSkills = false
     // 2026-10-07：MCP 服务
     @State var showMCP = false
     // v2.0.87：AI 记忆
     @State var showMemory = false
-    @State var memoryCount = 0
     @State var showTasks = false
     @State var showLogs = false
     /// v4.0.61：搜索「钉一钉存储」直达——钉一钉存储行已搬进「连接设置」页（用户 2026-10-05），
@@ -89,7 +83,6 @@ struct SettingsView: View {
     @State var showAgentKeywords = false
     // v2.0.113：Agent 记忆弹窗 + 计数
     @State var showAgentMemory = false
-    @State var agentRuleCount = 0
     // v3.0.20：Agent 模型自定义（独立于主模型，可单独指定 Agent 使用的模型）
     // J 线 2026-10-06：Agent 模型独立页已删（一个功能一个入口，主模型在「连接设置」统一管理）；
     // UserDefaultsKey.agentModel / agentProvider 的 key 保留（ChatStore/AppIntents 仍在读）。
@@ -104,7 +97,7 @@ struct SettingsView: View {
     // K 线 2026-10-06：本地模型整套删除（Hermes 是唯一后端，端侧模型是第二套模型体系）。
     // J 线 2026-10-06：能力示例（卡片画廊）整行删掉；微信推送开关删掉。
     // v3.0.81：上下文管理（v4.4.x：迁后端 /api/agent/settings，换设备一致）
-    @State var contextAutoCompress = false
+    @State var contextAutoCompress = true
     @State var contextThreshold = ContextTuning.defaultThreshold
     // v3.9.56：TypeSafe 智能路由（设置页开关 + 就地展开）。后端是唯一真源，所以用 @State 影子状态
     // 而不是 @AppStorage —— 本地也存一份的话，换设备/运维改了后端配置，UI 就会显示假状态。
@@ -243,9 +236,11 @@ struct SettingsView: View {
                let s = j["settings"] as? [String: Any] {
                 if let v = s["context_auto_compress"] as? Bool {
                     contextAutoCompress = v
+                    UserDefaults.standard.set(v, forKey: "qingliao_context_auto_compress")
                 }
                 if let v = s["context_threshold"] as? Int {
                     contextThreshold = v
+                    UserDefaults.standard.set(v, forKey: "qingliao_context_threshold")
                 }
             }
         }
@@ -306,12 +301,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showSecrets) {
             SecretsView()
         }
-        // v2.0.81：知识库
-        .sheet(isPresented: $showKB) {
-            KBView()
-                .scrollContentBackground(.hidden)
-        }
-        // 2026-10-07：技能管理（整页，对标 Muse）
+        // Hermes 原生技能管理
         .sheet(isPresented: $showSkills) {
             SkillsView()
                 .scrollContentBackground(.hidden)
@@ -474,7 +464,6 @@ struct SettingsView: View {
         case "mail": showMailSettings = true
         case "cloudDrive": showCloudDrive = true
         case "appPermissions": showConnectApps = true
-        case "kb": showKB = true
         case "memory": showMemory = true
         case "cardGallery": break
         case "secrets": showSecrets = true
@@ -521,34 +510,15 @@ extension SettingsView {
     // MARK: - AI设置
 
     @ViewBuilder var agentSection: some View {
-        GraySettingsGroup(title: "AI设置") {
-            GraySettingsRow(icon: "brain.head.profile", title: "AI 记忆", value: "\(memoryCount) 条") { showMemory = true }
+        GraySettingsGroup(title: "Hermes Agent") {
+            GraySettingsRow(icon: "brain.head.profile", title: "Hermes 记忆",
+                            subtitle: "与 Hermes 配置同步") { showMemory = true }
             MuseRowDivider()
-            GraySettingsRow(icon: "list.bullet.rectangle", title: "Agent 记忆",
-                            value: agentRuleCount > 0 ? "\(agentRuleCount) 条规则" : "暂无") { showAgentMemory = true }
+            GraySettingsRow(icon: "timer", title: "定时任务",
+                            subtitle: "读取和管理 Hermes 计划任务") { showTasks = true }
             MuseRowDivider()
-            GraySettingsRow(icon: "tag", title: "Agent 关键词", subtitle: "关键词触发规则") { showAgentKeywords = true }
-            MuseRowDivider()
-            GraySettingsRow(icon: "bolt", title: "主动 Agent", subtitle: "AI 主动提醒 · 额度/免打扰/每日复盘") { showProactive = true }
-            MuseRowDivider()
-            GraySettingsRow(icon: "timer", title: "定时任务", subtitle: "智能体按计划自动执行") { showTasks = true }
-            MuseRowDivider()
-            GraySettingsRow(icon: "clock.arrow.circlepath", title: "任务记录", subtitle: "自动任务的执行记录") { showHistory = true }
-            MuseRowDivider()
-            GraySettingsRow(icon: "book.closed", title: "知识库", subtitle: "文档检索问答") { showKB = true }
-            MuseRowDivider()
-            GraySettingsRow(icon: "puzzlepiece.extension", title: "技能", subtitle: "给 AI 装上领域能力") { showSkills = true }
-            MuseRowDivider()
-            GraySettingsRow(icon: "server.rack", title: "MCP 服务", subtitle: "接入外部工具和数据源") { showMCP = true }
-            MuseRowDivider()
-            // K 线 2026-10-06：判定参数区收进二级页（分流方式/灵敏度/等待超时），列表不再展开
-            GraySettingsRow(icon: "arrow.triangle.branch", title: "智能路由",
-                            subtitle: tsRouting.subtitleText,
-                            value: tsRouting.enabled ? "已开启" : "已关闭") { showRoutingSettings = true }
-            MuseRowDivider()
-            // K 线 2026-10-06：阈值区收进二级页，列表不再展开
-            GraySettingsRow(icon: "rectangle.compress.vertical", title: "上下文自动压缩",
-                            subtitle: contextAutoCompress ? "已开启 · 约 \(contextThreshold) 字" : "token超限时AI摘要压缩历史消息") { showContextCompress = true }
+            GraySettingsRow(icon: "puzzlepiece.extension", title: "Hermes 技能",
+                            subtitle: "读取 Hermes 已安装技能") { showSkills = true }
         }
     }
 
@@ -800,10 +770,22 @@ extension SettingsView {
                         }
                     }
                     .onChange(of: contextAutoCompress) { _, new in
-                        // v4.4.x：存后端
+                        // Hermes stores the setting; mirror only after a confirmed save because
+                        // the chat send path reads this local value synchronously.
                         Task {
-                            _ = try? await auth.json("/api/agent/settings", method: "POST",
-                                                     body: ["context_auto_compress": new])
+                            do {
+                                let result = try await auth.json("/api/agent/settings", method: "POST",
+                                                                 body: ["context_auto_compress": new])
+                                guard (result["ok"] as? Bool) == true else { throw NSError(domain: "HermesSettings", code: 1) }
+                                UserDefaults.standard.set(new, forKey: "qingliao_context_auto_compress")
+                            } catch {
+                                if let result = try? await auth.json("/api/agent/settings", method: "GET"),
+                                   let settings = result["settings"] as? [String: Any],
+                                   let saved = settings["context_auto_compress"] as? Bool {
+                                    contextAutoCompress = saved
+                                    UserDefaults.standard.set(saved, forKey: "qingliao_context_auto_compress")
+                                }
+                            }
                         }
                     }
                 }
@@ -818,7 +800,21 @@ extension SettingsView {
                                 .labelsHidden()
                         }
                         .onChange(of: contextThreshold) { _, new in
-                            UserDefaults.standard.set(new, forKey: "qingliao_context_threshold")
+                            Task {
+                                do {
+                                    let result = try await auth.json("/api/agent/settings", method: "POST",
+                                                                     body: ["context_threshold": new])
+                                    guard (result["ok"] as? Bool) == true else { throw NSError(domain: "HermesSettings", code: 2) }
+                                    UserDefaults.standard.set(new, forKey: "qingliao_context_threshold")
+                                } catch {
+                                    if let result = try? await auth.json("/api/agent/settings", method: "GET"),
+                                       let settings = result["settings"] as? [String: Any],
+                                       let saved = settings["context_threshold"] as? Int {
+                                        contextThreshold = saved
+                                        UserDefaults.standard.set(saved, forKey: "qingliao_context_threshold")
+                                    }
+                                }
+                            }
                         }
                     } footer: {
                         Text("历史消息超过该字数时，自动用 AI 摘要压缩后再发送。")
@@ -838,9 +834,9 @@ extension SettingsView {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Agent 回复恒走 Hermes 智能体：查磁盘/内存、控制设备等自动调用工具")
                         Text("▸ 直接问：查磁盘/内存/温度、控制设备、执行场景，自动调用工具回复")
-                        Text("▸ 记忆规则：说「以后XX都用agent」，下次同类问题直接 Agent 处理")
+                        Text("▸ 记忆和行为规则由 Hermes 管理，可在对话中让 Hermes 记住或修改")
                         Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
-                        Text("▸ 普通聊天走 Hermes（带 AI 记忆）；Agent 只参考Nori记忆与规则")
+                        Text("▸ 所有对话都交给 Hermes；模型、记忆、技能与工具以 Hermes 配置为准")
                     }
                     .font(.system(size: Typography.body))
                     .foregroundStyle(.secondary)
@@ -868,14 +864,7 @@ extension SettingsView {
         if let j = try? await auth.json("/api/secrets") {
             secretCount = (j["secrets"] as? [Any])?.count ?? 0
         }
-        if let j = try? await auth.json("/api/memory/list") {
-            memoryCount = (j["entries"] as? [String] ?? []).count
-        }
         // J 线 2026-10-06：微信推送开关已删（不再同步 /api/push/settings）
-        // v2.0.113：Agent 记忆条数（行尾数字）
-        if let j = try? await auth.json("/api/agent/rules") {
-            agentRuleCount = (j["rules"] as? [Any] ?? []).count
-        }
     }
 
     var appearanceName: String {
