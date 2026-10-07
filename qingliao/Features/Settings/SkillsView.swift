@@ -108,16 +108,16 @@ struct SkillsView: View {
                             }
                         }
                     }
-                    .overlay(alignment: .top) {
-                        if let notice {
-                            Text(notice)
-                                .font(.system(size: 13))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 9)
-                                .background(.regularMaterial, in: Capsule())
-                                .padding(.top, 8)
-                        }
-                    }
+                }
+            }
+            .overlay(alignment: .top) {
+                if let notice {
+                    Text(notice)
+                        .font(.system(size: 13))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.top, 8)
                 }
             }
         }
