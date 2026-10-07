@@ -74,12 +74,19 @@ struct MemoryEntry: Identifiable, Equatable {
         switch source {
         case "chat": return "聊天中自动记住"
         case "manual": return "手动添加"
+        case "local": return "已停用的旧版本地记忆"
+        case "hermes": return "Hermes 原生记忆"
         default: return ""
         }
     }
 
     var sourceIcon: String {
-        source == "chat" ? "bubble.left.and.bubble.right" : "hand.tap"
+        switch source {
+        case "chat": return "bubble.left.and.bubble.right"
+        case "local": return "internaldrive"
+        case "hermes": return "sparkles"
+        default: return "hand.tap"
+        }
     }
 
     var hasSource: Bool { !sourceTitle.isEmpty }

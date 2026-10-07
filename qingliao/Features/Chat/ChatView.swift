@@ -1181,7 +1181,7 @@ struct ChatView: View {
             AnyView(QuickPromptSheet(onPick: { prompt in
                 inputText = prompt
                 showAttachmentMenu = false
-            }, includeKB: true)   // v3.9.28：知识库恒显示（原按云端/本地分流，云端已移除）
+            })
             .presentationDetents([.medium, .large])
             )
         }

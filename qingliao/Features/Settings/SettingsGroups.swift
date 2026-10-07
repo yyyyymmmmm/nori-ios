@@ -38,7 +38,7 @@ enum SettingsSubpage: String, Hashable, Identifiable, CaseIterable {
     var subtitle: String {
         switch self {
         case .profile: "账号 · 密码 · Face ID"
-        case .ai: "记忆 · 定时任务 · 智能路由"
+        case .ai: "Hermes 记忆 · 定时任务 · 技能"
         case .connector: "连接设置 · 连接应用 · 工具服务"
         case .general: "外观 · 朗读声音 · 快捷方式"
         case .notify: "本地提醒"

@@ -44,7 +44,7 @@ struct LoginGuideSheet: View {
                 "自动部署（推荐）：下载部署 skill → 丢给 Hermes → 说「帮我部署Nori」",
                 "手动部署：克隆仓库 → 跑 bash install.sh（它会引导设置密码与上游 AI 端点）",
                 "⚠️ 别跳过 install.sh：它自动生成 QL_INBOX_TOKEN / QL_PUSH_TOKEN；在 compose 里手填却漏了这两个，收件箱与推送会静默失效（没有任何报错）",
-                "AI 记忆 / 文件管理等模块随服务开启；智能家居需另配 Home Assistant（QL_HA_URL / Token）",
+                "Hermes 记忆 / NAS 文件管理等模块随服务开启；智能家居需另配 Home Assistant",
             ],
             code: "# 手动部署（在装了 Docker 的机器上执行）\ngit clone https://github.com/lxm20060513-svg/qingliao-backend.git\ncd qingliao-backend\nbash install.sh          # 交互式：设密码 + 上游 AI 端点，并自动生成接口 token\ndocker compose logs -f   # 看启动日志（统一入口默认 9127）",
             skillCode: "# 第一步：下载部署 skill（GitHub），放进 Hermes 的 skills 目录\n# 第二步：对 Hermes 说一句「帮我部署Nori」，\n# Hermes 会自动完成克隆、改配置、启动。",

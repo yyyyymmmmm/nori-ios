@@ -62,16 +62,10 @@ enum SettingsSearchIndex {
         .init(route: "appPermissions", title: "权限与 AI 操控", icon: "lock.shield.fill", group: "连接与模型",
               keywords: ["权限", "授权", "ai 操控", "操控"]),
         // ── AI 智能 ──
-        .init(route: "kb", title: "知识库", icon: "books.vertical.fill", group: "AI 智能",
-              keywords: ["知识库", "文档", "检索", "问答"]),
-        .init(route: "memory", title: "AI 记忆", icon: "brain.head.profile", group: "AI 智能",
-              keywords: ["记忆", "长期记忆", "记住"]),
+        .init(route: "memory", title: "Hermes 记忆", icon: "brain.head.profile", group: "AI 智能",
+              keywords: ["Hermes 记忆", "长期记忆", "记住"]),
         .init(route: "cardGallery", title: "能力示例", icon: "rectangle.grid.2x2.fill", group: "AI 智能",
               keywords: ["能力", "示例", "卡片形态", "卡片"]),
-        .init(route: "sec:ai", title: "上下文自动压缩", icon: "arrow.down.right.and.arrow.up.left", group: "AI 智能",
-              keywords: ["压缩", "token", "上下文", "历史消息"]),
-        .init(route: "sec:ai", title: "智能路由", icon: "arrow.triangle.branch", group: "AI 智能",
-              keywords: ["路由", "分流", "自动选择"]),
         .init(route: "sec:ai", title: "微信推送", icon: "paperplane.fill", group: "AI 智能",
               keywords: ["推送", "微信", "通知", "自动化"]),
 
@@ -80,8 +74,6 @@ enum SettingsSearchIndex {
               keywords: ["凭据", "密码", "密钥", "账号"]),
         .init(route: "tasks", title: "定时任务", icon: "clock.badge.fill", group: "数据与自动化",
               keywords: ["定时", "任务", "cron", "计划"]),
-        .init(route: "history", title: "任务记录", icon: "clock.arrow.circlepath", group: "数据与自动化",
-              keywords: ["历史", "执行记录", "记录"]),
         .init(route: "logs", title: "日志", icon: "doc.text.fill", group: "数据与自动化",
               keywords: ["日志", "log", "排错"]),
         .init(route: "diagnostics", title: "诊断", icon: "stethoscope", group: "数据与自动化",
@@ -96,16 +88,10 @@ enum SettingsSearchIndex {
               keywords: ["文件", "上传", "下载", "管理"]),
 
         // ── Agent 设置 ──
-        .init(route: "proactive", title: "主动 Agent", icon: "bolt.horizontal.circle.fill", group: "Agent 设置",
-              keywords: ["主动", "开口", "预算", "静默", "复盘"]),
         .init(route: "agentModel", title: "Agent 模型", icon: "cpu.fill", group: "Agent 设置",
               keywords: ["agent", "模型", "智能体"]),
         .init(route: "agentHelp", title: "使用说明", icon: "questionmark.circle.fill", group: "关于",
               keywords: ["说明", "用法", "帮助", "怎么用", "agent 说明"]),
-        .init(route: "agentKeywords", title: "Agent 关键词", icon: "text.badge.plus", group: "Agent 设置",
-              keywords: ["关键词", "分流词", "匹配词"]),
-        .init(route: "agentMemory", title: "Agent 记忆", icon: "brain.head.profile", group: "Agent 设置",
-              keywords: ["agent 记忆", "规则", "记忆"]),
 
         // ── 外观与显示 ──
         .init(route: "appearance", title: "外观", icon: "circle.lefthalf.filled", group: "外观与显示",

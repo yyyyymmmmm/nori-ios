@@ -71,8 +71,6 @@ struct HermesShortcutSheet: View {
 struct QuickPromptSheet: View {
     var onPick: (String) -> Void
     @Environment(\.dismiss) private var dismiss
-    // v3.0.6 fix：知识库快捷指令仅本地 AI 显示（云端无）；默认含，ChatView 按模式传
-    var includeKB: Bool = true
 
     private var prompts: [(icon: String, name: String, prompt: String)] {
         var list: [(icon: String, name: String, prompt: String)] = [
@@ -87,10 +85,6 @@ struct QuickPromptSheet: View {
             ("textformat", "取标题", "请为以下内容取 3 个简洁贴切的标题：\n"),
             ("person.2", "角色扮演", "请扮演一个资深嵌入式硬件工程师，回答以下问题：\n"),
         ]
-        // v2.0.104b：知识库快捷指令（@知识库 前缀触发知识库检索问答）——仅本地 AI 有
-        if includeKB {
-            list.append(("books.vertical.fill", "知识库", "@知识库 "))
-        }
         return list
     }
 

@@ -35,7 +35,7 @@ enum IntentProvenance: String, Sendable {
 
 /// 可执行动作。**UI 不做判断**，一律由 actions(for:) 按 kind + fields 生成
 enum IntentAction: String, Sendable, Hashable {
-    case storeRecord, addTodo, addReminder, saveMemo, saveToKB, openMap, call, mailto, copy, askAI
+    case storeRecord, addTodo, addReminder, saveMemo, openMap, call, mailto, copy, askAI
 }
 
 /// 识别结果
@@ -93,7 +93,7 @@ enum IntentPipeline {
         switch i.kind {
         case .express:  return [.addTodo, .saveMemo, .copy, .askAI]
         case .address:  return [.openMap, .saveMemo, .copy, .askAI]
-        case .link:     return [.saveToKB, .saveMemo, .copy, .askAI]
+        case .link:     return [.saveMemo, .copy, .askAI]
         case .amount:   return [.storeRecord, .saveMemo, .copy, .askAI]
         case .datetime: return [.addReminder, .addTodo, .copy, .askAI]
         case .contact:

@@ -37,7 +37,6 @@ enum HomeCardKind: String, CaseIterable {
     case memo         // 备忘速记（MemoStore）
     case express      // 快递在途（/api/life/cards）
     case stock        // 关注行情（/api/life/cards）
-    case kb           // 知识库问答（/api/kb/list）
     case scene        // 家庭场景（/api/scenes/list）
     case device       // 设备状态（/api/hw/status）
     case cloud        // 云盘（/api/agent/clouddrive/drives）
@@ -298,7 +297,7 @@ enum HomeCardStore {
     /// resolve 的「缺失 kind 自动补尾」保证老用户升级后排序不重置，想要哪张自己来「自定义」开）。
     static let defaultOff: [HomeCardKind] = [
         .todo, .weather, .expense,
-        .nextReminder, .memo, .express, .stock, .kb, .scene, .device, .cloud, .goal, .clipboard,
+        .nextReminder, .memo, .express, .stock, .scene, .device, .cloud, .goal, .clipboard,
     ]
 
     /// 写回（order 必须含被关掉的卡，否则重开后位置会漂）

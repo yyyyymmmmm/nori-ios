@@ -185,7 +185,7 @@ struct AgentMemorySheet: View {
                         Image(systemName: "brain.head.profile")
                             .font(.system(size: 40))
                             .foregroundStyle(Color.accentColor.opacity(0.7))
-                        Text("暂无 Agent 记忆")
+                        Text("暂无 Agent 路由规则")
                             .font(.system(size: Typography.title, weight: .semibold))
                         Text("聊天时说「以后查内存都用agent」\n会自动记住，同类请求直接走 Agent 处理")
                             .font(.system(size: Typography.subhead))
@@ -238,7 +238,7 @@ struct AgentMemorySheet: View {
                     }
                 }
             }
-            .navigationTitle("Agent 记忆")
+            .navigationTitle("Agent 路由规则")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -383,10 +383,10 @@ struct MemoryView: View {
                                 Image(systemName: "brain.head.profile")
                                     .font(.system(size: Typography.display))
                                     .foregroundStyle(.tertiary)
-                                Text("还没有记忆条目")
+                                Text("Hermes 当前没有记忆内容")
                                     .font(.system(size: Typography.subhead))
                                     .foregroundStyle(.secondary)
-                                Text("聊天时说「记住…」会自动保存，或手动添加")
+                                Text("聊天时让 Hermes 记住或忘记内容；此处显示 Hermes 同步的记忆")
                                     .font(.system(size: Typography.caption))
                                     .foregroundStyle(.tertiary)
                             }
@@ -422,41 +422,43 @@ struct MemoryView: View {
                                         }
                                     }
                                     Spacer(minLength: 0)
-                                    // v4.0.x 第 4 项：改状态（不改正文）
-                                    Menu {
-                                        ForEach(MemoryEntry.allStatuses, id: \.self) { s in
-                                            Button {
-                                                Task { await setStatus(item, s) }
-                                            } label: {
-                                                Label(MemoryEntry.statusTitle(s), systemImage: MemoryEntry.statusIcon(s))
+                                    if item.source != "hermes" {
+                                        // Hermes MEMORY.md / USER.md 内容由 Hermes 自身维护；
+                                        // 此处只提供查看，避免本地 CRUD 假装改动了 Hermes 文件。
+                                        Menu {
+                                            ForEach(MemoryEntry.allStatuses, id: \.self) { s in
+                                                Button {
+                                                    Task { await setStatus(item, s) }
+                                                } label: {
+                                                    Label(MemoryEntry.statusTitle(s), systemImage: MemoryEntry.statusIcon(s))
+                                                }
                                             }
+                                        } label: {
+                                            Image(systemName: "ellipsis.circle")
+                                                .font(.system(size: Typography.subhead))
+                                                .foregroundStyle(Color.accentColor)
                                         }
-                                    } label: {
-                                        Image(systemName: "ellipsis.circle")
-                                            .font(.system(size: Typography.subhead))
-                                            .foregroundStyle(Color.accentColor)
+                                        .accessibilityLabel("修改这条记忆的状态")
+                                        Button {
+                                            editText = item.text
+                                            editing = item.text
+                                        } label: {
+                                            Image(systemName: "pencil")
+                                                .font(.system(size: Typography.subhead))
+                                                .foregroundStyle(Color.accentColor)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("编辑这条记忆")
+                                        Button {
+                                            confirmDelete = item.text
+                                        } label: {
+                                            Image(systemName: "trash")
+                                                .font(.system(size: Typography.subhead))
+                                                .foregroundStyle(.red)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("删除这条记忆")
                                     }
-                                    .accessibilityLabel("修改这条记忆的状态")
-                                    // v3.9.40（#19）：就地编辑（原只能删了再加，会掉到列表末尾）
-                                    Button {
-                                        editText = item.text
-                                        editing = item.text
-                                    } label: {
-                                        Image(systemName: "pencil")
-                                            .font(.system(size: Typography.subhead))
-                                            .foregroundStyle(Color.accentColor)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("编辑这条记忆")
-                                    Button {
-                                        confirmDelete = item.text   // v2.0.102：先确认再删（记忆不可恢复）
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .font(.system(size: Typography.subhead))
-                                            .foregroundStyle(.red)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("删除这条记忆")
                                 }
                                 .padding(.horizontal, Spacing.xl)
                                 .padding(.vertical, Spacing.lg)
@@ -469,7 +471,7 @@ struct MemoryView: View {
                     .padding(.top, Spacing.xs)
                 }
             }
-            .navigationTitle("AI 记忆")
+            .navigationTitle("Hermes 记忆")
             .navigationBarTitleDisplayMode(.inline)
             // v2.0.102：删除确认（记忆不可恢复）
             .confirmationDialog("删除这条记忆？", isPresented: Binding(get: { confirmDelete != nil },

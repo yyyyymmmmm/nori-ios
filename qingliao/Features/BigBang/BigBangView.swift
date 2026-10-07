@@ -174,7 +174,7 @@ struct BigBangView: View {
             }
             .buttonStyle(.plain)
             Spacer(minLength: 0)
-            // v3.9.71：选中词块 → 识别类型 → 一键执行（记一笔/加待办/建提醒/存知识库…）
+            // v3.9.71：选中词块 → 识别类型 → 一键执行（记一笔/加待办/建提醒…）
             Button {
                 recognizeSelected()
             } label: {
