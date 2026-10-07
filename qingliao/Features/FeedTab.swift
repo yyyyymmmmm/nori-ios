@@ -171,52 +171,54 @@ struct FeedTabView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    topBar
-                        .padding(.top, Spacing.xl)
-                    Text("动态")
-                        .font(.system(size: 34, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .padding(.top, Spacing.lg)
-                    promptBox
-                        .padding(.top, Spacing.xl)
-                    if store.units.isEmpty {
-                        feedEmptyState
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(store.units) { u in
-                                FeedUnitCard(
-                                    unit: u,
-                                    liked: store.isLiked(u.id),
-                                    onLike: { store.toggleLike(u.id) },
-                                    onDiscuss: { onFillInput("我们来讨论一下这条动态：「\(u.title)」") },
-                                    onShowReason: { reasonUnit = u }
-                                )
-                                Divider()
-                            }
-                            // 2026-10-07：加载更多（分页）
-                            if store.hasMore {
-                                Button {
-                                    Task { await store.loadMore() }
-                                } label: {
-                                    Text("加载更多")
-                                        .font(.system(size: 15))
-                                        .foregroundStyle(.secondary)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
+            GeometryReader { geometry in
+                let contentWidth = max(0, geometry.size.width - Spacing.section * 2)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        topBar
+                            .padding(.top, Spacing.xl)
+                        Text("动态")
+                            .font(.system(size: 34, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .padding(.top, Spacing.lg)
+                        promptBox
+                            .padding(.top, Spacing.xl)
+                        if store.units.isEmpty {
+                            feedEmptyState
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(store.units) { u in
+                                    FeedUnitCard(
+                                        unit: u,
+                                        availableWidth: contentWidth,
+                                        liked: store.isLiked(u.id),
+                                        onLike: { store.toggleLike(u.id) },
+                                        onDiscuss: { onFillInput("我们来讨论一下这条动态：「\(u.title)」") },
+                                        onShowReason: { reasonUnit = u }
+                                    )
+                                    Divider()
                                 }
-                                .buttonStyle(.plain)
+                                if store.hasMore {
+                                    Button {
+                                        Task { await store.loadMore() }
+                                    } label: {
+                                        Text("加载更多")
+                                            .font(.system(size: 15))
+                                            .foregroundStyle(.secondary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 16)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
+                            .padding(.top, Spacing.xs)
                         }
-                        .padding(.top, Spacing.xs)
                     }
+                    .padding(.horizontal, Spacing.section)
+                    .frame(width: geometry.size.width, alignment: .leading)
+                    .padding(.bottom, 100)
                 }
-                // Keep every feed section inside the viewport even when article text or
-                // remote image metadata reports a wider intrinsic size.
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Spacing.section)
-                .padding(.bottom, 100)   // F线：系统 tab bar 下内容不被遮（原来按悬浮胶囊留的）
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
             }
             .toolbar(.hidden, for: .navigationBar)
             .task {
@@ -225,7 +227,7 @@ struct FeedTabView: View {
             }
             .refreshable { await store.load() }
             .sheet(isPresented: $showPrompt) { promptSheet }
-            .sheet(item: $reasonUnit) { u in
+            .sheet(item: $reasonUnit) { _ in
                 VStack(alignment: .leading, spacing: 12) {
                     Text("为什么推荐这条")
                         .font(.system(size: 20, weight: .semibold))
@@ -394,31 +396,34 @@ struct FeedTabView: View {
 
 private struct FeedUnitCard: View {
     let unit: FeedUnit
+    let availableWidth: CGFloat
     let liked: Bool
     let onLike: () -> Void
     let onDiscuss: () -> Void
     let onShowReason: () -> Void
+
+    private var textColumnWidth: CGFloat { max(0, availableWidth - 40) }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: categoryIcon(unit.category))
                 .font(.system(size: 38, weight: .light))
                 .foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .top)
+                .frame(width: 28, alignment: .top)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(unit.title)
                     .font(.system(size: Typography.title, weight: .semibold))
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(width: textColumnWidth, alignment: .leading)
 
                 linkedBody(unit.bodyMarkdown)
                     .font(.system(size: Typography.body))
                     .foregroundStyle(.primary)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(width: textColumnWidth, alignment: .leading)
 
                 if let img = unit.imageURL, let url = URL(string: img) {
                     AsyncImage(url: url) { image in
@@ -426,8 +431,8 @@ private struct FeedUnitCard: View {
                     } placeholder: {
                         Color.secondary.opacity(0.1)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 120)
-                    .aspectRatio(1.6, contentMode: .fit)
+                    .frame(width: textColumnWidth, height: max(120, textColumnWidth / 1.6))
+                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                 }
 
@@ -461,9 +466,9 @@ private struct FeedUnitCard: View {
                 }
                 .padding(.top, Spacing.xs)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: textColumnWidth, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: availableWidth, alignment: .leading)
         .padding(.vertical, Spacing.section)
     }
 

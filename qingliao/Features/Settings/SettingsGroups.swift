@@ -69,25 +69,25 @@ struct SettingsGroupLink<Destination: View>: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .regular))
+                    .font(.system(size: 20, weight: .regular))
                     .foregroundStyle(.primary)
-                    .frame(width: 34)
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 17))
+                        .font(.system(size: 16))
                         .foregroundStyle(.primary)
                     Text(subtitle)
-                        .font(.system(size: 14))
+                        .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 16)
+            .padding(.vertical, 11)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -109,23 +109,23 @@ struct SettingsGroupActionRow: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .regular))
+                    .font(.system(size: 20, weight: .regular))
                     .foregroundStyle(.primary)
-                    .frame(width: 34)
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.system(size: 17)).foregroundStyle(.primary)
-                    Text(subtitle).font(.system(size: 14)).foregroundStyle(.tertiary).lineLimit(2)
+                    Text(title).font(.system(size: 16)).foregroundStyle(.primary)
+                    Text(subtitle).font(.system(size: 13)).foregroundStyle(.tertiary).lineLimit(2)
                 }
                 Spacer(minLength: 8)
                 if let value {
-                    Text(value).font(.system(size: 14)).foregroundStyle(.secondary)
+                    Text(value).font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 16)
+            .padding(.vertical, 11)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

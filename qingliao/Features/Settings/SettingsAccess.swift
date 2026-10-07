@@ -799,7 +799,6 @@ struct SecretRow: View {
 // MARK: - 新增/编辑表单
 
 struct SecretEditSheet: View {
-    @Environment(AuthStore.self) private var auth
     @Environment(\.dismiss) private var dismiss
     let entry: SecretEntry?
     let onSave: (SecretEntry) -> Void
@@ -809,57 +808,162 @@ struct SecretEditSheet: View {
     @State private var address = ""
     @State private var username = ""
     @State private var password = ""
+    @FocusState private var focusedField: Field?
+
+    private enum Field { case address, name, username, password }
+    private var isEditing: Bool { entry?.id.isEmpty == false }
+    private var displayName: String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        let raw = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let host = URL(string: raw.contains("://") ? raw : "https://\(raw)")?.host,
+              !host.isEmpty else { return raw }
+        return host
+    }
+    private var canSave: Bool {
+        !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        (!password.isEmpty || entry?.hasPassword == true)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 0) {
             HStack {
-                Text(entry?.id.isEmpty == false ? "编辑凭据" : "新增凭据")
-                    .font(.system(size: Typography.title, weight: .bold))
-                Spacer()
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: Typography.titleXL)).foregroundStyle(.tertiary)
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("关闭")
+                .accessibilityLabel("返回")
+                Spacer()
+                Text(isEditing ? "编辑登录信息" : "添加登录信息")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Color.clear.frame(width: 44, height: 44)
             }
-            Picker("类型", selection: $type) {
-                Text("NAS").tag("nas")
-                Text("路由器").tag("router")
-                Text("其他").tag("other")
-            }
-            .pickerStyle(.segmented)
-            TextField("名称（如：NAS SSH）", text: $name)
-                .textFieldStyle(.roundedBorder)
-            TextField("地址（IP 或 域名:端口）", text: $address)
-                .textFieldStyle(.roundedBorder)
-                .autocapitalization(.none)
-            TextField("用户名", text: $username)
-                .textFieldStyle(.roundedBorder)
-                .autocapitalization(.none)
-            SecureField(entry?.hasPassword == true ? "新密码（留空保持不变）" : "密码", text: $password)
-                .textFieldStyle(.roundedBorder)
-            Button {
-                var e = entry ?? SecretEntry(id: "", name: "", type: "nas", address: "", username: "", hasPassword: false)
-                e.name = name; e.type = type; e.address = address; e.username = username
-                if !password.isEmpty { e.password = password }
-                onSave(e)
-                dismiss()
-            } label: {
-                HStack {
-                    Spacer()
-                    Text("保存")
-                    Spacer()
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 20)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("网站")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Menu {
+                                Button("NAS") { type = "nas" }
+                                Button("路由器") { type = "router" }
+                                Button("其他") { type = "other" }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(typeLabel)
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                        VStack(spacing: 0) {
+                            TextField("https://example.com", text: $address)
+                                .textContentType(.URL)
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .focused($focusedField, equals: .address)
+                                .submitLabel(.next)
+                                .onSubmit { focusedField = .name }
+                                .padding(.horizontal, 18)
+                                .frame(minHeight: 58)
+                            Rectangle()
+                                .fill(Color(uiColor: .separator).opacity(0.35))
+                                .frame(height: 0.5)
+                                .padding(.leading, 18)
+                            TextField("名称（可选）", text: $name)
+                                .textInputAutocapitalization(.words)
+                                .focused($focusedField, equals: .name)
+                                .submitLabel(.next)
+                                .onSubmit { focusedField = .username }
+                                .padding(.horizontal, 18)
+                                .frame(minHeight: 52)
+                        }
+                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("登录信息")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        VStack(spacing: 0) {
+                            TextField("账号或邮箱", text: $username)
+                                .textContentType(.username)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .focused($focusedField, equals: .username)
+                                .submitLabel(.next)
+                                .onSubmit { focusedField = .password }
+                                .padding(.horizontal, 18)
+                                .frame(minHeight: 60)
+                            Rectangle()
+                                .fill(Color(uiColor: .separator).opacity(0.35))
+                                .frame(height: 0.5)
+                                .padding(.leading, 18)
+                            SecureField(entry?.hasPassword == true ? "密码（留空则保持不变）" : "密码", text: $password)
+                                .textContentType(isEditing ? .newPassword : .password)
+                                .focused($focusedField, equals: .password)
+                                .submitLabel(.done)
+                                .onSubmit { focusedField = nil }
+                                .padding(.horizontal, 18)
+                                .frame(minHeight: 60)
+                        }
+                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+
+                    Button {
+                        var value = entry ?? SecretEntry(id: "", name: "", type: "nas", address: "", username: "", hasPassword: false)
+                        value.name = displayName
+                        value.type = type
+                        value.address = address.trimmingCharacters(in: .whitespacesAndNewlines)
+                        value.username = username.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !password.isEmpty { value.password = password }
+                        onSave(value)
+                        dismiss()
+                    } label: {
+                        Text(isEditing ? "保存" : "添加")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white.opacity(canSave ? 1 : 0.72))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(
+                                LinearGradient(colors: canSave ? [Color(red: 0.17, green: 0.55, blue: 0.94), Color(red: 0.42, green: 0.36, blue: 0.88)] : [Color.gray.opacity(0.45), Color.gray.opacity(0.35)], startPoint: .leading, endPoint: .trailing),
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSave)
+                    .padding(.top, 2)
+
+                    Button("取消") { dismiss() }
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
                 }
-                .font(.system(size: Typography.body, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .pill(.primary)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
             }
-            .buttonStyle(.plain)
-            .disabled(name.isEmpty || address.isEmpty || username.isEmpty)
-            Spacer()
+            .scrollDismissesKeyboard(.interactively)
         }
-        .padding(Spacing.sheetInset)
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
         .onAppear {
             if let entry {
                 name = entry.name
@@ -867,6 +971,14 @@ struct SecretEditSheet: View {
                 address = entry.address
                 username = entry.username
             }
+        }
+    }
+
+    private var typeLabel: String {
+        switch type {
+        case "nas": "NAS"
+        case "router": "路由器"
+        default: "其他"
         }
     }
 }

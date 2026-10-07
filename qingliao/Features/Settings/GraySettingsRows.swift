@@ -1,5 +1,5 @@
-// J 线 2026-10-06：设置页视觉组件（对标 Muse 设置参考图）。
-// 行 = 单色线条图标 + 标题(17) + 副标题(15) + 右侧值(15) + 灰 chevron；
+// 设置页视觉组件：分组列表使用统一细线图标、紧凑行高与系统语义色。
+// 行 = 单色线条图标 + 标题(16) + 副标题(13) + 右侧值 + 灰 chevron；
 // 分组 = 圆角 16 实色卡片（行间细分割线由调用方用 MuseRowDivider 显式插入）；
 // iOS 26 玻璃只用在顶栏按钮，卡片一律实色（深色模式自适应）。
 
@@ -68,16 +68,16 @@ struct GraySettingsRow: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    .font(.system(size: 22))
+                    .font(.system(size: 20))
                     .frame(width: 30)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 17))
+                        .font(.system(size: 16))
                         .foregroundStyle(.primary)
                     if let subtitle {
                         Text(subtitle)
-                            .font(.system(size: 14))
+                            .font(.system(size: 13))
                             .foregroundStyle(.tertiary)
                             .lineLimit(2)
                     }
@@ -85,7 +85,7 @@ struct GraySettingsRow: View {
                 Spacer(minLength: 8)
                 if let value {
                     Text(value)
-                        .font(.system(size: 15))
+                        .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -96,7 +96,7 @@ struct GraySettingsRow: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 11)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -114,17 +114,17 @@ struct GraySettingsStaticRow: View {
         HStack(spacing: 12) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 22))
+                    .font(.system(size: 20))
                     .foregroundStyle(.primary)
                     .frame(width: 30)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .foregroundStyle(.primary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 14))
+                        .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                 }
@@ -132,7 +132,7 @@ struct GraySettingsStaticRow: View {
             Spacer(minLength: 8)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 11)
     }
 }
 
@@ -148,17 +148,17 @@ struct GraySettingsToggleRow: View {
         HStack(spacing: 12) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 22))
+                    .font(.system(size: 20))
                     .foregroundStyle(.primary)
                     .frame(width: 30)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .foregroundStyle(.primary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 14))
+                        .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                 }
@@ -167,6 +167,6 @@ struct GraySettingsToggleRow: View {
             Toggle("", isOn: $isOn).qingliaoSwitch()
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 11)
     }
 }

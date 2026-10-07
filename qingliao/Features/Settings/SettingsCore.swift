@@ -188,7 +188,7 @@ struct SettingsView: View {
             ScrollView {
                 // 2026-10-07：一级页按账户、智能体、连接、安全、设备、通用与支持分类，
                 // 各组内容整体搬进二级页（见 SettingsGroups.swift），GraySettingsGroup 原样复用
-                VStack(spacing: 28) {
+                VStack(spacing: 20) {
                     // v4.0.22：搜索结果插在最上面（逻辑不变）；下面是一级设置分类
                     if !settingsQuery.isEmpty {
                         SettingsSearchList(query: settingsQuery) { openSearchEntry($0) }
