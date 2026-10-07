@@ -257,6 +257,7 @@ struct ThirdPartyPlatform: Identifiable {
 }
 
 private struct ThirdPartyConfigSheet: View {
+    @Environment(\.dismiss) private var dismiss
     let platform: ThirdPartyPlatform
     let save: ([String: String]) async -> String?
     @State private var values: [String: String] = [:]
