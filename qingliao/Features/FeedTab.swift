@@ -212,6 +212,9 @@ struct FeedTabView: View {
                         .padding(.top, Spacing.xs)
                     }
                 }
+                // Keep every feed section inside the viewport even when article text or
+                // remote image metadata reports a wider intrinsic size.
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Spacing.section)
                 .padding(.bottom, 100)   // F线：系统 tab bar 下内容不被遮（原来按悬浮胶囊留的）
             }
@@ -407,11 +410,15 @@ private struct FeedUnitCard: View {
                 Text(unit.title)
                     .font(.system(size: Typography.title, weight: .semibold))
                     .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 linkedBody(unit.bodyMarkdown)
                     .font(.system(size: Typography.body))
                     .foregroundStyle(.primary)
                     .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let img = unit.imageURL, let url = URL(string: img) {
                     AsyncImage(url: url) { image in
@@ -419,8 +426,8 @@ private struct FeedUnitCard: View {
                     } placeholder: {
                         Color.secondary.opacity(0.1)
                     }
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(1.6, contentMode: .fill)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+                    .aspectRatio(1.6, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                 }
 
@@ -454,7 +461,9 @@ private struct FeedUnitCard: View {
                 }
                 .padding(.top, Spacing.xs)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, Spacing.section)
     }
 
