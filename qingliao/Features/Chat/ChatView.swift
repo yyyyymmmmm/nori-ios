@@ -927,7 +927,7 @@ struct ChatView: View {
                 //   配套：welcomeView 自己在键盘弹起时收缩（见那里的注释），否则会看到被截断的欢迎页。
             }
             // Muse 式固定玻璃 chrome：消息列表铺满视口，顶部控件/输入区固定叠放，滚动文字能从下方透出。
-            .safeAreaBar(edge: .top) { chatHeaderBar.background(Color(uiColor: .systemBackground)) }
+            .safeAreaBar(edge: .top) { chatHeaderBar.background(Color.clear) }
             .safeAreaBar(edge: .bottom) { chatComposerArea.background(Color(uiColor: .systemBackground)) }
             // v4.1.0 D路：实测底部安全区（替代不存在的 \.safeAreaInsets EnvironmentKey，CI 修错）
             .background(
@@ -1402,8 +1402,7 @@ struct ChatView: View {
     // 层级、条件分支、闭包、修饰符逐字未变，渲染结果与拆分前一致，只为把类型检查表达式打小。
 
     /// 页头 + 思考档位弹窗 + 任务中心全屏页
-    /// F线 2026-10-06：Muse 式顶栏 —— 左侧边栏（line.3.horizontal）/ 中 AITopCapsule / 右搜索；
-    /// 更多（...）按钮已删（用户要求只留搜索）；离线状态由胶囊状态小字统一显示。
+    /// 顶栏仅保留导航和操作入口；状态胶囊已移除，避免重复占据聊天页视觉焦点。
     @ViewBuilder
     private var chatHeaderBar: some View {
         HStack(spacing: 12) {
@@ -1419,10 +1418,6 @@ struct ChatView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
-
-            Spacer()
-
-            AITopCapsule()
 
             Spacer()
 
@@ -3138,15 +3133,17 @@ struct ChatView: View {
                 if showScrollToBottom {
                     Button {
                         Haptics.tap()
+                        withAnimation(Motion.tap) { showScrollToBottom = false }
                         withAnimation(Motion.tap) {
                             proxy.scrollTo("chatBottomAnchor", anchor: .bottom)
                         }
                     } label: {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .frame(width: 44, height: 44)
-                            .background(Color.accentColor, in: Circle())
+                            .opaqueChrome(in: Circle())
+                            .overlay(Circle().strokeBorder(Tint.line(colorScheme), lineWidth: 0.8))
                             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
                     }
                     .buttonStyle(.plain)
@@ -4646,7 +4643,10 @@ extension ChatView {
                                                     contentH: new.contentH,
                                                     containerH: new.containerH)
                 let remaining = new.contentH - new.offset - new.containerH
-                showScrollToBottom = remaining > 80
+                let shouldShow = remaining > 80
+                if showScrollToBottom != shouldShow {
+                    withAnimation(Motion.tap) { showScrollToBottom = shouldShow }
+                }
             }
             // v4.0.34：测量滚动容器可视高度——列表 minHeight 用它实现「不满屏也贴底」
             //（onScrollGeometryChange 首次挂载即回调一次初始值；键盘弹出容器变矮也自动更新）

@@ -159,6 +159,31 @@ struct ComposerModelSheet: View {
     @State private var loadError: String?
     @State private var actionError: String?
     @State private var savingID: String?
+    @State private var searchText = ""
+
+    private var filteredGroups: [HermesProviderGroup] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return groups }
+        return groups.filter { group in
+            group.name.localizedCaseInsensitiveContains(query)
+                || group.id.localizedCaseInsensitiveContains(query)
+                || group.models.contains {
+                    $0.name.localizedCaseInsensitiveContains(query)
+                        || $0.id.localizedCaseInsensitiveContains(query)
+                }
+        }
+    }
+
+    private func filteredModels(in group: HermesProviderGroup) -> [HermesModelOption] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty,
+              !group.name.localizedCaseInsensitiveContains(query),
+              !group.id.localizedCaseInsensitiveContains(query) else { return group.models }
+        return group.models.filter {
+            $0.name.localizedCaseInsensitiveContains(query)
+                || $0.id.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -200,19 +225,24 @@ struct ComposerModelSheet: View {
                                 .font(.system(size: Typography.tiny))
                                 .foregroundStyle(.secondary)
                         }
-                        ForEach(groups) { group in
+                        ForEach(filteredGroups) { group in
                             Section(group.name) {
                                 if let error = group.error {
                                     Text(error)
                                         .font(.system(size: Typography.tiny))
                                         .foregroundStyle(.orange)
                                 }
-                                ForEach(group.models) { model in
+                                ForEach(filteredModels(in: group)) { model in
                                     modelRow(model, in: group.id)
                                 }
                             }
                         }
+                        if filteredGroups.isEmpty {
+                            ContentUnavailableView.search(text: searchText)
+                        }
                     }
+                    .searchable(text: $searchText, prompt: "搜索服务商或模型")
+                    .refreshable { await loadModels() }
                 }
             }
             .navigationTitle("切换模型")
