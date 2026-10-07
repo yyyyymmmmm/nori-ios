@@ -233,7 +233,8 @@ struct QingliaoSidebar: View {
             .padding(.bottom, 30)
         }
         .frame(maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        // 侧栏保持固定抽屉，但用系统材质透出当前页面，避免整块不透明底板。
+        .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.trailing, 60)   // 右侧露出一点底页，暗示可滑回
         .shadow(color: .black.opacity(0.15), radius: 24, x: 8, y: 0)

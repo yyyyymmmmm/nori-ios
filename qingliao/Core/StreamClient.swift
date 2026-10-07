@@ -473,6 +473,13 @@ final class StreamClient {
                 }
             }
             if done {
+                // 有些后端版本会先报告 done、但最后一段正文还没进入增量轮询结果。
+                // 生成成功且仍无任何正文时，用完整 recover 快照补一次，避免把传输竞态误报成空回复。
+                if st != "error", content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   !recoverTried {
+                    recoverTried = true
+                    if await tryRecover(auth: auth) { return }
+                }
                 finish(success: st != "error", error: err)
             }
             if phase != .normal { phase = .normal }   // v3.9.58：成功轮询 → 恢复正常相位

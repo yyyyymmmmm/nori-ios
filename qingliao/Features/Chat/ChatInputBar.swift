@@ -737,7 +737,7 @@ extension ChatInputBar {
             //   v3.9.65 起用户明确「加到 18」→ ChatInputBarLayout.containerCornerRadius（单一真源，见 enum 定义）。
             // 外层玻璃容器其余件（白边/聚焦蓝边/流光）全部换成同一个形状（四处同形真值表钉住）。
             // v4.0.61：走无障碍玻璃出口（容器本体无描边 —— 聚焦蓝边是下面独立的 overlay，保持不动）
-            .a11yGlass(.regular, in: RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous),
+            .a11yGlass(.clear, in: RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous),
                        stroke: .clear)
             // v3.4.20：聚焦态光晕——输入框获得焦点时边缘亮起细描边（0.8pt 与全站描边同参），失焦淡出。
             // 灰度重做 2026-10-06：淡蓝 → 灰（禁用系统蓝）

@@ -36,8 +36,6 @@ struct GoalsTabView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    topBar
-                        .padding(.top, Spacing.xl)
                     Text("目标")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.primary)
@@ -100,6 +98,11 @@ struct GoalsTabView: View {
                 .padding(.horizontal, Spacing.section)
                 .padding(.bottom, Spacing.xl)
             }
+            .safeAreaBar(edge: .top) {
+                topBar
+                    .padding(.horizontal, Spacing.section)
+                    .padding(.top, Spacing.xl)
+            }
             .toolbar(.hidden, for: .navigationBar)
             .task { await store.loadFromServer() }
             .sheet(isPresented: $showCompleted) { completedSheet }
@@ -118,7 +121,7 @@ struct GoalsTabView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
@@ -150,7 +153,7 @@ struct GoalsTabView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("更多")

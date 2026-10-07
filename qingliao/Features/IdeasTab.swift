@@ -17,8 +17,6 @@ struct IdeasTabView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    topBar
-                        .padding(.top, Spacing.xl)
                     Text("点子")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.primary)
@@ -33,6 +31,11 @@ struct IdeasTabView: View {
                 }
                 .padding(.horizontal, Spacing.section)
                 .padding(.bottom, Spacing.xl)
+            }
+            .safeAreaBar(edge: .top) {
+                topBar
+                    .padding(.horizontal, Spacing.section)
+                    .padding(.top, Spacing.xl)
             }
             .toolbar(.hidden, for: .navigationBar)
             .task { await store.refresh() }
@@ -52,7 +55,7 @@ struct IdeasTabView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")

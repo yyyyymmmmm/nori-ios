@@ -934,7 +934,6 @@ struct ChatView: View {
         chatBodyChrome1(
             // 键盘避让交给系统安全区；键盘出现后消息视口收缩，输入栏跟随键盘上移。
             VStack(spacing: 0) {
-                chatHeaderBar
                 chatStatusBannerStrip
                 chatTranscriptArea
                 // 🚨 v3.9.71 修复（用户截图报「输入法会遮住输入框」）：空态（欢迎页）在键盘弹起时把输入栏挤没了。
@@ -944,8 +943,10 @@ struct ChatView: View {
                 //   344 < 380 → VStack 压不动欢迎页，就只能把**输入栏挤到键盘后面**（截图即此）。
                 //   layoutPriority(1)：空间不足时**先挤上面的内容区**，输入栏必须完整可见。
                 //   配套：welcomeView 自己在键盘弹起时收缩（见那里的注释），否则会看到被截断的欢迎页。
-                chatComposerArea
             }
+            // Muse 式固定玻璃 chrome：消息列表铺满视口，顶部控件/输入区固定叠放，滚动文字能从下方透出。
+            .safeAreaBar(edge: .top) { chatHeaderBar }
+            .safeAreaBar(edge: .bottom) { chatComposerArea }
             // v4.1.0 D路：实测底部安全区（替代不存在的 \.safeAreaInsets EnvironmentKey，CI 修错）
             .background(
                 GeometryReader { proxy in
@@ -1450,7 +1451,7 @@ struct ChatView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
@@ -1470,7 +1471,7 @@ struct ChatView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("搜索")
@@ -1484,7 +1485,7 @@ struct ChatView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("语音对话")

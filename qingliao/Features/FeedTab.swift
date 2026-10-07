@@ -175,8 +175,6 @@ struct FeedTabView: View {
                 let contentWidth = max(0, geometry.size.width - Spacing.section * 2)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        topBar
-                            .padding(.top, Spacing.xl)
                         Text("动态")
                             .font(.system(size: 34, weight: .bold))
                             .foregroundStyle(.primary)
@@ -220,6 +218,12 @@ struct FeedTabView: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
             }
+            // 顶栏固定在页面视口，信息流从它下面滚过；采用系统滚动边缘材质。
+            .safeAreaBar(edge: .top) {
+                topBar
+                    .padding(.horizontal, Spacing.section)
+                    .padding(.top, Spacing.xl)
+            }
             .toolbar(.hidden, for: .navigationBar)
             .task {
                 await store.loadPrompt()
@@ -254,7 +258,7 @@ struct FeedTabView: View {
                     .font(.system(size: Typography.headline))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .a11yGlass(.regular, in: Circle(), stroke: Color.primary.opacity(0.08))
+                    .a11yGlass(.clear, in: Circle(), stroke: Color.primary.opacity(0.08))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
