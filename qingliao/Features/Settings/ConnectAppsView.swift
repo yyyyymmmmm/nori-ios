@@ -83,7 +83,6 @@ struct ConnectAppsView: View {
                             return state(app)
                         }) { await connect(app) }
                     case .tools: MCPSettingsSheet().scrollContentBackground(.hidden)
-                    case .thirdParty: ThirdPartyView()
                     case .mail: MailSettingsSheet().scrollContentBackground(.hidden)
                     case .cloudDrive: CloudDriveSettingsSheet().scrollContentBackground(.hidden)
                     case .homeAssistant: HASettingsSheet()
@@ -116,8 +115,6 @@ struct ConnectAppsView: View {
                 .padding(.horizontal, 4)
             VStack(spacing: 0) {
                 cloudRow("工具服务（MCP）", subtitle: "查看和管理 Hermes 可调用的工具", icon: "hammer") { presented = .tools }
-                MuseRowDivider()
-                cloudRow("对接第三方", subtitle: "消息渠道与 OAuth 授权", icon: "square.grid.2x2") { presented = .thirdParty }
                 MuseRowDivider()
                 cloudRow("邮件", subtitle: "查看和管理已配置的邮箱账号", icon: "envelope") { presented = .mail }
                 MuseRowDivider()
@@ -300,7 +297,6 @@ private enum PresentedSheet: Identifiable {
     case intro(ConnectApp)
     case detail(ConnectApp)
     case tools
-    case thirdParty
     case mail
     case cloudDrive
     case homeAssistant
@@ -309,7 +305,6 @@ private enum PresentedSheet: Identifiable {
         case .intro(let app): "intro-\(app.id)"
         case .detail(let app): "detail-\(app.id)"
         case .tools: "tools"
-        case .thirdParty: "third-party"
         case .mail: "mail"
         case .cloudDrive: "cloud-drive"
         case .homeAssistant: "home-assistant"

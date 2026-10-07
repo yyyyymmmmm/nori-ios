@@ -17,62 +17,55 @@ struct AboutView: View {
     @State private var backendVersion = "读取中…"
 
     var body: some View {
-        VStack(spacing: 14) {
-            // v2.0.34：关于页换新图标（淡青底微笑气泡，与 AppIcon 同款）
-            Image("AboutLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 76, height: 76)
-                .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    VStack(spacing: 10) {
+                        Image("AboutLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 76, height: 76)
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        Text("Nori").font(.system(size: 28, weight: .bold))
+                        Text("自托管 AI 助手客户端")
+                            .font(.system(size: 15)).foregroundStyle(.secondary)
+                        Text("版本 \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知")")
+                            .font(.system(size: 13)).foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
 
-            Text("Nori")
-                .font(.system(size: Typography.titleXL, weight: .bold))
-            Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.0")")
-                .font(.system(size: Typography.subhead))
-                .foregroundStyle(.secondary)
+                    GraySettingsGroup(title: "产品") {
+                        GraySettingsStaticRow(icon: "sparkles", title: "Nori", subtitle: "SwiftUI 原生客户端，连接自托管 Hermes Agent")
+                        MuseRowDivider()
+                        GraySettingsStaticRow(icon: "cpu", title: "模型与智能体", subtitle: "由 Hermes 管理模型、技能、记忆与任务")
+                        MuseRowDivider()
+                        GraySettingsStaticRow(icon: "externaldrive", title: "数据与服务", subtitle: "Nori 后端提供代理与设备连接能力")
+                    }
 
-            Divider().padding(.horizontal, 30)
+                    GraySettingsGroup(title: "服务版本") {
+                        GraySettingsStaticRow(icon: "app", title: "Nori iOS", subtitle: "v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知")")
+                        MuseRowDivider()
+                        GraySettingsStaticRow(icon: "sparkle.magnifyingglass", title: "Hermes Agent", subtitle: hermesVersion)
+                        MuseRowDivider()
+                        GraySettingsStaticRow(icon: "server.rack", title: "Nori 后端", subtitle: backendVersion)
+                    }
 
-            VStack(alignment: .leading, spacing: 10) {
-                // v3.0.8：项目版本说明（iOS 客户端版本）
-                aboutRow("项目版本", "Nori · iOS 客户端 v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
-                // 2026-10-07：产品定位更新（对标 Muse，更强大的自部署 AI 助手）
-                aboutRow("产品", "Nori —— 你的 AI 助手。SwiftUI 原生客户端，连接 Hermes Agent，数据自主可控。")
-                appModeRow()
-                aboutRow("功能", "流式对话 · 语音对话 · 图片理解 · 文件 · Hermes 技能 · 定时任务 · 智能家居 · Hermes 记忆")
-                aboutRow("模型", "Hermes Agent 统一调度（多服务商/多模型）")
-                aboutRow("架构", "SwiftUI 原生 · Hermes Agent 引擎 · Nori 后端（代理与控制面）")
-                // v3.0.8：Hermes Agent 版本号固定放在介绍最后一行（本地模式读容器实时版本）
-                HStack(alignment: .top) {
-                    Text("Hermes Agent")
-                        .font(.system(size: Typography.subhead, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .frame(width: 68, alignment: .leading)
-                    Text(hermesVersion)
-                        .font(.system(size: Typography.subhead))
-                        .foregroundStyle(.secondary)
+                    Text("Nous Research · Hermes Agent")
+                        .font(.system(size: 13)).foregroundStyle(.tertiary)
+                        .padding(.bottom, 24)
                 }
-                // v4.0.14：Nori后端版本（/api/version 免鉴权，失败只显示"未获取到"，不打扰用户）
-                HStack(alignment: .top) {
-                    Text("Nori后端")
-                        .font(.system(size: Typography.subhead, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .frame(width: 68, alignment: .leading)
-                    Text(backendVersion)
-                        .font(.system(size: Typography.subhead))
-                        .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+            }
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("关于 Nori")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("完成") { dismiss() }
                 }
             }
-            .font(.system(size: Typography.subhead))
-            .padding(.horizontal, 24)
-
-            Spacer()
-            Text("Nous Research · Hermes Agent")
-                .font(.system(size: Typography.caption))
-                .foregroundStyle(.tertiary)
-                .padding(.bottom, Spacing.xl)
         }
-        .padding(.top, 22)
         // v3.0.8：拉取 Hermes 容器版本（v3.9.28 云端模式移除后不再需要分支）
         .task {
             if let j = try? await auth.json("/api/nas/status"),
@@ -101,20 +94,4 @@ struct AboutView: View {
         }
     }
 
-    /// v3.0.3：当前模式行（v3.9.28 云端直连移除后恒为本地 AI）
-    private func appModeRow() -> some View {
-        aboutRow("当前模式", "自托管 AI 客户端 —— 连接 NAS 上的 Hermes Agent；模型、记忆、技能与任务由 Hermes 管理。")
-    }
-
-    private func aboutRow(_ title: String, _ content: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(title)
-                .font(.system(size: Typography.subhead, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .leading)
-            Text(content)
-                .font(.system(size: Typography.subhead))
-                .foregroundStyle(.primary)
-        }
-    }
 }

@@ -52,7 +52,7 @@ struct ThirdPartyView: View {
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("对接第三方")
+            .navigationTitle("消息渠道")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

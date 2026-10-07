@@ -510,11 +510,17 @@ extension SettingsView {
     // MARK: - 连接器
 
     @ViewBuilder var connectionSection: some View {
-        GraySettingsGroup(title: "连接器") {
+        VStack(spacing: 22) {
+          GraySettingsGroup(title: "AI连接") {
             GraySettingsRow(icon: "network", title: "连接设置") { showConnSettings = true }
+          }
+          GraySettingsGroup(title: "消息与服务") {
+            GraySettingsRow(icon: "bubble.left.and.bubble.right", title: "消息渠道",
+                            subtitle: "管理 Hermes 已支持的消息平台") { showThirdParty = true }
             MuseRowDivider()
             GraySettingsRow(icon: "square.grid.2x2", title: "连接应用",
                             subtitle: "设备权限、云端服务与工具服务") { showConnectApps = true }
+          }
         }
     }
 
@@ -544,9 +550,11 @@ extension SettingsView {
     // MARK: - 个人中心
 
     @ViewBuilder var accountSection: some View {
-        GraySettingsGroup(title: "个人中心") {
-            GraySettingsStaticRow(icon: "person.circle", title: auth.username, subtitle: "已登录")
-            MuseRowDivider()
+        VStack(spacing: 22) {
+          GraySettingsGroup(title: "账户") {
+            GraySettingsStaticRow(icon: "person.crop.circle", title: auth.username, subtitle: "Nori 账户 · 已登录")
+          }
+          GraySettingsGroup(title: "登录与安全") {
             GraySettingsRow(icon: "key", title: "修改密码") { showPasswordSheet = true }
             MuseRowDivider()
             GraySettingsToggleRow(icon: "faceid", title: "Face ID 登录", isOn: $faceIDLogin)
@@ -568,9 +576,12 @@ extension SettingsView {
                 } message: {
                     Text("未通过系统 Face ID 验证，App 锁不可用。")
                 }
-            MuseRowDivider()
-            GraySettingsRow(icon: "lock.rectangle.stack", title: "密码管理", value: "\(secretCount) 条密码") { showSecrets = true }
-            MuseRowDivider()
+          }
+          GraySettingsGroup(title: "安全凭证") {
+            GraySettingsRow(icon: "lock.rectangle.stack", title: "安全凭证存储库",
+                            subtitle: "服务端加密 · 验证后限时查看", value: "\(secretCount)") { showSecrets = true }
+          }
+          GraySettingsGroup(title: "账户操作") {
             // 2026-10-07 真机反馈：退出登录从「关于我们」搬到个人中心（一个功能一个入口）
             Button {
                 confirmLogout = true
@@ -582,6 +593,7 @@ extension SettingsView {
                     .padding(.vertical, Spacing.xxl)
             }
             .buttonStyle(.plain)
+          }
         }
         .confirmationDialog("退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("退出登录", role: .destructive) { auth.logout() }
@@ -602,16 +614,16 @@ extension SettingsView {
     // MARK: - 关于我们
 
     @ViewBuilder var aboutSection: some View {
-        GraySettingsGroup(title: "关于我们") {
-            GraySettingsRow(icon: "info.circle", title: "关于Nori") { showAbout = true }
+        VStack(spacing: 22) {
+          GraySettingsGroup(title: "产品") {
+            GraySettingsRow(icon: "info.circle", title: "关于 Nori", subtitle: "版本、产品与服务信息") { showAbout = true }
+          }
+          GraySettingsGroup(title: "帮助与支持") {
+            GraySettingsRow(icon: "questionmark.circle", title: "帮助与支持", subtitle: "功能说明与使用指引") { showAgentHelp = true }
             MuseRowDivider()
-            GraySettingsRow(icon: "doc.text", title: "日志") { showLogs = true }
-            MuseRowDivider()
-            GraySettingsRow(icon: "stethoscope", title: "诊断",
-                            value: CrashReporter.hasPendingLog() ? "有待查看" : "设备/网络/崩溃记录") { showDiagnostics = true }
-            MuseRowDivider()
-            // K 线 2026-10-06：使用说明从智能体组移到关于组（静态帮助）
-            GraySettingsRow(icon: "questionmark.circle", title: "使用说明") { showAgentHelp = true }
+            GraySettingsRow(icon: "exclamationmark.bubble", title: "报告问题",
+                            subtitle: CrashReporter.hasPendingLog() ? "有待查看的诊断记录" : "反馈问题并附上诊断信息") { showDiagnostics = true }
+          }
         }
     }
 
@@ -799,7 +811,7 @@ extension SettingsView {
                     .padding(.vertical, Spacing.sm)
                 }
             }
-            .navigationTitle("使用说明")
+            .navigationTitle("帮助与支持")
             .navigationBarTitleDisplayMode(.inline)
         }
     }

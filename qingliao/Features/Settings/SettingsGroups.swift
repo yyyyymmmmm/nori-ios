@@ -37,12 +37,12 @@ enum SettingsSubpage: String, Hashable, Identifiable, CaseIterable {
     /// 分组行副标题摘要（一眼看出组里有什么）
     var subtitle: String {
         switch self {
-        case .profile: "账号 · 密码 · Face ID"
+        case .profile: "账户 · 安全 · 凭证"
         case .ai: "Hermes 记忆 · 定时任务 · 技能"
-        case .connector: "连接设置 · 连接应用 · 工具服务"
+        case .connector: "模型连接 · 消息渠道 · 应用与工具"
         case .general: "外观 · 朗读声音 · 快捷方式"
         case .notify: "本地提醒"
-        case .about: "版本 · 日志 · 诊断"
+        case .about: "关于 · 帮助与支持 · 问题反馈"
         }
     }
 }

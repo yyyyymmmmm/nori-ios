@@ -36,6 +36,7 @@ struct DiagnosticsView: View {
     @State private var showExporter = false
     @State private var exportText = ""
     @State private var showCrashSheet = false
+    @State private var showLogs = false
     /// v3.6.4：清除本机诊断记录（崩溃 / 卡顿）二次确认
     @State private var showClearAlert = false
     @State private var uploading = false
@@ -62,7 +63,7 @@ struct DiagnosticsView: View {
                 .padding(.horizontal, Spacing.xxl)
                 .padding(.bottom, 30)
             }
-            .navigationTitle("诊断")
+            .navigationTitle("报告问题")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -113,6 +114,7 @@ struct DiagnosticsView: View {
             .sheet(isPresented: $showCrashSheet) {
                 CrashAlertSheet(logText: CrashReporter.latestLogText(), allowDismiss: false)
             }
+            .sheet(isPresented: $showLogs) { LogsView() }
             .alert("清除全部诊断记录？", isPresented: $showClearAlert) {
                 Button("取消", role: .cancel) { }
                 Button("清除", role: .destructive) { clearRecords() }
@@ -190,6 +192,25 @@ struct DiagnosticsView: View {
                        iconColor: uploadStats.lastOK ? .green : .orange,
                        title: "上报统计",
                        value: uploadStatsText)
+            Divider().padding(.leading, Spacing.rowDividerInset)
+            Button { showLogs = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.system(size: Typography.subhead, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(Color.gray, in: RoundedRectangle(cornerRadius: Radius.icon, style: .continuous))
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                        Text("运行日志").font(.system(size: Typography.body))
+                        Text("仅在排查问题时查看").font(.system(size: Typography.caption)).foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, Spacing.xxl).padding(.vertical, Spacing.lg)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             Divider().padding(.leading, Spacing.rowDividerInset)
             Button {
                 Task { await manualUpload() }

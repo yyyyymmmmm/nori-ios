@@ -453,9 +453,9 @@ struct SecretsView: View {
                             .font(.system(size: 34))
                             .foregroundStyle(Color.accentColor)
                     }
-                    Text("密码管理已锁定")
+                    Text("安全凭证存储库已锁定")
                         .font(.system(size: Typography.body, weight: .semibold))
-                    Text("使用 Face ID / 面容验证解锁")
+                    Text("使用 Face ID 或设备密码解锁")
                         .font(.system(size: Typography.subhead))
                         .foregroundStyle(.secondary)
                     if authFailed {
@@ -496,10 +496,10 @@ struct SecretsView: View {
                 } else if entries.isEmpty {
                 Spacer()
                 VStack(spacing: 8) {
-                    Text("暂无凭据")
+                    Text("未保存任何凭据")
                         .font(.system(size: Typography.subhead))
                         .foregroundStyle(.tertiary)
-                    Text("点击右上角 + 添加 NAS SSH / 路由器密码")
+                    Text("添加 NAS、路由器或其他服务的登录信息")
                         .font(.system(size: Typography.caption))
                         .foregroundStyle(.tertiary)
                 }
@@ -538,7 +538,7 @@ struct SecretsView: View {
                     .transition(.opacity)
             }
         }
-        .navigationTitle("密码管理")
+        .navigationTitle("安全凭证存储库")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -557,18 +557,16 @@ struct SecretsView: View {
         }
     }
 
-    /// Face ID / 面容验证（失败可重试）
-    /// v2.0.102：无生物识别设备直接放行（原恒 locked 只能关闭页面）
+    /// Face ID 或设备密码验证；不可验证时保持锁定，绝不降级为明文访问。
     private func authenticate() {
         let ctx = LAContext()
         var err: NSError?
-        guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) else {
-            locked = false   // 设备无生物识别 → 不锁（个人自用 App 降级为明文可见）
-            authFailed = false
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &err) else {
+            authFailed = true
             return
         }
-        ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
-                           localizedReason: "验证后查看已加密保存的 NAS / 路由器密码") { success, _ in
+        ctx.evaluatePolicy(.deviceOwnerAuthentication,
+                           localizedReason: "验证后查看已加密保存的登录凭据") { success, _ in
             DispatchQueue.main.async {
                 if success {
                     locked = false
