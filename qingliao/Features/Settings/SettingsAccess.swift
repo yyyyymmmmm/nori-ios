@@ -494,25 +494,51 @@ struct SecretsView: View {
                     // v3.9.42：首屏骨架（左右留白与下方真列表同为 Spacing.xxl）
                     LoadingStateView(shape: .rows(3))
                 } else if entries.isEmpty {
-                Spacer()
-                VStack(spacing: 8) {
-                    Text("未保存任何凭据")
-                        .font(.system(size: Typography.subhead))
-                        .foregroundStyle(.tertiary)
-                    Text("添加 NAS、路由器或其他服务的登录信息")
-                        .font(.system(size: Typography.caption))
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer()
-            } else {
-                ScrollView {
+                    Spacer()
                     VStack(spacing: 8) {
-                        ForEach(entries) { e in
-                            SecretRow(entry: e, onReveal: { reveal(e) }, onEdit: { edit(e) }, onDelete: { delete(e) })
+                        Image(systemName: "lock.shield")
+                            .font(.system(size: 40, weight: .light))
+                            .foregroundStyle(.secondary)
+                        Text("未保存任何信息")
+                            .font(.system(size: Typography.title, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Text("安全保存登录信息，供你管理 NAS、旁路由等设备。")
+                            .font(.system(size: Typography.subhead))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 28)
+                        Button {
+                            editing = SecretEntry(id: "", name: "", type: "nas", address: "", username: "", hasPassword: false)
+                            showEdit = true
+                        } label: {
+                            Text("添加登录信息")
+                                .font(.system(size: Typography.body, weight: .semibold))
+                                .pill(.primary)
                         }
+                        .buttonStyle(.plain)
+                        .padding(.top, Spacing.sm)
                     }
-                    .padding(.horizontal, Spacing.xxl)
-                    .padding(.vertical, Spacing.lg)
+                    Spacer()
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("登录信息使用服务端加密保存。解锁后可按需查看密码，离开页面后会自动遮蔽。")
+                                .font(.system(size: Typography.subhead))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            VStack(spacing: 0) {
+                                ForEach(entries.indices, id: \.self) { index in
+                                    let entry = entries[index]
+                                    SecretRow(entry: entry, onReveal: { reveal(entry) }, onEdit: { edit(entry) }, onDelete: { delete(entry) })
+                                    if index < entries.count - 1 { MuseRowDivider() }
+                                }
+                            }
+                            .background(Color(uiColor: .secondarySystemGroupedBackground),
+                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                        .padding(.horizontal, Spacing.xxl)
+                        .padding(.vertical, Spacing.lg)
+                    }
                 }
             }
         }
@@ -681,9 +707,9 @@ struct SecretRow: View {
 
     private var typeIcon: String {
         switch entry.type {
-        case "nas": return "🖥"
-        case "router": return "📡"
-        default: return "🔑"
+        case "nas": return "server.rack"
+        case "router": return "wifi"
+        default: return "key.fill"
         }
     }
     private var typeName: String {
@@ -696,8 +722,11 @@ struct SecretRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(typeIcon).font(.system(size: Typography.title))
+            HStack(spacing: 10) {
+                Image(systemName: typeIcon)
+                    .font(.system(size: 20))
+                    .foregroundStyle(.primary)
+                    .frame(width: 34)
                 Text(entry.name)
                     .font(.system(size: Typography.body, weight: .semibold))
                 Text(typeName)
@@ -728,13 +757,13 @@ struct SecretRow: View {
                 }
                 .buttonStyle(.plain)
             }
-            HStack(spacing: 10) {
-                Text("地址：\(entry.address)")
-                    .font(.system(size: Typography.caption))
-                    .foregroundStyle(.secondary)
-                Text("用户：\(entry.username)")
-                    .font(.system(size: Typography.caption))
-                    .foregroundStyle(.secondary)
+            if !entry.address.isEmpty || !entry.username.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    if !entry.address.isEmpty { Label(entry.address, systemImage: "network") }
+                    if !entry.username.isEmpty { Label(entry.username, systemImage: "person") }
+                }
+                .font(.system(size: Typography.caption))
+                .foregroundStyle(.secondary)
             }
             // 密码：默认掩码，点击眼睛显示明文
             HStack(spacing: 8) {
@@ -762,10 +791,9 @@ struct SecretRow: View {
                 }
             }
         }
-        .padding(Spacing.xl)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: Radius.inset, style: .continuous))
     }
 }
 

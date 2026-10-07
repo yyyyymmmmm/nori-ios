@@ -55,6 +55,7 @@ struct SettingsView: View {
     @State var showHASettings = false
     // J 线 2026-10-06：新增页开关
     @State var showConnectApps = false
+    @State var showDevicePermissions = false
     @State var showThirdParty = false
     @State var showReadAloud = false
     // v4.0.x：邮件接入（IMAP/SMTP 邮箱账号，AI 可收发邮件）
@@ -185,20 +186,32 @@ struct SettingsView: View {
             // v4.0.22：设置项越堆越多，顶部给一行搜索框（索引与匹配见 Core/SettingsSearchIndex.swift）
             SettingsSearchBar(text: $settingsQuery)
             ScrollView {
-                // 2026-10-07 Item 1：一级页只剩 6 个分组行（大厂顺序：个人中心在前），
+                // 2026-10-07：一级页按账户、智能体、连接、安全、设备、通用与支持分类，
                 // 各组内容整体搬进二级页（见 SettingsGroups.swift），GraySettingsGroup 原样复用
                 VStack(spacing: 28) {
-                    // v4.0.22：搜索结果插在最上面（逻辑不变）；下面是 6 个分组行
+                    // v4.0.22：搜索结果插在最上面（逻辑不变）；下面是一级设置分类
                     if !settingsQuery.isEmpty {
                         SettingsSearchList(query: settingsQuery) { openSearchEntry($0) }
                     }
-                    GraySettingsGroup(title: "") {
+                    GraySettingsGroup(title: "账户与智能体") {
                         groupLink(.profile)
                         MuseRowDivider()
                         groupLink(.ai)
-                        MuseRowDivider()
+                    }
+                    GraySettingsGroup(title: "连接与安全") {
                         groupLink(.connector)
                         MuseRowDivider()
+                        SettingsGroupActionRow(icon: "lock.shield", title: "安全凭证存储库",
+                                               subtitle: "NAS、路由器等登录凭据 · 加密保存",
+                                               value: secretCount == 0 ? "未添加" : "\(secretCount) 项") { showSecrets = true }
+                        MuseRowDivider()
+                        SettingsGroupActionRow(icon: "bubble.left.and.bubble.right", title: "消息渠道",
+                                               subtitle: "管理 Hermes 已支持的消息平台") { showThirdParty = true }
+                        MuseRowDivider()
+                        SettingsGroupActionRow(icon: "iphone.and.arrow.forward", title: "设备与权限",
+                                               subtitle: "iPhone 数据授权与 AI 操作权限") { showDevicePermissions = true }
+                    }
+                    GraySettingsGroup(title: "偏好与支持") {
                         groupLink(.general)
                         MuseRowDivider()
                         groupLink(.notify)
@@ -329,7 +342,10 @@ struct SettingsView: View {
         }
         // v3.9.95：权限与 AI 操控已拆散 —— 本机权限逐项进「连接应用」页（AppPermissionKit 逐项授权）
         .sheet(isPresented: $showConnectApps) {
-            ConnectAppsView()
+            ConnectAppsView(mode: .services)
+        }
+        .sheet(isPresented: $showDevicePermissions) {
+            ConnectAppsView(mode: .devicePermissions)
         }
         // v3.5.x：生活卡片设置页（股票 / 资讯 / 快递）
         .sheet(isPresented: $showLifeCards) {
@@ -514,12 +530,9 @@ extension SettingsView {
           GraySettingsGroup(title: "AI连接") {
             GraySettingsRow(icon: "network", title: "连接设置") { showConnSettings = true }
           }
-          GraySettingsGroup(title: "消息与服务") {
-            GraySettingsRow(icon: "bubble.left.and.bubble.right", title: "消息渠道",
-                            subtitle: "管理 Hermes 已支持的消息平台") { showThirdParty = true }
-            MuseRowDivider()
-            GraySettingsRow(icon: "square.grid.2x2", title: "连接应用",
-                            subtitle: "设备权限、云端服务与工具服务") { showConnectApps = true }
+          GraySettingsGroup(title: "服务与工具") {
+            GraySettingsRow(icon: "square.grid.2x2", title: "服务与工具",
+                            subtitle: "MCP、邮件、网盘与 Home Assistant") { showConnectApps = true }
           }
         }
     }
@@ -576,10 +589,6 @@ extension SettingsView {
                 } message: {
                     Text("未通过系统 Face ID 验证，App 锁不可用。")
                 }
-          }
-          GraySettingsGroup(title: "安全凭证") {
-            GraySettingsRow(icon: "lock.rectangle.stack", title: "安全凭证存储库",
-                            subtitle: "服务端加密 · 验证后限时查看", value: "\(secretCount)") { showSecrets = true }
           }
           GraySettingsGroup(title: "账户操作") {
             // 2026-10-07 真机反馈：退出登录从「关于我们」搬到个人中心（一个功能一个入口）
@@ -748,6 +757,14 @@ extension SettingsView {
             }
             .navigationTitle("智能路由")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { showRoutingSettings = false } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .accessibilityLabel("返回")
+                }
+            }
         }
     }
 
@@ -791,6 +808,14 @@ extension SettingsView {
             }
             .navigationTitle("上下文自动压缩")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { showContextCompress = false } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .accessibilityLabel("返回")
+                }
+            }
         }
     }
 

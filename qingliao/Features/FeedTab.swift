@@ -22,19 +22,12 @@ struct FeedUnit: Identifiable, Codable, Sendable {
 @Observable @MainActor
 final class FeedStore {
     // v4.4.x：prompt 存后端（/api/agent/feed/prompt），换设备一致
-    static let defaultPrompt = "我的兴趣动态版块，围绕三块内容：科技圈的新动态、AI 圈的进展、好玩的开源项目。"
+    static let defaultPrompt = "科技、AI、效率工具"
+    private static let promptCacheKey = "nori_feed_prompt_v1"
+    private static let promptDirtyKey = "nori_feed_prompt_pending_sync_v1"
+    private static let promptUserSavedKey = "nori_feed_prompt_user_saved_v1"
 
-    var prompt: String = defaultPrompt {
-        didSet {
-            // 后端保存（异步，不阻塞 UI）
-            let p = prompt
-            Task { [weak self] in
-                guard let self else { return }
-                _ = try? await self.auth.json("/api/agent/feed/prompt", method: "POST",
-                                              body: ["prompt": p])
-            }
-        }
-    }
+    var prompt: String
     var units: [FeedUnit] = []
     // 2026-10-07：分页
     var hasMore = true
@@ -43,14 +36,50 @@ final class FeedStore {
     private let auth = AuthStore()
 
     init() {
-        // 启动时从后端拉 prompt
-        Task { [weak self] in
-            guard let self else { return }
-            if let j = try? await self.auth.json("/api/agent/feed/prompt", method: "GET"),
-               let p = j["prompt"] as? String, !p.isEmpty {
-                self.prompt = p
+        // 先用本机上次明确保存的值，避免登录/首屏网络请求失败时短暂退回另一个默认提示词。
+        prompt = UserDefaults.standard.string(forKey: Self.promptCacheKey) ?? Self.defaultPrompt
+    }
+
+    func loadPrompt() async {
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: Self.promptUserSavedKey),
+           let cached = defaults.string(forKey: Self.promptCacheKey), !cached.isEmpty {
+            // 用户明确保存过后以本机值为主；服务器值丢失/回滚时自动补写，不重置用户偏好。
+            prompt = cached
+            if defaults.bool(forKey: Self.promptDirtyKey) {
+                await syncPrompt(cached)
+            } else if let remote = try? await auth.json("/api/agent/feed/prompt", method: "GET"),
+                      (remote["prompt"] as? String) != cached {
+                defaults.set(true, forKey: Self.promptDirtyKey)
+                await syncPrompt(cached)
             }
+            return
         }
+        guard let j = try? await auth.json("/api/agent/feed/prompt", method: "GET"),
+              let remote = j["prompt"] as? String else { return }
+        let value = remote.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        prompt = value
+        UserDefaults.standard.set(value, forKey: Self.promptCacheKey)
+    }
+
+    func savePrompt(_ value: String) {
+        let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+        // 先落本机，后同步后端：即使 NAS 暂时不可达，重新登录也保持用户刚保存的主题。
+        prompt = cleaned
+        UserDefaults.standard.set(cleaned, forKey: Self.promptCacheKey)
+        UserDefaults.standard.set(true, forKey: Self.promptDirtyKey)
+        UserDefaults.standard.set(true, forKey: Self.promptUserSavedKey)
+        Task { await syncPrompt(cleaned) }
+    }
+
+    private func syncPrompt(_ value: String) async {
+        guard let result = try? await auth.json("/api/agent/feed/prompt", method: "POST",
+                                                body: ["prompt": value]),
+              result["ok"] as? Bool == true else { return }
+        UserDefaults.standard.set(value, forKey: Self.promptCacheKey)
+        UserDefaults.standard.set(false, forKey: Self.promptDirtyKey)
     }
 
     func isLiked(_ id: String) -> Bool { likedIDs.contains(id) }
@@ -187,7 +216,10 @@ struct FeedTabView: View {
                 .padding(.bottom, 100)   // F线：系统 tab bar 下内容不被遮（原来按悬浮胶囊留的）
             }
             .toolbar(.hidden, for: .navigationBar)
-            .task { await store.load() }
+            .task {
+                await store.loadPrompt()
+                await store.load()
+            }
             .refreshable { await store.load() }
             .sheet(isPresented: $showPrompt) { promptSheet }
             .sheet(item: $reasonUnit) { u in
@@ -325,7 +357,7 @@ struct FeedTabView: View {
                     }
                     .buttonStyle(.plain)
                     Button {
-                        store.prompt = draftPrompt
+                        store.savePrompt(draftPrompt)
                         showPrompt = false
                     } label: {
                         Text("保存")

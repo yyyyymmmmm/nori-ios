@@ -37,9 +37,9 @@ enum SettingsSubpage: String, Hashable, Identifiable, CaseIterable {
     /// 分组行副标题摘要（一眼看出组里有什么）
     var subtitle: String {
         switch self {
-        case .profile: "账户 · 安全 · 凭证"
+        case .profile: "账户 · 登录与安全"
         case .ai: "Hermes 记忆 · 定时任务 · 技能"
-        case .connector: "模型连接 · 消息渠道 · 应用与工具"
+        case .connector: "AI连接 · 服务与工具"
         case .general: "外观 · 朗读声音 · 快捷方式"
         case .notify: "本地提醒"
         case .about: "关于 · 帮助与支持 · 问题反馈"
@@ -82,6 +82,44 @@ struct SettingsGroupLink<Destination: View>: View {
                         .lineLimit(2)
                 }
                 Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// 直达型设置分类（凭证库、消息渠道、设备权限）：保持与 push 分类相同的行样式。
+struct SettingsGroupActionRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    var value: String? = nil
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 22))
+                    .foregroundStyle(.primary)
+                    .frame(width: 30)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.system(size: 17)).foregroundStyle(.primary)
+                    Text(subtitle).font(.system(size: 14)).foregroundStyle(.tertiary).lineLimit(2)
+                }
+                Spacer(minLength: 8)
+                if let value {
+                    Text(value).font(.system(size: 14)).foregroundStyle(.secondary)
+                }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.tertiary)

@@ -4,6 +4,9 @@ import SwiftUI
 import UIKit
 
 struct ConnectAppsView: View {
+    enum Mode: Equatable { case all, devicePermissions, services }
+
+    var mode: Mode = .all
     @Environment(\.dismiss) private var dismiss
     @State private var states: [AppCapability: PermissionState] = [:]
     @State private var micState: PermissionState = .notDetermined
@@ -39,18 +42,22 @@ struct ConnectAppsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    searchField
-                    appSection("已连接", apps: connectedApps, mode: .connected)
-                    appSection("可用", apps: availableApps, mode: .available)
-                    if !unavailableApps.isEmpty {
-                        appSection("当前设备不可用", apps: unavailableApps, mode: .unavailable)
+                    if mode != .services {
+                        searchField
+                        appSection("已连接", apps: connectedApps, mode: .connected)
+                        appSection("可用", apps: availableApps, mode: .available)
+                        if !unavailableApps.isEmpty {
+                            appSection("当前设备不可用", apps: unavailableApps, mode: .unavailable)
+                        }
                     }
-                    cloudManagers
-                    if visibleApps.isEmpty {
+                    if mode != .devicePermissions { cloudManagers }
+                    if mode != .services && visibleApps.isEmpty {
                         ContentUnavailableView("没有匹配的应用", systemImage: "magnifyingglass")
                             .padding(.top, 28)
                     }
-                    Text("授权状态由 iOS 实时提供。系统权限只允许 Nori 访问对应数据；是否允许 AI 使用，还要由下方的 AI 操作开关控制。云端服务在各自的连接设置中管理。")
+                    Text(mode == .devicePermissions
+                         ? "授权状态由 iOS 实时提供。系统权限只允许 Nori 访问对应数据；授权后仍可在 iPhone 设置中随时撤销。"
+                         : "这些服务由 Hermes 或 Nori 后端提供。连接状态和权限以服务端的实际配置为准。")
                         .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -61,7 +68,7 @@ struct ConnectAppsView: View {
                 .padding(.bottom, 36)
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("连接应用")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -91,6 +98,14 @@ struct ConnectAppsView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
+        }
+    }
+
+    private var title: String {
+        switch mode {
+        case .all: "连接应用"
+        case .devicePermissions: "设备与权限"
+        case .services: "服务与工具"
         }
     }
 
