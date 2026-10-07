@@ -82,8 +82,6 @@ struct ConnectAppsView: View {
             .sheet(item: $presented) { item in
                 Group {
                     switch item {
-                    case .intro(let app):
-                        ConnectAppIntroSheet(app: app, state: state(app)) { await connect(app) }
                     case .detail(let app):
                         ConnectAppDetailSheet(app: app, state: state(app), refresh: {
                             await refresh()
@@ -185,7 +183,7 @@ struct ConnectAppsView: View {
             Haptics.tap()
             switch mode {
             case .connected: presented = .detail(app)
-            case .available: presented = .intro(app)
+            case .available: Task { _ = await connect(app) }
             case .unavailable: presented = .detail(app)
             }
         } label: {
@@ -309,7 +307,6 @@ private enum ConnectApp: Identifiable, Hashable {
 }
 
 private enum PresentedSheet: Identifiable {
-    case intro(ConnectApp)
     case detail(ConnectApp)
     case tools
     case mail
@@ -317,67 +314,12 @@ private enum PresentedSheet: Identifiable {
     case homeAssistant
     var id: String {
         switch self {
-        case .intro(let app): "intro-\(app.id)"
         case .detail(let app): "detail-\(app.id)"
         case .tools: "tools"
         case .mail: "mail"
         case .cloudDrive: "cloud-drive"
         case .homeAssistant: "home-assistant"
         }
-    }
-}
-
-private struct ConnectAppIntroSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let app: ConnectApp
-    let state: PermissionState
-    let connect: () async -> PermissionState
-    @State private var working = false
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Capsule().fill(.tertiary).frame(width: 38, height: 5).padding(.top, 10)
-            ScrollView {
-                VStack(spacing: 18) {
-                    app.icon.frame(width: 60, height: 60).padding(.top, 22)
-                    Text(app.name).font(.system(size: 25, weight: .semibold))
-                    Text("Nori 需要通过 iOS 授权才能访问此应用的数据。你可以随时在系统设置中撤销权限。")
-                        .font(.system(size: 16)).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    VStack(alignment: .leading, spacing: 16) {
-                        ForEach(app.permissions, id: \.0) { item in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: item.0 == "读取" ? "eye" : "slider.horizontal.3")
-                                    .frame(width: 22).font(.system(size: 18, weight: .medium))
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(item.0).font(.system(size: 16, weight: .semibold))
-                                    Text(item.1).font(.system(size: 14)).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(18)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
-                }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 16)
-            }
-            Button {
-                guard !working else { return }
-                working = true
-                Task { _ = await connect(); working = false; dismiss() }
-            } label: {
-                Group { if working { ProgressView().tint(.white) } else { Text(state == .denied || state == .restricted ? "前往系统设置" : "继续") } }
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(maxWidth: .infinity).frame(height: 54)
-                    .foregroundStyle(.white).background(Color.accentColor, in: Capsule())
-            }
-            .disabled(working || state == .unavailable)
-            .padding(.horizontal, 22)
-            Button("取消") { dismiss() }
-                .font(.system(size: 16, weight: .medium)).padding(.top, 16).padding(.bottom, 20)
-        }
-        .background(Color(uiColor: .systemGroupedBackground))
     }
 }
 
