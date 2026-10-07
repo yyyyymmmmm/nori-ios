@@ -934,9 +934,7 @@ struct ChatView: View {
         chatBodyChrome3(
         chatBodyChrome2(
         chatBodyChrome1(
-            // v2.0.140：禁用系统键盘避让——ChatInputBar 已手动按 kb.topY 精确计算 bottom padding，
-            // 系统默认避让叠加会双重上抬 → 输入框与键盘间留空隙（用户红线标注）。
-            // 只保留手动控制，输入框精确贴键盘。
+            // 键盘避让交给系统安全区；键盘出现后消息视口收缩，输入栏跟随键盘上移。
             VStack(spacing: 0) {
                 chatHeaderBar
                 chatStatusBannerStrip
@@ -3202,7 +3200,8 @@ struct ChatView: View {
                     }
                     // 视口不足一屏时只扩展整个内容容器；锚点留在真实消息之后，不能把
                     // minHeight 挂在锚点上，否则会额外制造整屏空白滚动区。
-                    .frame(maxWidth: .infinity, minHeight: chatListViewportH, alignment: .top)
+                    .frame(maxWidth: .infinity, minHeight: chatListViewportH,
+                           alignment: kb.isVisible ? .bottom : .top)
                     .id("messages")   // v2.0.39：与欢迎页分支区分身份
                 }
                 .coordinateSpace(name: "chatScroll")
@@ -4750,6 +4749,14 @@ extension ChatView {
                 // 不加新行为：此处原本就无条件滚底，复位只是让随后的 delta 不再被旧态挡住。
                 scrollPinState = .pinnedAtBottom
                 scrollBottom(proxy)
+            }
+            .onChange(of: kb.isVisible) { _, visible in
+                guard visible, scrollPinState.pinned else { return }
+                // 等键盘动画完成、消息视口高度落定后，把最新消息放回可视区域。
+                DispatchQueue.main.asyncAfter(deadline: .now() + kb.animationDuration) {
+                    guard inputFocus, scrollPinState.pinned else { return }
+                    scrollBottom(proxy, animated: false)
+                }
             }
             .onChange(of: displayLimit) { _, _ in
                 refreshVisibleMessages()
