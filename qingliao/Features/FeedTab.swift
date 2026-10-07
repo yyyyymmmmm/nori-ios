@@ -131,7 +131,6 @@ private struct PagedFeed: Decodable {
     let units: [FeedUnit]
     let has_more: Bool
 }
-}
 
 struct FeedTabView: View {
     let onAskAI: (String) -> Void
