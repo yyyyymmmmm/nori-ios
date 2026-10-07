@@ -30,9 +30,10 @@ struct AgentActionCard: View {
     @State private var undo: (() async -> Void)?
     @State private var undoDeadline: Date?
     @State private var now = Date()
+    @AppStorage(AppPermissionKit.confirmReadActionsKey) private var confirmReadActions = false
 
-    /// 读动作自动执行；写/删等用户点。
-    private var autoRuns: Bool { action.kind.impact == .read }
+    /// 默认只读自动执行；开启「每次操作前询问」后，只读卡也必须由用户点按。
+    private var autoRuns: Bool { action.kind.impact == .read && !confirmReadActions }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
@@ -46,7 +47,7 @@ struct AgentActionCard: View {
         }
         .padding(Spacing.lg)
         .glassListCard()
-        .task {
+        .task(id: autoRuns) {
             if autoRuns { await execute() }
         }
         .task(id: undoDeadline) {
@@ -140,7 +141,7 @@ struct AgentActionCard: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: action.kind.impact == .delete ? "trash" : "play.fill")
-                    Text(action.kind.impact == .delete ? "确认删除" : "执行")
+                    Text(action.kind.impact == .delete ? "确认删除" : action.kind.impact == .read ? "允许查看" : "执行")
                 }
                 .font(.system(size: Typography.caption, weight: .semibold))
                 .foregroundStyle(.white)

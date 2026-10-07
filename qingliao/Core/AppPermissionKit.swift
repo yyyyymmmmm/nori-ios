@@ -174,6 +174,13 @@ enum AppPermissionKit {
     /// 「允许 AI 操作」总闸（用户逐项授权之外的兜底总开关）。
     /// 默认 **false** —— 权限给了不等于同意让 AI 动手，必须显式开。
     private static let aiControlMasterKey = "qingliao_ai_control_master"
+    static let confirmReadActionsKey = "qingliao_confirm_read_actions"
+
+    /// When enabled, read-only action cards wait for an explicit user tap as well.
+    static var confirmReadActions: Bool {
+        get { UserDefaults.standard.bool(forKey: confirmReadActionsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: confirmReadActionsKey) }
+    }
 
     /// 单项 AI 开关：key = "qingliao_ai_control.<capability>"
     private static func aiKey(_ c: AppCapability) -> String { "qingliao_ai_control.\(c.rawValue)" }

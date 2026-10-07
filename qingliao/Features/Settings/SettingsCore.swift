@@ -208,8 +208,8 @@ struct SettingsView: View {
                         SettingsGroupActionRow(icon: "bubble.left.and.bubble.right", title: "消息渠道",
                                                subtitle: "管理 Hermes 已支持的消息平台") { showThirdParty = true }
                         MuseRowDivider()
-                        SettingsGroupActionRow(icon: "iphone.and.arrow.forward", title: "设备与权限",
-                                               subtitle: "iPhone 数据授权与 AI 操作权限") { showDevicePermissions = true }
+                        SettingsGroupActionRow(icon: "hand.raised", title: "权限与审批",
+                                               subtitle: "AI 操作确认与本机数据授权") { showDevicePermissions = true }
                     }
                     GraySettingsGroup(title: "偏好与支持") {
                         groupLink(.general)
@@ -345,7 +345,7 @@ struct SettingsView: View {
             ConnectAppsView(mode: .services)
         }
         .sheet(isPresented: $showDevicePermissions) {
-            ConnectAppsView(mode: .devicePermissions)
+            PermissionCenterView()
         }
         // v3.5.x：生活卡片设置页（股票 / 资讯 / 快递）
         .sheet(isPresented: $showLifeCards) {
