@@ -580,7 +580,6 @@ struct SecretsView: View {
                 }
             }
         }
-        }
     }
 
     /// Face ID 或设备密码验证；不可验证时保持锁定，绝不降级为明文访问。

@@ -69,9 +69,9 @@ struct SettingsGroupLink<Destination: View>: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 22))
+                    .font(.system(size: 24, weight: .regular))
                     .foregroundStyle(.primary)
-                    .frame(width: 30)
+                    .frame(width: 34)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.system(size: 17))
@@ -87,7 +87,7 @@ struct SettingsGroupLink<Destination: View>: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 16)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -109,9 +109,9 @@ struct SettingsGroupActionRow: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 22))
+                    .font(.system(size: 24, weight: .regular))
                     .foregroundStyle(.primary)
-                    .frame(width: 30)
+                    .frame(width: 34)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title).font(.system(size: 17)).foregroundStyle(.primary)
                     Text(subtitle).font(.system(size: 14)).foregroundStyle(.tertiary).lineLimit(2)
@@ -125,7 +125,7 @@ struct SettingsGroupActionRow: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 16)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
