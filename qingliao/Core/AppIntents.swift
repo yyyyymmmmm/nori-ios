@@ -76,13 +76,16 @@ enum QingliaoIntentClient {
     @MainActor
     static func oneShot(_ prompt: String, auth: AuthStore, imageDataURL: String?,
                         timeout: TimeInterval = 120) async throws -> String {
-        // 模型取源分两条，**别合并**：
-        //   · 带图 → `modelForImage`（视觉模型 > Agent 模型 > 主模型，与 ChatView.resolveModel 同规则）
-        //   · 纯文本（AI 翻译 / 问Nori / 纪要）→ 只认 `CloudConfig.mainModelAndProvider`
-        //     （v3.9.79 口径：翻译浮层是按主模型配的 30s 超时，切到 Agent 档位会成片掐断）
-        let (model, provider) = imageDataURL == nil
-            ? CloudConfig.mainModelAndProvider
-            : modelForImage(true)
+        // Hermes is the single model authority for shortcuts, one-shot tools, and chat.
+        let selection = try await auth.json("/api/agent/hermes/inspect/models")
+        guard selection["ok"] as? Bool == true,
+              let selected = selection["selected"] as? [String: Any],
+              let model = selected["id"] as? String, !model.isEmpty,
+              let provider = selected["provider"] as? String, !provider.isEmpty else {
+            throw QingliaoIntentError(message: "无法读取 Hermes 当前模型")
+        }
+        UserDefaults.standard.set(model, forKey: "qingliao_model")
+        UserDefaults.standard.set(provider, forKey: "qingliao_provider")
         // 逐分支直赋 `[[String: Any]]`：不要写成 `Any` 与 `??` 混推（本机 `swiftc -parse` 查不出这类，
         // 只有 CI Archive 才炸）。下面两条分支与 Models.swift 的图块分支同一写法。
         let messages: [[String: Any]]
@@ -112,12 +115,7 @@ enum QingliaoIntentClient {
     ///   取源（见 `oneShot` 里那段注释），别顺手合并成一条：翻译浮层的 30s 超时是配主模型的。
     @MainActor
     static func modelForImage(_ hasImage: Bool) -> (model: String, provider: String) {
-        if hasImage, let vision = CloudConfig.effectiveVisionModel() {
-            return (vision.model, vision.provider)
-        }
-        let agentModel = UserDefaults.standard.string(forKey: UserDefaultsKey.agentModel) ?? ""
-        let agentProvider = UserDefaults.standard.string(forKey: UserDefaultsKey.agentProvider) ?? ""
-        if !agentModel.isEmpty { return (agentModel, agentProvider) }
+        _ = hasImage
         return CloudConfig.mainModelAndProvider
     }
 

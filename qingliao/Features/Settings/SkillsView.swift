@@ -4,7 +4,7 @@
 import SwiftUI
 
 struct SkillItem: Identifiable, Decodable {
-    var id: String { name }
+    let id: String
     let name: String
     let description: String?
     let enabled: Bool?
@@ -13,7 +13,7 @@ struct SkillItem: Identifiable, Decodable {
     let authorized: Bool?       // 是否已授权
 
     enum CodingKeys: String, CodingKey {
-        case name, description, enabled, category, authorized
+        case id, name, description, enabled, category, authorized
     }
 }
 
@@ -23,6 +23,8 @@ struct SkillsView: View {
     @State private var skills: [SkillItem] = []
     @State private var loading = true
     @State private var error: String?
+    @State private var actionMessage: String?
+    @State private var busySkillID: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -98,9 +100,11 @@ struct SkillsView: View {
                         VStack(spacing: 0) {
                             ForEach(skills) { skill in
                                 Button {
-                                    Task { await toggleSkill(skill) }
+                                    guard busySkillID == nil else { return }
+                                    busySkillID = skill.id
+                                    Task { await toggleSkill(skill); busySkillID = nil }
                                 } label: {
-                                    skillRow(skill)
+                                    skillRow(skill).opacity(busySkillID == skill.id ? 0.55 : 1)
                                 }
                                 .buttonStyle(.plain)
                                 if skill.id != skills.last?.id {
@@ -115,6 +119,17 @@ struct SkillsView: View {
         }
         .task { await load() }
         .refreshable { await load() }
+        .overlay(alignment: .bottom) {
+            if let actionMessage {
+                Text(actionMessage)
+                    .font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(Color.black.opacity(0.82), in: Capsule()).padding(.bottom, 18)
+                    .onAppear {
+                        Task { try? await Task.sleep(for: .seconds(3)); self.actionMessage = nil }
+                    }
+            }
+        }
     }
 
     // Muse 式技能行：图标｜名称｜描述｜官方/未授权（点行进详情）
@@ -151,6 +166,9 @@ struct SkillsView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.red)
                     }
+                    Text(skill.enabled == true ? "已启用 · 点按关闭" : "已关闭 · 点按启用")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(skill.enabled == true ? .green : .secondary)
                 }
                 .padding(.top, 2)
             }
@@ -160,9 +178,6 @@ struct SkillsView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .contentShape(Rectangle())
-        .onTapGesture {
-            // TODO: 跳转技能详情/授权页
-        }
     }
 
     private func load() async {
@@ -170,10 +185,10 @@ struct SkillsView: View {
         error = nil
         defer { loading = false }
         do {
-            if let j = try? await auth.json("/api/agent/skills", method: "GET"),
-               let list = j["skills"] as? [[String: Any]] {
+            let j = try await auth.json("/api/agent/skills", method: "GET")
+            if let list = j["skills"] as? [[String: Any]] {
                 let data = try JSONSerialization.data(withJSONObject: list)
-                skills = (try? JSONDecoder().decode([SkillItem].self, from: data)) ?? []
+                skills = try JSONDecoder().decode([SkillItem].self, from: data).filter { !$0.id.isEmpty }
             } else {
                 self.error = "加载失败，请检查连接"
             }
@@ -185,9 +200,25 @@ struct SkillsView: View {
     // 2026-10-07：写闭环 —— 切换技能启用/禁用
     private func toggleSkill(_ skill: SkillItem) async {
         let newEnabled = !(skill.enabled == true)
-        if let _ = try? await auth.json("/api/agent/skills", method: "POST",
-                                         body: ["skill_id": skill.name, "enabled": newEnabled]) {
+        do {
+            let response = try await auth.json("/api/agent/skills", method: "POST",
+                                               body: ["skill_id": skill.id, "enabled": newEnabled])
+            guard response["ok"] as? Bool == true else {
+                actionMessage = response["error"] as? String ?? "技能设置失败"
+                if response["saved"] as? Bool == true { await load() }
+                return
+            }
+            if (response["restart"] as? String) == "failed" {
+                actionMessage = "配置已保存，但 Hermes 重启失败，请检查服务状态"
+                await load()
+                return
+            }
+            actionMessage = (response["restart"] as? String) == "triggered"
+                ? "技能已更新，Hermes 正在重启"
+                : "技能配置已保存；Hermes 重启未确认"
             await load()
+        } catch {
+            actionMessage = "技能设置失败：\(error.localizedDescription)"
         }
     }
 }

@@ -97,6 +97,7 @@ struct ChatView: View {
     @State var inputText = ""
     @FocusState var inputFocus: Bool
     @State var sentOK = false
+    @State private var modelError: String?
     @State var serverOnline: Bool?   // 服务器连接状态（真实绿点）
     // v3.5.1：AI 正在输入 状态——服务器侧真相兜底（App 重开/离开聊天页后仍能显示）
     @State var remoteBusy = false
@@ -332,8 +333,10 @@ struct ChatView: View {
     // 模型/提供商可从模型管理面板选择（UserDefaults 持久化）
     // v2.0.48：改 @AppStorage——computed property 无观察机制，
     // 设置页切换模型后聊天页头部不刷新（模型实际生效但显示旧名）
-    @AppStorage("qingliao_model") private var modelName = "deepseek-v4-flash"
-    @AppStorage("qingliao_provider") private var provider = "opencode"
+    @AppStorage("qingliao_model") private var modelName = ""
+    @AppStorage("qingliao_provider") private var provider = ""
+    @State private var hermesModelReady = false
+    @State private var modelSyncInFlight = false
     /// v3.6.5：模型思考档位（header 胶囊，仅本地模式）——随流式请求下发给后端
     @AppStorage(ReasoningLevel.storageKey) private var reasoningLevelRaw = ReasoningLevel.low.rawValue
     // v3.9.8：AI 回复自动朗读（header 胶囊开关）。默认关（不被动出声）。
@@ -1129,6 +1132,16 @@ struct ChatView: View {
         } message: {
             Text("最多合并 \(Self.maxMergeCount) 条，请减少勾选后再合并。")
         }
+        .alert("Hermes 模型不可用", isPresented: Binding(
+            get: { modelError != nil }, set: { if !$0 { modelError = nil } })) {
+            Button("重试") {
+                Task {
+                    hermesModelReady = await syncModelFromBackend()
+                    if !hermesModelReady { modelError = "仍无法读取 Hermes 当前模型" }
+                }
+            }
+            Button("取消", role: .cancel) { modelError = nil }
+        } message: { Text(modelError ?? "") }
         // v2.0.61：杀后台流式恢复（幂等——无持久化任务时静默返回）
     }
 
@@ -1138,7 +1151,8 @@ struct ChatView: View {
         .task {
             await resumePersistedStream()
             // 2026-10-07：从后端同步当前选中模型（只认后端，覆盖本地 UserDefaults）
-            await syncModelFromBackend()
+            hermesModelReady = await syncModelFromBackend()
+            await chat.loadLatestMessagePage(auth: auth)
             // v3.9.58c：探测未完任务标记——标记归属**其他**会话时显示「继续上次任务」横幅
             // （归属当前会话的情形 resumePersistedStream 已直接自动接回，无需横幅）
             if !stream.isStreaming, pendingResumeInfo == nil {
@@ -2290,6 +2304,7 @@ struct ChatView: View {
             onResume: { s in
                 Haptics.tap()
                 chat.load(s)
+                Task { await chat.loadLatestMessagePage(auth: auth) }
                 // v4.0.15：同 loadById 那条，切进来必须 markRead（详见其注释）
                 if let lt = s.lastTime { chat.markRead(s.id, upTo: lt) }
             },
@@ -3125,14 +3140,12 @@ struct ChatView: View {
     /// 给启动期 demangler 递归多塞 ~350 字符，抽出来名字里只剩一个 Qo 引用）
     private var loadEarlierButton: some View {
         Button {
-            withAnimation(Motion.snap) {
-                displayLimit += Self.loadMoreStep
-            }
+            Task { await loadOlderMessagesPreservingPosition() }
         } label: {
             HStack(spacing: Spacing.xs) {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: Typography.tiny, weight: .semibold))
-                Text("加载更早 \(min(visibleStartIndex, Self.loadMoreStep)) 条")
+                if chat.isLoadingOlderMessages { ProgressView().scaleEffect(0.8) }
+                else { Image(systemName: "chevron.up").font(.system(size: Typography.tiny, weight: .semibold)) }
+                Text(chat.isLoadingOlderMessages ? "正在加载…" : "加载更早消息")
                     .font(.system(size: Typography.subhead, weight: .medium))
             }
             .foregroundStyle(.secondary)
@@ -3142,6 +3155,24 @@ struct ChatView: View {
         }
         .buttonStyle(PressStyle())   // v3.4.29：统一按压反馈
         .padding(.bottom, Spacing.xxs)
+        .onAppear {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(150))
+                guard showScrollToBottom else { return }
+                await loadOlderMessagesPreservingPosition()
+            }
+        }
+    }
+
+    @MainActor
+    private func loadOlderMessagesPreservingPosition() async {
+        let anchorID = chat.messages.first?.id
+        guard await chat.loadOlderMessagePage(auth: auth) else { return }
+        withAnimation(Motion.snap) { displayLimit += Self.loadMoreStep }
+        refreshVisibleMessages()
+        guard let anchorID else { return }
+        await Task.yield()
+        scrollProxyRef?.scrollTo(anchorID, anchor: .top)
     }
 
     private var messageList: some View {
@@ -3166,7 +3197,7 @@ struct ChatView: View {
                     // 修复长文本滑动/左右切页卡顿
                     LazyVStack(spacing: 10) {
                                         // v3.0.51 A2：顶部"加载更早"按钮（会话长于可见窗口时显示）；v4.0.49 抽出到 loadEarlierButton
-                                        if visibleStartIndex > 0 {
+                                        if visibleStartIndex > 0 || chat.hasOlderMessages {
                                             loadEarlierButton
                                         }
                                         ForEach(visibleMessagesCache) { entry in
@@ -3546,6 +3577,7 @@ struct ChatView: View {
     /// 用户看到的仍是干净的新会话 + 欢迎页（区别于手动发 /new：那条走 sendCore 是可见的普通消息）
     private func silentGatewayReset() {
         let (useModel, useProvider) = resolveModel(hasImage: false)
+        guard hermesModelReady, !useModel.isEmpty else { return }
         let sid = chat.sessionId   // 已是新建后的新 sessionId
         // 只投单条 /new（不带历史）：gateway 收到命令即重置，带历史只是白传一遍上下文
         let payload: [[String: Any]] = [["role": "user", "content": "/new"]]
@@ -3566,6 +3598,20 @@ struct ChatView: View {
     /// 正解：只有**用户亲手在输入栏点发送**的那条路径传 `allowExpense: true`；
     /// 重试（:3902）与所有转发/收件路径保持默认 false（转发用户已说过的话不是新的消费意图）。
     func sendCore(text: String, imageData: String?, quotedText: String? = nil, allowExpense: Bool = false) {
+        guard hermesModelReady, !resolveModel(hasImage: imageData != nil).0.isEmpty else {
+            Task {
+                guard !modelSyncInFlight else { return }
+                modelSyncInFlight = true
+                defer { modelSyncInFlight = false }
+                hermesModelReady = await syncModelFromBackend()
+                guard hermesModelReady else {
+                    modelError = "无法读取 Hermes 当前模型，请检查后端连接后重试"
+                    return
+                }
+                sendCore(text: text, imageData: imageData, quotedText: quotedText, allowExpense: allowExpense)
+            }
+            return
+        }
         // v3.4.x：同内容短时间幂等（60s 内相同文本+同会话只发一次，防抖动/重试/恢复重复投递）
         // v3.4.27 fix：比较须含 image 指纹——纯图 text 恒空，只比 text 会把 60s 内第二张纯图误判重复丢弃（拍照/相册连发纯图被吞）
         let now = Date().timeIntervalSince1970
@@ -3822,41 +3868,17 @@ struct ChatView: View {
     /// v3.5.1：接回在途任务（杀后台/重启前的流）——抽成方法供 .task 与「AI 正在输入」探针共用，
     /// 保证两条路径落库回调一致（否则探针接回的回复没有 onFinished 收尾，答案会丢）。
     // 2026-10-07：从后端同步当前选中模型（只认后端 /api/agent/hermes/models 的 selected）
-    private func syncModelFromBackend() async {
-        guard let j = try? await auth.json("/api/agent/hermes/models", method: "GET") else { return }
-        var found: (String, String)?
-        if let groups = j["groups"] as? [[String: Any]] {
-            for g in groups {
-                let pid = g["id"] as? String ?? ""
-                if let models = g["models"] as? [[String: Any]] {
-                    for m in models {
-                        if (m["selected"] as? Bool) == true,
-                           let mid = m["id"] as? String {
-                            found = (pid, mid)
-                            break
-                        }
-                    }
-                }
-                if found != nil { break }
-            }
-        } else if let models = j["models"] as? [[String: Any]] {
-            for m in models {
-                if (m["selected"] as? Bool) == true,
-                   let mid = m["id"] as? String {
-                    let pid = m["provider"] as? String ?? ""
-                    found = (pid, mid)
-                    break
-                }
-            }
-        }
-        if let (pid, mid) = found {
-            // 直接写 AppStorage，触发 UI 更新
-            UserDefaults.standard.set(pid, forKey: "qingliao_provider")
-            UserDefaults.standard.set(mid, forKey: "qingliao_model")
-            // 触发 @AppStorage 更新
-            provider = pid
-            modelName = mid
-        }
+    private func syncModelFromBackend() async -> Bool {
+        guard let j = try? await auth.json("/api/agent/hermes/inspect/models", method: "GET"),
+              (j["ok"] as? Bool) == true,
+              let selected = j["selected"] as? [String: Any],
+              let modelID = selected["id"] as? String, !modelID.isEmpty,
+              let providerID = selected["provider"] as? String, !providerID.isEmpty else { return false }
+        UserDefaults.standard.set(providerID, forKey: "qingliao_provider")
+        UserDefaults.standard.set(modelID, forKey: "qingliao_model")
+        provider = providerID
+        modelName = modelID
+        return true
     }
 
     private func resumePersistedStream() async {
@@ -4614,17 +4636,9 @@ struct ChatView: View {
     /// - v3.10.x：「免费模型（免 Key）」档已移除——实测 opencode zen 免费档对非 OpenCode 客户端恒 403
     ///   （FreeTierError: free tier can only be used from within OpenCode），开启即每次回复都是错误文案。
     func resolveModel(hasImage: Bool = false) -> (String, String) {
-        // 视觉模型：含图片消息时优先
-        if hasImage, let vision = CloudConfig.effectiveVisionModel() {
-            return (vision.model, vision.provider)
-        }
-        // Agent 模型：已配置独立模型即优先（v3.4.12：开关已移除，恒开启）
-        let agentModelName = UserDefaults.standard.string(forKey: UserDefaultsKey.agentModel) ?? ""
-        let agentProviderName = UserDefaults.standard.string(forKey: UserDefaultsKey.agentProvider) ?? ""
-        if !agentModelName.isEmpty {
-            return (agentModelName, agentProviderName)
-        }
-        return (modelName, provider)
+        // Hermes is the sole model authority for all requests, including vision and agents.
+        _ = hasImage
+        return CloudConfig.mainModelAndProvider
     }
 
     /// ✅送达提示条（仅成功时显示，2.5s 后消失）
@@ -4803,6 +4817,10 @@ extension ChatView {
             }
             .onChange(of: displayLimit) { _, _ in
                 refreshVisibleMessages()
+            }
+            .onChange(of: chat.sessionId) { _, _ in
+                guard !chat.messages.isEmpty else { return }
+                Task { await chat.loadLatestMessagePage(auth: auth) }
             }
             // v3.0.86 fix：流式内容变化仅在用户贴底时自动滚底（scrollPinState 由下方
             // onScrollGeometryChange 实时维护）——上翻阅读历史不再被 delta 拽回；无动画防高频打断

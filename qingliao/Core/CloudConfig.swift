@@ -76,8 +76,9 @@ enum CloudConfig {
     /// 从没在模型管理里挑过模型的用户也按真实默认模型判视觉（v3.9.26 fix）。
     static var mainModelAndProvider: (model: String, provider: String) {
         let d = UserDefaults.standard
-        return (d.string(forKey: "qingliao_model") ?? "deepseek-v4-flash",
-                d.string(forKey: "qingliao_provider") ?? "opencode")
+        // Ignore legacy user-selected overrides; Hermes inspect is the only model source.
+        return (d.string(forKey: "qingliao_model") ?? "",
+                d.string(forKey: "qingliao_provider") ?? "")
     }
 
     /// 纯模型名判定（通用表）。

@@ -36,7 +36,7 @@ struct ConnSettingsView: View {
     @State private var showModelPicker = false
 
     private var currentHermesModel: String {
-        UserDefaults.standard.string(forKey: "qingliao_model") ?? ""
+        UserDefaults.standard.string(forKey: "qingliao_model") ?? "正在同步…"
     }
     @State private var sessionLoc = ""
     @State private var uploadDir = ""
@@ -1626,6 +1626,7 @@ struct HermesModelPickerSheet: View {
     @State private var loading = true
     @State private var loadError = false
     @State private var busyID: String? = nil
+    @State private var selectionError: String?
     @State private var showProviderManage = false
     @State private var hideConfirm: (provider: String, model: HermesModelOption)? = nil
 
@@ -1718,6 +1719,10 @@ struct HermesModelPickerSheet: View {
             .sheet(isPresented: $showProviderManage) {
                 HermesProviderManageView()
             }
+            .alert("模型切换失败", isPresented: Binding(
+                get: { selectionError != nil }, set: { if !$0 { selectionError = nil } })) {
+                Button("好", role: .cancel) { selectionError = nil }
+            } message: { Text(selectionError ?? "") }
             .confirmationDialog(
                 "隐藏模型", isPresented: Binding(
                     get: { hideConfirm != nil },
@@ -1742,14 +1747,19 @@ struct HermesModelPickerSheet: View {
         loading = true
         loadError = false
         defer { loading = false }
-        // 2026-10-07：用 Hermes 真实配置（/api/agent/hermes/inspect/models），
-        // 不再用上游服务商列表（那是 DeepSeek-V4 这类，和 Hermes 实际用的不是一份）
         guard let j = try? await auth.json("/api/agent/hermes/inspect/models"),
+              (j["ok"] as? Bool) == true,
               let arr = j["models"] as? [[String: Any]] else {
             loadError = true
             return
         }
-        // 按 provider 分组，转成 UI 要的格式
+        if let selected = j["selected"] as? [String: Any],
+           let modelID = selected["id"] as? String,
+           let providerID = selected["provider"] as? String {
+            UserDefaults.standard.set(modelID, forKey: "qingliao_model")
+            UserDefaults.standard.set(providerID, forKey: "qingliao_provider")
+        }
+        // Group the model list while retaining Hermes' explicit selected flag.
         var groups: [String: [[String: Any]]] = [:]
         for m in arr {
             let p = (m["provider"] as? String) ?? "hermes"
@@ -1765,11 +1775,17 @@ struct HermesModelPickerSheet: View {
         guard busyID == nil else { return }
         busyID = key
         defer { busyID = nil }
-        guard let j = try? await auth.json("/api/agent/hermes/model", method: "POST",
-                                           body: ["provider": pid, "model_id": m.id]),
-              (j["ok"] as? Bool) == true else { return }
-        // v4.4.x：只认后端 selected，不再写 UserDefaults
-        await load()
+        do {
+            let j = try await auth.json("/api/agent/hermes/model", method: "POST",
+                                        body: ["provider": pid, "model_id": m.id])
+            guard (j["ok"] as? Bool) == true else {
+                selectionError = j["error"] as? String ?? "Hermes 拒绝了模型切换"
+                return
+            }
+            await load()
+        } catch {
+            selectionError = "模型切换请求失败：\(error.localizedDescription)"
+        }
     }
 
     private func hideModel(provider pid: String, _ m: HermesModelOption) async {

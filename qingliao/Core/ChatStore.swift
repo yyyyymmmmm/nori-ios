@@ -30,6 +30,9 @@ final class ChatStore {
 
     var sessionId: String
     var messages: [ChatMessage] = []
+    private(set) var hasOlderMessages = false
+    private(set) var isLoadingOlderMessages = false
+    private var olderMessagesCursor: Int?
     var title = ""
     /// v3.4.29：最近一次从会话列表加载进来的会话——供欢迎页「继续上次」入口一键回归（内存态，无需持久化）
     private(set) var lastLoadedSession: ChatSession?
@@ -107,6 +110,8 @@ final class ChatStore {
         sessionId = s.id
         title = s.title
         messages = patchAwayLanded(s.id, s.messages)
+        hasOlderMessages = false
+        olderMessagesCursor = nil
         lastLoadedSession = s   // v3.4.29：欢迎页「继续上次」用
         defaults.set(sessionId, forKey: sessionKey)
         // v3.9.90：这次打开也顺手反推一次「这个标题是不是我们写的」——
@@ -234,17 +239,8 @@ final class ChatStore {
         //   而表面看「修好了」。且绕过了 resolveModel 的优先级链（视觉>Agent>主）：
         //   配了独立 Agent 模型的用户，重置请求会发到另一个模型上，上下文未必被清。
         // 现在与 `ChatView.resolveModel(hasImage: false)` 同口径（/new 是纯文本、无图 → 无视觉档）。
-        let agentModel = defaults.string(forKey: UserDefaultsKey.agentModel) ?? ""
-        let agentProvider = defaults.string(forKey: UserDefaultsKey.agentProvider) ?? ""
-        let model: String
-        let provider: String
-        if !agentModel.isEmpty {
-            model = agentModel
-            provider = agentProvider
-        } else {
-            model = defaults.string(forKey: UserDefaultsKey.model) ?? "deepseek-v4-flash"
-            provider = defaults.string(forKey: UserDefaultsKey.provider) ?? "opencode"
-        }
+        let (model, provider) = CloudConfig.mainModelAndProvider
+        guard !model.isEmpty, !provider.isEmpty else { return }
         let payload: [[String: Any]] = [["role": "user", "content": "/new"]]
         // 🚨 审查 F5 抓到的副作用：streamStart 不是无害调用 —— 遇 401 会 markSessionExpired()，
         //   于是「冷启动时 token 恰好过期」→ **启动即弹「登录已过期」横幅**（此前不聊就不会弹）；
@@ -284,7 +280,41 @@ final class ChatStore {
         let sessions = raw.compactMap { ChatSession.parse($0 as? [String: Any] ?? [:]) }
         if let match = sessions.first(where: { $0.id == sid }) {
             await MainActor.run { self.load(match) }
+            await loadLatestMessagePage(auth: auth)
         }
+    }
+
+    /// Replace list preview messages with the latest server page, then fetch earlier pages on demand.
+    func loadLatestMessagePage(auth: AuthStore) async {
+        let sid = sessionId
+        guard let j = try? await auth.json("/api/sessions/messages?sessionId=\(sid)&limit=100"),
+              (j["ok"] as? Bool) == true,
+              let raw = j["messages"] as? [Any] else { return }
+        guard sessionId == sid else { return }
+        let page = raw.compactMap(ChatMessage.parse)
+        messages = patchAwayLanded(sid, page)
+        olderMessagesCursor = j["start"] as? Int ?? 0
+        hasOlderMessages = (j["hasMore"] as? Bool) == true
+        if let current = lastLoadedSession {
+            lastLoadedSession = ChatSession(id: current.id, title: current.title, messages: messages)
+        }
+    }
+
+    func loadOlderMessagePage(auth: AuthStore) async -> Bool {
+        guard hasOlderMessages, !isLoadingOlderMessages, let cursor = olderMessagesCursor else { return false }
+        let sid = sessionId
+        isLoadingOlderMessages = true
+        defer { isLoadingOlderMessages = false }
+        guard let j = try? await auth.json("/api/sessions/messages?sessionId=\(sid)&before=\(cursor)&limit=100"),
+              (j["ok"] as? Bool) == true,
+              let raw = j["messages"] as? [Any] else { return false }
+        guard sessionId == sid else { return false }
+        let older = raw.compactMap(ChatMessage.parse)
+        let currentIDs = Set(messages.map(\.id))
+        messages = older.filter { !currentIDs.contains($0.id) } + messages
+        olderMessagesCursor = j["start"] as? Int ?? 0
+        hasOlderMessages = (j["hasMore"] as? Bool) == true
+        return !older.isEmpty
     }
 
     /// 新会话（v3.3.0：bot 模式已移除，仅生成普通新会话 id）
@@ -292,6 +322,8 @@ final class ChatStore {
         sessionId = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(13).description
         title = ""
         messages = []
+        hasOlderMessages = false
+        olderMessagesCursor = nil
         highlightTarget = nil   // v2.0.44：新建会话清除残留定位
         // 🚨 v4.0.0（审查 F6，高）：原先这里**无条件**把「当前会话」指针指向新 id。
         //   而这个 id 在第一条消息发出前**从未落库** → 谁在此时杀掉 App，下次启动读到的就是
@@ -694,8 +726,7 @@ final class ChatStore {
             // ② 主模型支持视觉 → 直接 OK
             if !curModelName.isEmpty,
                CloudConfig.modelSupportsVision(curModelName, provider: curProviderName) { return true }
-            // 主模型不支持 → 开关开 + 有视觉模型配置才保留图片，否则降级文本
-            return CloudConfig.visionFallbackEnabled && CloudConfig.localVisionModel != nil
+            return false
         }()
         // v3.0.83fix：isPush=1 的推送消息不进模型上下文（推送被当AI回复污染对话的根治）
         // 推送消息是 Hermes 主动注入的，不该作为历史喂给模型。保留在会话展示，但历史重放滤掉。
@@ -709,9 +740,7 @@ final class ChatStore {
         // （2026-09-13 实证：一句「不用」被回三份 NAS 内存诊断）。
         let (curProvider, curModel): (String, String) = {
             if let m = model, !m.isEmpty { return (provider ?? "", m) }
-            // 兜底默认值必须与 ChatView 的 @AppStorage 默认值一致（未设置时 @AppStorage 也返回它们）
-            return (UserDefaults.standard.string(forKey: "qingliao_provider") ?? "opencode",
-                    UserDefaults.standard.string(forKey: "qingliao_model") ?? "deepseek-v4-flash")
+            return CloudConfig.mainModelAndProvider
         }()
         let breakRepeatSeed = !CloudConfig.isStrongModel(provider: curProvider, model: curModel)
         // SR6：撤回的消息同样不得进模型上下文（原来只滤推送与错误占位，撤回正文照发给 AI）
@@ -1450,8 +1479,10 @@ final class ChatStore {
         let summaryPrompt = "请用简洁的要点总结以下对话内容（保留关键信息、结论、待办，不超过200字）：\n\n\(conversationText)"
 
         // 调用 AI 摘要（用当前模型）
-        let model = UserDefaults.standard.string(forKey: "qingliao_model") ?? "deepseek-v4-flash"
-        let provider = UserDefaults.standard.string(forKey: "qingliao_provider") ?? "opencode"
+        let (model, provider) = CloudConfig.mainModelAndProvider
+        guard !model.isEmpty, !provider.isEmpty else {
+            return compressContext(keepLast: keepLast)
+        }
 
         do {
             // 直接 await（无需 withCheckedThrowingContinuation + Task 嵌套，

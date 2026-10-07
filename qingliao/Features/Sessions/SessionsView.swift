@@ -712,6 +712,7 @@ struct SessionsView: View {
         // 任务中心有自己的常驻入口，在聊天页 header 那一排（见 ChatView showTaskCenter）。
         chat.markRead(s.id, upTo: s.lastTime)   // v4.0.15：带上会话最后消息时间做基线，防时钟差导致角标复亮；v3.9.32：打开会话即已读（此前 markRead 全仓零调用，红点会永久挂着）
         chat.load(s)
+        Task { await chat.loadLatestMessagePage(auth: auth) }
         Haptics.tap()         // v3.4.29：进入会话触感
         onOpenSession?()
     }
@@ -1237,17 +1238,12 @@ struct BotCard: View {
     @Environment(AuthStore.self) private var auth
     @State private var online: Bool?
     // v2.0.50：模型/提供商动态读取（设置切换后实时刷新）
-    @AppStorage("qingliao_model") private var modelName = "deepseek-v4-flash"
-    @AppStorage("qingliao_provider") private var provider = "opencode"
+    @AppStorage("qingliao_model") private var modelName = ""
+    @AppStorage("qingliao_provider") private var provider = ""
     // 当前模型显示
     // v3.0.20：Agent 模型自定义——配置了独立模型时显示 agent 模型（v3.4.12：开关已移除，恒开启）
     private var displayModel: String {
-        // v3.4.12：Agent 开关已移除（后端恒走 Hermes agent），配置了独立模型即显示
-        let agentModel = UserDefaults.standard.string(forKey: UserDefaultsKey.agentModel) ?? ""
-        if !agentModel.isEmpty {
-            return "\(provider)/\(agentModel)"
-        }
-        return "\(provider)/\(modelName)"
+        return modelName.isEmpty ? "Hermes 模型同步中" : "\(provider)/\(modelName)"
     }
 
     var body: some View {

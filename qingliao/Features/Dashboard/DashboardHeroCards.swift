@@ -102,6 +102,7 @@ struct TodaySuggestionCard: View {
     @State private var loading = false
     @State private var loaded = false
     @State private var isFallback = false
+    @State private var isPersonalized = false
 
     struct Suggestion: Identifiable {
         let id = UUID()
@@ -171,6 +172,10 @@ struct TodaySuggestionCard: View {
                 Text("AI 暂不可用，显示为通用建议")
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
+            } else if isPersonalized {
+                Text("已结合健康数据生成")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
             }
         }
         .padding(18)
@@ -187,19 +192,6 @@ struct TodaySuggestionCard: View {
     private func load(force: Bool = false) async {
         // v4.4.x：提示词收归后端（/api/agent/suggestions），iOS 只展示
         // 每日缓存仍在 iOS 做（省流量），后端也做了缓存
-        let dateKey = "nori_suggestion_date"
-        let cacheKey = "nori_suggestion_cache"
-        let today = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none)
-
-        if !force, UserDefaults.standard.string(forKey: dateKey) == today,
-           let data = UserDefaults.standard.data(forKey: cacheKey),
-           let cached = try? JSONDecoder().decode([CachedSuggestion].self, from: data),
-           !cached.isEmpty {
-            suggestions = cached.map { Suggestion(title: $0.t, reason: $0.r, prompt: $0.p) }
-            isFallback = false
-            return
-        }
-
         loading = true
         defer { loading = false }
         do {
@@ -231,14 +223,15 @@ struct TodaySuggestionCard: View {
             guard !list.isEmpty else { throw SuggestionError.badJSON }
             suggestions = list
             isFallback = (obj["fallback"] as? Bool) ?? false
+            isPersonalized = (obj["personalized"] as? Bool) ?? (health != nil && !isFallback)
             let cached = list.map { CachedSuggestion(t: $0.title, r: $0.reason, p: $0.prompt) }
             if let cdata = try? JSONEncoder().encode(cached) {
-                UserDefaults.standard.set(cdata, forKey: cacheKey)
-                UserDefaults.standard.set(today, forKey: dateKey)
+                UserDefaults.standard.set(cdata, forKey: "nori_suggestion_cache")
             }
         } catch {
             suggestions = fallbackSuggestions()
             isFallback = true
+            isPersonalized = false
         }
     }
 

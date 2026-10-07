@@ -108,6 +108,8 @@ struct MemoryBoardView: View {
     @State private var showManage = false
     @State private var showHealth = false
     @State private var viewing: MemoryEntry?
+    @State private var showVoiceNotes = false
+    @State private var voiceNotes: [VoiceNote] = []
 
     // 健康 mini 统计（取不到则 nil → "--" 占位）
     @State private var healthSteps: Int?
@@ -154,6 +156,10 @@ struct MemoryBoardView: View {
             }
             .sheet(isPresented: $showHealth) {
                 HealthBoardView()
+            }
+            .sheet(isPresented: $showVoiceNotes) {
+                VoiceNotesView(notes: $voiceNotes, onDelete: deleteVoiceNote)
+                    .environment(auth)
             }
             .sheet(item: $viewing) { entry in
                 MemoryEntryDetailSheet(entry: entry)
@@ -284,7 +290,7 @@ struct MemoryBoardView: View {
 
     private var groups: [MemoryGroup] {
         let counts = Dictionary(grouping: items, by: Self.groupKey)
-        var result = [MemoryGroup(key: "voice", name: "语音笔记", isMic: true, count: 0)]
+        var result = [MemoryGroup(key: "voice", name: "语音笔记", isMic: true, count: voiceNotes.count)]
         for (key, name) in [("manual", "手动添加"), ("chat", "聊天记录"), ("other", "其他")] {
             let c = counts[key]?.count ?? 0
             if c > 0 {
@@ -300,7 +306,7 @@ struct MemoryBoardView: View {
             ForEach(groups) { g in
                 Button {
                     if g.key == "voice" {
-                        toast = "语音笔记即将上线"
+                        showVoiceNotes = true
                     } else {
                         showManage = true
                     }
@@ -403,6 +409,15 @@ struct MemoryBoardView: View {
         items = parsed
     }
 
+    private func deleteVoiceNote(_ note: VoiceNote) async -> Bool {
+        do {
+            let (_, response) = try await auth.request("/api/notes/\(note.id)", method: "DELETE")
+            guard (200..<300).contains(response.statusCode) else { return false }
+            voiceNotes.removeAll { $0.id == note.id }
+            return true
+        } catch { return false }
+    }
+
     private func loadHealthMini() async {
         guard HealthStore.isAvailable else { return }
         if let steps = await HealthStore.shared.todaySteps() {
@@ -432,6 +447,109 @@ struct MemoryBoardView: View {
             } catch {
                 toast = "网络不通"
             }
+        }
+    }
+}
+
+private struct VoiceNote: Identifiable, Equatable {
+    let id: String
+    let text: String
+    let created: TimeInterval
+
+    static func parse(_ raw: [String: Any]) -> VoiceNote? {
+        guard let id = raw["id"] as? String, let text = raw["text"] as? String else { return nil }
+        return VoiceNote(id: id, text: text, created: raw["created"] as? TimeInterval ?? 0)
+    }
+}
+
+private struct VoiceNotesView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AuthStore.self) private var auth
+    @Binding var notes: [VoiceNote]
+    let onDelete: (VoiceNote) async -> Bool
+    @State private var deletingID: String?
+    @State private var error: String?
+    @State private var draft = ""
+    @State private var saving = false
+
+    private var canSave: Bool {
+        !saving && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if notes.isEmpty {
+                    Text("暂无语音笔记").foregroundStyle(.secondary)
+                        .listRowSeparator(.hidden)
+                }
+                ForEach(notes) { note in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(note.text).font(.body)
+                        Text(Date(timeIntervalSince1970: note.created).formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            deletingID = note.id
+                            Task {
+                                let removed = await onDelete(note)
+                                if !removed { error = "删除失败，请检查网络后重试" }
+                                deletingID = nil
+                            }
+                        } label: { Label("删除", systemImage: "trash") }
+                        .disabled(deletingID != nil)
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                HStack(spacing: 10) {
+                    TextField("听写或输入语音笔记…", text: $draft, axis: .vertical)
+                        .lineLimit(1...4).textFieldStyle(.roundedBorder)
+                    Button { Task { await saveVoiceNote() } } label: {
+                        Image(systemName: saving ? "hourglass" : "arrow.up")
+                            .foregroundStyle(.white).frame(width: 38, height: 38)
+                            .background(canSave ? Color.accentColor : Color.secondary.opacity(0.3), in: Circle())
+                    }
+                    .disabled(!canSave)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                .background(.bar)
+            }
+            .task { await refresh() }
+            .navigationTitle("语音笔记")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+            .alert("操作失败", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("好", role: .cancel) { error = nil }
+            } message: { Text(error ?? "") }
+        }
+    }
+
+    private func refresh() async {
+        guard let response = await auth.jsonOrLog("/api/notes"),
+              let rows = response["notes"] as? [[String: Any]] else { return }
+        notes = rows.compactMap(VoiceNote.parse).sorted { $0.created > $1.created }
+    }
+
+    private func saveVoiceNote() async {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !saving else { return }
+        saving = true
+        defer { saving = false }
+        do {
+            let response = try await auth.json("/api/notes", method: "POST",
+                                               body: ["text": text, "source": "voice"])
+            guard response["ok"] as? Bool == true,
+                  let raw = response["note"] as? [String: Any],
+                  let note = VoiceNote.parse(raw) else {
+                error = response["error"] as? String ?? "保存语音笔记失败"
+                return
+            }
+            notes.insert(note, at: 0)
+            draft = ""
+        } catch {
+            self.error = "保存失败：\(error.localizedDescription)"
         }
     }
 }
