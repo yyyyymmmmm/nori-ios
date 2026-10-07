@@ -783,29 +783,6 @@ struct ChatView: View {
         }
     }
 
-    /// 内联附件面板（类微信 + 面板：点击回形针展开）
-    /// v2.0.96b：发牌弹出效果（每个按钮依次从底部弹出 + 回弹）
-    @ViewBuilder
-    private var attachmentMenuBar: some View {
-        if showAttachmentMenu {
-            HStack(spacing: 26) {
-                menuButton("photo.on.rectangle", "图片", .primary, idx: 0) { showPhotoPicker = true }
-                menuButton("doc.fill", "文件", .primary, idx: 1) { showFileImporter = true }
-                // v2.0.43：快捷指令（常用 prompt 模板）
-                menuButton("bolt.fill", "指令", .primary, idx: 2) { showQuickPrompts = true }
-                // v3.9.28：云端模式移除，Hermes 捷径恒显示（v3.0.6 的按模式隐藏随之作废）
-                menuButton("sparkles", "Hermes 捷径", .primary, idx: 3) { showHermesShortcut = true }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.xl)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
-                .strokeBorder(Color.white.opacity(Tint.subtle), lineWidth: 0.8))
-            .padding(.horizontal, Spacing.xl)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
-    }
-
     /// 引用回复条（发送后自动清除）
     @ViewBuilder
     private var quotedReplyBar: some View {
@@ -927,16 +904,26 @@ struct ChatView: View {
                 //   layoutPriority(1)：空间不足时**先挤上面的内容区**，输入栏必须完整可见。
                 //   配套：welcomeView 自己在键盘弹起时收缩（见那里的注释），否则会看到被截断的欢迎页。
             }
-            // 固定系统材质 chrome：消息仍可在下方滚动，顶部和输入区通过模糊材质与正文分层。
+            // 对话页与其他主页面采用相同的固定页头、系统背景和原生底部 Tab 栏。
             .safeAreaBar(edge: .top) {
                 chatHeaderBar
-                    .background(.regularMaterial)
-                    .overlay(alignment: .bottom) { Color(uiColor: .separator).opacity(0.18).frame(height: 0.5) }
+                    .padding(.horizontal, Spacing.section)
+                    .padding(.top, Spacing.xl)
+                    .background(Color(uiColor: .systemBackground))
             }
             .safeAreaBar(edge: .bottom) {
                 chatComposerArea
-                    .background(.regularMaterial)
-                    .overlay(alignment: .top) { Color(uiColor: .separator).opacity(0.18).frame(height: 0.5) }
+                    .confirmationDialog("添加到对话", isPresented: $showAttachmentMenu, titleVisibility: .visible) {
+                        Button { showPhotoPicker = true } label: { Label("选择照片", systemImage: "photo") }
+                        Button { showFileImporter = true } label: { Label("选择文件", systemImage: "doc") }
+                        Divider()
+                        Button { showQuickPrompts = true } label: { Label("快捷提示词", systemImage: "bolt") }
+                        Button { showHermesShortcut = true } label: { Label("Hermes 指令", systemImage: "sparkles") }
+                        Button("取消", role: .cancel) {}
+                    } message: {
+                        Text("选择要添加到消息的内容")
+                    }
+                    .background(Color(uiColor: .systemBackground))
             }
             // v4.1.0 D路：实测底部安全区（替代不存在的 \.safeAreaInsets EnvironmentKey，CI 修错）
             .background(
@@ -1410,11 +1397,10 @@ struct ChatView: View {
     // 这里按原注释分段把视图块原样搬成独立 @ViewBuilder 属性 —— **纯搬运**：视图顺序、
     // 层级、条件分支、闭包、修饰符逐字未变，渲染结果与拆分前一致，只为把类型检查表达式打小。
 
-    /// 页头 + 思考档位弹窗 + 任务中心全屏页
-    /// 顶栏仅保留导航和操作入口；状态胶囊已移除，避免重复占据聊天页视觉焦点。
+    /// 对话页顶栏与资讯、点子、目标页共用相同的 44pt 控件、页面留白和系统背景。
     @ViewBuilder
     private var chatHeaderBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Button {
                 Haptics.tap()
                 NotificationCenter.default.post(name: .qingliaoToggleSidebar, object: nil)
@@ -1428,39 +1414,45 @@ struct ChatView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("打开侧边栏")
 
-            Spacer()
+            Spacer(minLength: 0)
 
-            Button {
-                Haptics.tap()
-                // 搜索：切到会话搜索（与侧边栏搜索同口径）
-                NotificationCenter.default.post(name: .qingliaoOpenChatSearch, object: nil)
-            } label: {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: Typography.headline))
-                    .foregroundStyle(.primary)
-                    .frame(width: 44, height: 44)
-                    .opaqueChrome(in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("搜索")
+            HStack(spacing: 8) {
+                Button {
+                    Haptics.tap()
+                    NotificationCenter.default.post(name: .qingliaoOpenChatSearch, object: nil)
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: Typography.headline))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .opaqueChrome(in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("搜索")
 
-            // 2026-10-07：语音对话（电话图标）
-            Button {
-                Haptics.tap()
-                showVoiceDialog = true
-            } label: {
-                Image(systemName: "phone.fill")
-                    .font(.system(size: Typography.headline))
-                    .foregroundStyle(.primary)
-                    .frame(width: 44, height: 44)
-                    .opaqueChrome(in: Circle())
+                Button {
+                    Haptics.tap()
+                    showVoiceDialog = true
+                } label: {
+                    Image(systemName: "phone.fill")
+                        .font(.system(size: Typography.headline))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .opaqueChrome(in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("语音对话")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("语音对话")
         }
-        .padding(.horizontal, Spacing.section)
-        .padding(.top, Spacing.md)
-        .padding(.bottom, Spacing.xs)
+        .frame(height: 44)
+        .overlay {
+            Text("对话")
+                .font(.system(size: Typography.headline, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .allowsHitTesting(false)
+                .accessibilityAddTraits(.isHeader)
+        }
         // 2026-10-07：语音对话全屏页
         .sheet(isPresented: $showVoiceDialog) {
             VoiceDialogView()
@@ -1615,7 +1607,7 @@ struct ChatView: View {
             }
     }
 
-    /// 图片预览条/附件面板/引用条/上下文条 + 输入区
+    /// 图片预览条、引用条、上下文条与输入区；附件选项由「＋」系统菜单打开。
     @ViewBuilder
     private var chatComposerArea: some View {
         // v3.0.77：移除 v3.0.36 分段流式（边说边出字实时显示）——改回整段录音一次转写
@@ -1626,9 +1618,7 @@ struct ChatView: View {
         // v4.0.x：一句话记账的「已记账 + 撤销」条（同一套定位口径，见 ChatRecordBar 头注释：
         // 撤销按钮放不进卡片里，所以它落在卡片下方这一条上；卡片 footer 只指路）
         chatRecordBarSlot
-        // 内联附件面板（类微信 + 面板：点击回形针展开）
-        // v2.0.96b：发牌弹出效果（每个按钮依次从底部弹出 + 回弹）
-        attachmentMenuBar
+        // 附件、快捷提示词和 Hermes 指令由「＋」的系统菜单承载。
         // v2.0.36：引用回复条（发送后自动清除）
         quotedReplyBar
         // v3.0.7 beautify：Bot 选择器已移到 header（本地模式），此处不再单独占一行
@@ -1646,7 +1636,7 @@ struct ChatView: View {
         // 键盘避让交还系统安全区（v3.0.64 口径）；原来按胶囊高度算的那套数学已删。
         .padding(.bottom, Spacing.xs)
         // 🚨 v3.9.72（审查修正）：`layoutPriority(1)` 只挂**输入栏这一层**，不挂整个 chatComposerArea。
-        // 整组里还有选图条/动作条/附件面板/引用条/上下文条（各自定高，合计 ≈380pt）：把整组抬到最高
+        // 整组里还有选图条/动作条/引用条/上下文条（各自定高）：把整组抬到最高
         // 优先 = 键盘与动作条同开时输入栏本身仍会被顶出可见区，且空态欢迎页（非 ScrollView）被压到
         // 溢出盖住输入栏。要保护的是「输入栏必须完整可见」，不是那些浮条。
         .layoutPriority(1)
@@ -4513,17 +4503,6 @@ struct ChatView: View {
             try? await Task.sleep(for: .seconds(2.5))
             withAnimation { sentOK = false }
         }
-    }
-
-    /// v2.0.96b：发牌弹出附件按钮（idx 控制延迟，依次从底部弹出 + 回弹）
-    /// v2.0.96c：onAppear 驱动（if 包裹下按钮创建即终态，值动画无效 → 子视图内部 appeared 状态）
-    func menuButton(_ icon: String, _ name: String, _ color: Color, idx: Int,
-                            action: @escaping () -> Void) -> some View {
-        DealAttachmentButton(icon: icon, name: name, color: color, idx: idx,
-                             onPick: {
-                                 withAnimation(Motion.settle) { showAttachmentMenu = false }   // v3.9.0：令牌收口
-                                 action()
-                             })
     }
 
     /// 图片压缩（PWA 同款：最长边 1280 / JPEG 0.72，超 900KB 降质）

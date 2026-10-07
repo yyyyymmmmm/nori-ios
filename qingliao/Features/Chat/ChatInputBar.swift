@@ -513,48 +513,22 @@ struct ChatInputBar: View {
             .padding(.vertical, Spacing.xl)
             .padding(.horizontal, Spacing.xxs)
         } else {
-            TextField("", text: $text, axis: .vertical)
+            TextField(transcribingEffective ? "语音转换中…" : "发消息", text: $text, axis: .vertical)
                 .font(.system(size: Typography.body))
+                .foregroundStyle(.primary)
+                .tint(.accentColor)
                 // v3.9.52：**恒 1 行起**。v3.9.48 让展开态 `2...6` 是为了"点一下就变大"，
                 // 真机 496 报「光标不居中了」——两行块里占位符整块居中、光标坐在第一行，两者错开。
                 // 这条坑本仓 v2.0.35 就踩过一次（当时的注释原话："2...6 最小2行高→单行光标/文字偏上不居中"），
                 // v3.9.48 又把它请回来了。行高改由内容驱动：打字/换行才长，`fixedSize` 负责撑。
                 .lineLimit(1...6)
-                // v3.9.62：**显式靠左**。SwiftUI 对空 label + axis .vertical 的 TextField
-                //   默认对齐不保证（真机曾观感居中/光标与文字错位），这里把「输入的消息文本」
-                //   钉成 leading，与同层占位符 overlay 的 `.leading` 严格同侧——用户原话：
-                //   「第一层的输入消息有没有靠左？我想，按照靠左而不是居中」。
+                // 显式靠左，输入文本与系统原生 placeholder 始终同侧。
                 .multilineTextAlignment(.leading)
                 // v2.0.93f：9→12 输入框加高（用户反馈太窄）
                 .padding(.vertical, Spacing.xl)
                 .padding(.horizontal, Spacing.xxs)
                 .fixedSize(horizontal: false, vertical: true)   // 文字超宽自动增高输入框，旧文字始终可见
                 .focused($focused)
-                // v4.1.0 E路：输入框长按进语音已摘除（PTT 麦克风键是唯一语音入口，一个功能一个入口）
-                .overlay {
-                    if text.isEmpty {
-                        // G线：PTT 期间不用"语音转换中…"占位（面板已接管状态，避免两套口径打架）
-                        if transcribingEffective {
-                            // v2.0.100：转写中动画（waveform 图标 + 文字脉冲）
-                            HStack(spacing: 6) {
-                                Image(systemName: "waveform")
-                                    .font(.system(size: Typography.subhead))
-                                    .symbolEffect(.pulse)
-                                Text("语音转换中…")
-                                    .font(.system(size: Typography.body))
-                            }
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .allowsHitTesting(false)
-                        } else {
-                            Text("点击输入或按住说话...")
-                                .font(.system(size: Typography.body))
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                }
         }
     }
 
@@ -596,12 +570,14 @@ struct ChatInputBar: View {
                     sendButton
                 }
             }
-            .background(
-                // v3.4.19：三态配色（语音=Siri 彩/空=淡灰/有字=蓝紫），渐变过渡动画
-                LinearGradient(colors: sendColors,
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: Capsule()
-            )
+            .background {
+                // 空态麦克风保持轻量线性图标；真正发送时才显示实色操作按钮。
+                if !showMicButton {
+                    LinearGradient(colors: sendColors,
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                        .clipShape(Capsule())
+                }
+            }
             .animation(Motion.snap, value: sendColors)
         }
     }
@@ -619,9 +595,9 @@ struct ChatInputBar: View {
     /// 长按录音的手势搬到语音模式的"按住说话"文字区（pttPressGesture）。
     private var micButton: some View {
         Button(action: onEnterVoiceMode) {
-            Image(systemName: "mic.fill")
-                .font(.system(size: Typography.body, weight: .medium))
-                .foregroundStyle(.white)
+            Image(systemName: "mic")
+                .font(.system(size: Typography.headline, weight: .regular))
+                .foregroundStyle(.secondary)
                 .frame(width: 32, height: 32)
                 .contentShape(Circle())
         }
@@ -720,18 +696,18 @@ extension ChatInputBar {
             .padding(.vertical, Spacing.xs)
     }
 
-    /// 输入框系统材质底、统一描边与轻阴影。
+    /// 输入框使用不透明系统表面、统一描边与轻阴影，与页面底色清楚分层。
     @MainActor
     private func applyInputBarGlassChrome<C: View>(to content: C) -> some View {
         content
-            // 收起态沿用系统常见的胶囊输入框；展开工具层时切换为圆角矩形。
-            // regularMaterial 提供真正的系统模糊，同时保持输入文字与正文之间的层级。
+            // 收起态使用系统胶囊输入框；键盘展开工具层后切换为圆角面板。
+            // 实心语义色保证正文不会透过输入栏干扰占位文字与输入内容。
             .background {
                 if toolLayerExpanded {
                     RoundedRectangle(cornerRadius: ChatInputBarLayout.containerCornerRadius, style: .continuous)
-                        .fill(.regularMaterial)
+                        .fill(Color(uiColor: .secondarySystemBackground))
                 } else {
-                    Capsule().fill(.regularMaterial)
+                    Capsule().fill(Color(uiColor: .secondarySystemBackground))
                 }
             }
             .overlay {
