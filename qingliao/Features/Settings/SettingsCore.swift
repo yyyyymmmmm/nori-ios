@@ -797,22 +797,50 @@ extension SettingsView {
     /// 使用说明二级页（K 线：从智能体组移到关于组，行内展开改为二级页）
     @ViewBuilder var agentHelpPage: some View {
         NavigationStack {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Agent 回复恒走 Hermes 智能体：查磁盘/内存、控制设备等自动调用工具")
-                        Text("▸ 直接问：查磁盘/内存/温度、控制设备、执行场景，自动调用工具回复")
-                        Text("▸ 记忆和行为规则由 Hermes 管理，可在对话中让 Hermes 记住或修改")
-                        Text("▸ 复杂任务（联网搜索/写脚本/操作文件）自动转交 Hermes 执行")
-                        Text("▸ 所有对话都交给 Hermes；模型、记忆、技能与工具以 Hermes 配置为准")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("让 Nori 与 Hermes 协作")
+                            .font(.system(size: 25, weight: .bold))
+                        Text("Nori 提供 iPhone 对话与设备入口，Hermes 负责智能体响应和已配置的工具。")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .font(.system(size: Typography.body))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, Spacing.sm)
+                    .padding(.horizontal, 4)
+
+                    GraySettingsGroup(title: "日常使用") {
+                        GraySettingsStaticRow(icon: "bubble.left", title: "直接描述需求", subtitle: "在对话中提问或说明想完成的任务")
+                        MuseRowDivider()
+                        GraySettingsStaticRow(icon: "paperclip", title: "使用文件", subtitle: "通过文件入口上传、查看服务端文件目录")
+                    }
+
+                    GraySettingsGroup(title: "Hermes 智能体") {
+                        GraySettingsStaticRow(icon: "cpu", title: "模型与消息渠道", subtitle: "由 Hermes 的服务商配置和已连接渠道提供")
+                        MuseRowDivider()
+                        GraySettingsStaticRow(icon: "puzzlepiece.extension", title: "技能与工具", subtitle: "可用能力取决于 Hermes 已安装的技能和工具服务")
+                        MuseRowDivider()
+                        GraySettingsStaticRow(icon: "memorychip", title: "记忆与任务", subtitle: "由 Hermes 当前配置和后端支持情况决定")
+                    }
+
+                    Text("遇到异常时，前往“关于我们 → 报告问题”查看连接状态或提交诊断信息。")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 22)
+                .padding(.bottom, 36)
             }
+            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("帮助与支持")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
         }
     }
 
